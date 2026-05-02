@@ -130,4 +130,8 @@ def get_references_metadata():
     """
     return [
         {"name": "Dr. Gideon P. Caplovitz", "title": "Professor, UNR (PhD Mentor)", "contact": "gcaplovitz@unr.edu"},
-        {"name": "Dr. Michael-Paul Schallmo
+        {"name": "Dr. Michael-Paul Schallmo", "title": "Professor, UMN (Post-doc Advisor)", "contact": "schal110@umn.edu"},
+        {"name": "Kelly Thorson", "title": "Principal, Lied STEM", "contact": "thorskt@nv.ccsd.net"},
+        {"name": "Dr. Marian Berryhill", "title": "Professor, UNR (PhD Co-Mentor)", "contact": "mberryhill@unr.edu"},
+        {"name": "Dr. Ryan Mruczek", "title": "Professor, College of the Holy Cross (Research Peer)", "contact": "rmruczek@holycross.edu"}
+    ]
