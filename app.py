@@ -201,3 +201,19 @@ elif page == "🔬 Researcher Profile":
             st.download_button("🔬 Download Academic CV", data=pdf_file.read(), file_name="Kyle_Killebrew_Academic_CV.pdf", mime="application/pdf")
     else:
          st.warning(f"Save your CV as '{ACADEMIC_CV_FILE}' in the folder to enable the download.")
+
+
+
+```python
+# ... (all previous imports and logic) ...
+
+# =====================================================================
+# ADD THIS AT THE VERY BOTTOM OF THE FILE
+# =====================================================================
+if __name__ == "__main__":
+    # This block allows the app to run on professional cloud hosts like Koyeb/Render
+    # which assign a dynamic Port via environment variables.
+    port = int(os.environ.get("PORT", 8501))
+    # Note: When running locally or on Streamlit Cloud, it uses 8501 by default.
+
+```
