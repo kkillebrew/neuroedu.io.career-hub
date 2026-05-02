@@ -1,0 +1,102 @@
+"""
+=============================================================================
+MODULE: pages/2_mentorship_app.py
+AUTHOR: Kyle W. Killebrew, PhD
+VERSION: 1.0 (Spoke App)
+DESCRIPTION: 
+    The Educational Mentorship & Tutoring sub-page for career-hub.neuro-edu.io.
+    Utilizes the 1-to-1 mentorship_loader.py.
+=============================================================================
+"""
+
+import streamlit as st
+import os
+import sys
+
+# Ensure the app can find the loaders folder from the pages sub-directory
+sys.path.append(os.getcwd())
+
+from loaders.mentorship_loader import get_mentorship_data
+
+# --- DATA LOAD ---
+mentorship = get_mentorship_data()
+
+# --- UI CONFIGURATION ---
+st.set_page_config(page_title="Mentorship | Kyle Killebrew", layout="wide")
+
+# --- SHARED AESTHETIC STYLING ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #fdfdfd; }
+    html, body, [class*="st-"] { font-size: 1.15rem; color: #1e293b; font-family: 'Inter', sans-serif; }
+    h1, h2, h3 { color: #0f172a !important; font-weight: 800 !important; }
+    
+    /* Highlight Box */
+    .method-box {
+        padding: 20px;
+        background-color: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 15px;
+    }
+    .method-title { font-weight: 700; color: #1e3a8a; }
+    
+    /* Pricing Card */
+    .rate-card {
+        background-color: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        border-top: 5px solid #2563eb;
+        text-align: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #f1f5f9;
+    }
+    .rate-price { font-size: 1.5rem; font-weight: 800; color: #2563eb; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- HEADER ---
+st.title("Mentorship & Educational Design")
+st.markdown("Bridging the gap between theory and practice through personalized, inquiry-based guidance.")
+
+st.divider()
+
+# --- TOP SECTION: Qualifications ---
+col1, col2 = st.columns([2, 1], gap="large")
+
+with col1:
+    st.header("Core Qualifications")
+    for qual in mentorship['qualifications']:
+        st.success(f"🎓 **{qual}**")
+
+with col2:
+    st.header("Financials")
+    for rate_type, price in mentorship['rates'].items():
+        st.markdown(f"""
+            <div class="rate-card">
+                <div style="font-size:0.9rem; color:#64748b; text-transform:uppercase;">{rate_type}</div>
+                <div class="rate-price">{price}</div>
+            </div>
+            <br>
+        """, unsafe_allow_html=True)
+
+st.divider()
+
+# --- BOTTOM SECTION: Methodology ---
+st.header("Teaching Methodology")
+st.write("My approach is designed specifically for researchers and industry professionals who need to master data tools without losing sight of scientific rigor.")
+
+m_cols = st.columns(3)
+for i, method in enumerate(mentorship['methodology']):
+    with m_cols[i]:
+        title, desc = method.split(":", 1)
+        st.markdown(f"""
+            <div class="method-box">
+                <div class="method-title">{title}</div>
+                <div style="font-size:0.95rem; color:#475569;">{desc.strip()}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+# --- CONTACT CTA ---
+st.divider()
+st.info("💡 **Ready to accelerate your learning?** Use the Contact tab on the main page to inquire about session availability.")
