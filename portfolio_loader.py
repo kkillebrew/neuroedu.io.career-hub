@@ -10,9 +10,6 @@ DESCRIPTION:
     If you are coming from MATLAB, think of this module as a dedicated data 
     function (e.g., `load_portfolio_data.m`) that outputs cleanly formatted 
     workspace variables (tables and structs) for your App Designer UI to consume.
-    
-    By centralizing data here, updates to your CV or Bio only need to be 
-    made in this file to reflect globally across the app.
 =============================================================================
 """
 
@@ -21,11 +18,7 @@ import pandas as pd
 def get_biographic_metadata():
     """
     Defines core biographic info and the master 'About Me' narrative.
-    
     MATLAB Equivalent: A scalar structure (e.g., bio.name = 'Kyle'; bio.title = '...')
-    
-    Returns:
-        dict: Containing 'name', 'title', 'bio', and 'interests'.
     """
     return {
         'name': 'Kyle W. Killebrew, PhD',
@@ -41,13 +34,9 @@ def get_biographic_metadata():
 def get_portfolio_metadata():
     """
     Defines the structured data for technical skills, philosophy, and academic publications.
-    
-    Returns:
-        tuple: (pubs_df, skills_dict, beliefs_dict, academic_ids_dict)
+    MATLAB Equivalent: A mix of Tables, Structs, and Cell Arrays.
     """
-    # 1. Publication Data 
-    # MATLAB Equivalent: A MATLAB `table` (e.g., table(Year, Title, Journal, Link))
-    # Stored as a Pandas DataFrame for easy UI iteration and native table rendering.
+    # 1. Publication Data (MATLAB Table equivalent)
     pubs = pd.DataFrame({
         'Year': [2024, 2018, 2017, 2015, 2020], 
         'Title': [
@@ -73,8 +62,7 @@ def get_portfolio_metadata():
         ]
     })
     
-    # 2. Skill Proficiency (Mapped to UI radar chart and progress bars)
-    # MATLAB Equivalent: A standard struct or a `containers.Map` for fast key-value lookups.
+    # 2. Skill Proficiency (For Radar Chart / Progress Bars)
     skills = {
         'Python (DS)': 95, 
         'MATLAB (App)': 95, 
@@ -84,8 +72,7 @@ def get_portfolio_metadata():
         'Mentorship': 98
     }
     
-    # 3. Philosophy & Principles
-    # MATLAB Equivalent: A struct containing strings and cell arrays of character vectors.
+    # 3. Philosophy
     beliefs = {
         'sop': 'To empower individuals and organizations through hands-on data science and inquiry-driven education.',
         'core_principles': [
@@ -96,9 +83,7 @@ def get_portfolio_metadata():
         ]
     }
 
-    # 4. Academic IDs
-    # MATLAB Equivalent: A struct with string fields.
-    # CRITICAL: These keys must match the .get() calls in app.py to avoid KeyErrors.
+    # 4. Academic IDs (Matches the .get() calls in app.py)
     academic_ids = {
         'orcid': '0000-0002-6112-9214',
         'google_scholar': 'https://scholar.google.com/citations?user=vPIdl8kAAAAJ&hl=en',
@@ -108,14 +93,6 @@ def get_portfolio_metadata():
     return pubs, skills, beliefs, academic_ids
 
 def get_teaching_metadata():
-    """
-    Defines tutoring qualifications and rates.
-    
-    MATLAB Equivalent: A nested struct containing character vectors and sub-structs.
-    
-    Returns:
-        dict: Service descriptions and financial metadata.
-    """
     return {
         'qualifications': [
             '15+ Years Educational Experience (MS to PhD Level)',
@@ -132,41 +109,33 @@ def get_teaching_metadata():
 def get_references_metadata():
     """
     Defines professional references for social proof.
-    
-    MATLAB Equivalent: A 1xN struct array (e.g., refs(1).name = '...', refs(2).name = '...').
-    
-    Returns:
-        list: List of dictionaries containing contact, title, and quote info.
+    MATLAB Equivalent: A 1xN struct array with multiple fields.
+    NOTE: Quotes removed for a cleaner, high-contrast professional look.
     """
     return [
         {
             "name": "Dr. Gideon P. Caplovitz", 
             "title": "Professor, UNR (PhD Mentor)", 
-            "quote": "Kyle possesses a rare blend of technical rigor and pedagogical intuition.",
             "contact": "gcaplovitz@unr.edu"
         },
         {
             "name": "Dr. Michael-Paul Schallmo", 
             "title": "Professor, UMN (Post-doc Advisor)", 
-            "quote": "A meticulous researcher capable of translating complex neural data into actionable models.",
             "contact": "schal110@umn.edu"
         },
         {
             "name": "Kelly Thorson", 
             "title": "Principal, Lied STEM", 
-            "quote": "His ability to engage students in inquiry-based STEM is unparalleled.",
             "contact": "thorskt@nv.ccsd.net"
         },
         {
             "name": "Dr. Marian Berryhill", 
             "title": "Professor, UNR (PhD Co-Mentor)", 
-            "quote": "Kyle’s commitment to scientific integrity and clear communication makes him an asset to any team.",
             "contact": "mberryhill@unr.edu"
         },
         {
             "name": "Dr. Ryan Mruczek", 
             "title": "Professor, College of the Holy Cross", 
-            "quote": "A talented researcher who brings a deep understanding of visual systems and modeling to every collaboration.",
             "contact": "rmruczek@holycross.edu"
         }
     ]
