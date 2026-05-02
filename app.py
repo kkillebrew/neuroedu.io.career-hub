@@ -1,219 +1,194 @@
 """
 =============================================================================
 MODULE: Career Hub Main Application Interface (app.py)
-AUTHOR: Kyle W. Killebrew
+AUTHOR: Kyle W. Killebrew, PhD
+VERSION: 2.0 (Production-Ready)
 DESCRIPTION: 
     This script serves as the frontend interface (the "View" layer) of the 
-    application. It functions similarly to MATLAB's App Designer, converting 
-    the backend data structures (from portfolio_loader.py) into an interactive 
-    web application using Streamlit.
+    application. It converts backend data structures (from portfolio_loader.py) 
+    into an interactive web application using Streamlit. 
+    
+    The architecture follows a Model-View pattern to ensure data management 
+    is isolated from UI design. Optimized for DigitalOcean deployment.
 =============================================================================
 """
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import sys
 import os
+import sys
+import requests
 
-# =====================================================================
-# 1. ENVIRONMENT SETUP & PATHING
-# =====================================================================
-# Ensure Colab's background process (and Streamlit Cloud) can always find sibling files
+# --- SYSTEM & ENVIRONMENT SETUP ---
+# Appending the current directory to sys.path ensures that the 'portfolio_loader' 
+# module can be imported regardless of the execution environment.
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Import the data models. This keeps our UI code perfectly separated from 
-# our data logic (Model-View architecture).
-from portfolio_loader import get_biographic_metadata, get_portfolio_metadata, get_teaching_metadata, get_references_metadata
+try:
+    from portfolio_loader import (
+        get_biographic_metadata, 
+        get_portfolio_metadata, 
+        get_teaching_metadata, 
+        get_references_metadata
+    )
+except ImportError as e:
+    st.error(f"Critical Error: Could not find 'portfolio_loader.py'. {e}")
+    st.stop()
 
-# Fetch all metadata into memory at startup so the app runs instantaneously.
+# --- DATA INITIALIZATION ---
+# We fetch all metadata at startup to minimize latency during page navigation.
 bio = get_biographic_metadata()
-pubs, skills, beliefs, academic = get_portfolio_metadata()
+pubs, skills, beliefs, _ = get_portfolio_metadata()
 teaching = get_teaching_metadata()
 references_data = get_references_metadata()
 
-
-# =====================================================================
-# 2. FILE DIRECTORY CONFIGURATION
-# =====================================================================
-# Single Source of Truth for file paths. If a filename changes in your repo, 
-# you only ever have to update it right here.
-HEADSHOT_FILE = "Documents/kyle.jpg"
-DS_RESUME_FILE = "Documents/KWK_Data_Science_Resume_20240520.pdf"
-AI_RESUME_FILE = "Documents/KWK_SME_AI_Resume_20260325.pdf"
-TEACHING_RESUME_FILE = "Documents/KWK_Teacher_Resume_20260305.pdf"
-ACADEMIC_CV_FILE = "Documents/KWK_Academic_CV_20240520.pdf"
-
-
-# =====================================================================
-# 3. GLOBAL APP CONFIGURATION & STYLING
-# =====================================================================
-# Must be the very first Streamlit command. Sets browser tab properties.
+# --- UI & BROWSER CONFIGURATION ---
 st.set_page_config(
-    page_title=f"{bio['name']} | Portfolio",
+    page_title=f"{bio['name']} | PhD Portfolio",
     page_icon="🔬",
-    layout="wide" # Uses the full width of the monitor rather than a narrow central column
+    layout="wide"
 )
 
-# Injecting Custom CSS: Streamlit allows raw HTML/CSS injection to override default styling.
+# --- CUSTOM CSS STYLING ---
+# We inject raw CSS to customize Streamlit's default components, providing
+# a more professional, branded appearance.
 st.markdown("""
     <style>
-    .ref-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 5px solid #007bff;
-        margin-bottom: 15px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+    /* Custom Styling for Main Action Buttons */
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 5px; 
+        background-color: #007bff; 
+        color: white; 
+        border: none;
+        font-weight: 500;
+        transition: background-color 0.3s ease;
     }
-    .ref-name { font-weight: bold; color: #007bff; margin-bottom: 0px; }
-    .ref-title { font-size: 0.9em; color: #6c757d; font-style: italic; }
+    .stButton>button:hover { 
+        background-color: #0056b3; 
+        border: none; 
+    }
+    /* Section Divider Styling */
+    hr { margin-top: 1rem; margin-bottom: 1rem; border-color: #eee; }
     </style>
     """, unsafe_allow_html=True)
 
-
-# =====================================================================
-# 4. SIDEBAR & NAVIGATION ROUTING
-# =====================================================================
-# The sidebar acts as persistent real estate that stays visible on every page.
-with st.sidebar:
-    st.markdown("### 🔗 Quick Links")
-    st.write("[Google Scholar](https://scholar.google.com/citations?user=y-2G-voAAAAJ&hl=en)")
-    st.write("[ORCID Profile](https://orcid.org/0000-0002-9662-9844)")
-    st.write("[GitHub](https://github.com/kkillebrew/)")
-    st.write("[LinkedIn](https://www.linkedin.com/in/kylewkillebrew/)")
-
-# Main Header Title
-st.title(f"🌐 {bio['name']}")
-st.caption(bio['title'])
-
-# Main Navigation Router: We use a horizontal radio button to act as a 
-# navigation bar. 'label_visibility="collapsed"' hides the title text for a cleaner UI.
+# --- NAVIGATION MENU ---
+# Using a horizontal radio button as a sleek navigation bar.
 page = st.radio(
-    "Select a Page:", 
-    ["🏠 Home & Bio", "📈 Data Science Portfolio", "🎓 Tutoring & Mentoring", "🔬 Researcher Profile"],
-    horizontal=True,
+    "Navigation Select", 
+    ["🏠 Home", "📈 Data Science", "🎓 Tutoring", "🔬 Research", "✉️ Contact"], 
+    horizontal=True, 
     label_visibility="collapsed"
 )
 st.divider()
 
-
 # =====================================================================
-# 5. PAGE RENDERERS (The 'Switch/Case' Router)
+# PAGE: 🏠 HOME
+# Purpose: Introductory profile, technical stack overview, and resumes.
 # =====================================================================
-
-if page == "🏠 Home & Bio":
+if page == "🏠 Home":
     col1, col2 = st.columns([1, 2], gap="large")
     
     with col1:
-        # Safely attempt to load the headshot image.
-        if os.path.exists(HEADSHOT_FILE):
-            st.image(HEADSHOT_FILE, caption=bio['name'], use_container_width=True)
+        # User Headshot logic
+        img_path = "Documents/kyle.jpg"
+        if os.path.exists(img_path): 
+            st.image(img_path, use_container_width=True, caption=bio['name'])
         else:
-            st.info(f"📸 **Profile Picture Placeholder**\n\n*(Save your image as '{HEADSHOT_FILE}' in the folder to see it here!)*")
-        
+            st.info("📸 **Profile Image**\n(Place 'kyle.jpg' in /Documents)")
+            
+        # Technical Skill Progress Bars
         st.markdown("### 🛠 Technical Stack")
-        st.code("Python (Pandas/Scikit-learn)\nMATLAB (App Designer)\nSQL & Cloud Data\nStatistical Modeling")
-
+        for s, v in skills.items():
+            st.write(f"**{s}**")
+            st.progress(v/100)
+            
     with col2:
         st.title(bio['name'])
         st.subheader(bio['title'])
         st.write(bio['bio'])
-        
-        # --- PDF DOCUMENT SERVERS ---
-        st.markdown("### 📄 Professional Resumes")
-        res_col1, res_col2 = st.columns(2)
-        
-        with res_col1:
-            if os.path.exists(DS_RESUME_FILE):
-                with open(DS_RESUME_FILE, "rb") as pdf_file:
-                    st.download_button("📊 Download Data Science Resume", data=pdf_file.read(), file_name="Kyle_Killebrew_Data_Science_Resume.pdf", mime="application/pdf")
-            else:
-                st.button(f"📊 Data Science Resume (Missing '{DS_RESUME_FILE}')")
-                
-        with res_col2:
-            if os.path.exists(AI_RESUME_FILE):
-                with open(AI_RESUME_FILE, "rb") as pdf_file:
-                    st.download_button("🤖 Download AI Resume", data=pdf_file.read(), file_name="Kyle_Killebrew_AI_Resume.pdf", mime="application/pdf")
-            else:
-                st.button(f"🤖 AI Resume (Missing '{AI_RESUME_FILE}')")
-        
         st.divider()
         
-        # --- REFERENCES (Discreet Note) ---
-        with st.expander("📌 Professional References"):
-            st.caption("Available for contact regarding my academic, research, and professional tenure:")
-            for ref in references_data:
-                st.markdown(f"- **{ref['name']}** | *{ref['title']}* | ✉️ `{ref['contact']}`")
+        # Resume Download Section
+        st.subheader("Professional Resumes")
+        c1, c2 = st.columns(2)
+        ds_path = "Documents/KWK_Data_Science_Resume_20240520.pdf"
+        if os.path.exists(ds_path):
+            with open(ds_path, "rb") as f: 
+                c1.download_button("📊 Data Science Resume", f.read(), "Killebrew_DS.pdf")
+        else:
+            c1.button("📊 Resume (File Not Found)", disabled=True)
 
-
-elif page == "📈 Data Science Portfolio":
-    st.title("Project Showcase & Philosophy")
+# =====================================================================
+# PAGE: 📈 DATA SCIENCE
+# Purpose: Portfolio showcase and technical mission statement.
+# =====================================================================
+elif page == "📈 Data Science":
+    st.title("Data Science & Modeling")
+    st.info(f"**Mission:** {beliefs['sop']}")
     
-    st.info(f"**Statement of Purpose:** {beliefs['sop']}")
+    st.subheader("Core Principles")
+    # Looping through principles defined in the loader
+    for p in beliefs['core_principles']: 
+        st.write(f"✅ {p}")
+
+# =====================================================================
+# PAGE: 🎓 TUTORING
+# Purpose: Educational qualifications and service rates.
+# =====================================================================
+elif page == "🎓 Tutoring":
+    st.title("Education & Mentorship")
+    for q in teaching['qualifications']: 
+        st.success(f"🎓 {q}")
     
-    st.markdown("### Core Principles")
-    for principle in beliefs['core_principles']:
-        st.write(f"✅ {principle}")
-        
-    st.divider()
-    st.subheader("Interactive Pipelines")
-    # This section will eventually hold the links to your converted interactive Plotly charts 
-    projects = ["Financial Forecasting", "Clustering Analysis", "Signal Processing", "Tutoring Metrics"]
-    for project in projects:
-        with st.expander(f"📂 View Project: {project}"):
-            st.write(f"Detailed analysis for {project}.")
-            st.button("Launch App", key=project)
+    st.markdown("### Rates & Inquiries")
+    st.info(f"**Current Rates:** {teaching['rates']['Hourly Rate']}")
+    st.caption("Custom project-based pricing available for modeling & data design.")
 
-
-elif page == "🎓 Tutoring & Mentoring":
-    st.title("Tutoring & Educational Services")
-    
-    st.write("### Qualifications")
-    for qual in teaching['qualifications']:
-        st.success(qual)
-        
-    st.markdown("### 📄 Teaching Materials")
-    if os.path.exists(TEACHING_RESUME_FILE):
-        with open(TEACHING_RESUME_FILE, "rb") as pdf_file:
-            st.download_button("🎓 Download Teaching Resume", data=pdf_file.read(), file_name="Kyle_Killebrew_Teaching_Resume.pdf", mime="application/pdf")
-    else:
-        st.warning(f"Save your teaching resume as '{TEACHING_RESUME_FILE}' in the folder to enable the download.")
-        
-    st.write("### Rates")
-    st.json(teaching['rates'])
-
-
-elif page == "🔬 Researcher Profile":
-    st.title("Research & Academic CV")
-    
-    # Iterating through the DataFrame to create a clean, hyperlinked list instead of a raw table
-    st.markdown("### 📚 Selected Publications")
+# =====================================================================
+# PAGE: 🔬 RESEARCH
+# Purpose: Academic publications and professional references.
+# =====================================================================
+elif page == "🔬 Research":
+    st.title("Publications & Tenure")
+    # Dynamically rendering publication list from DataFrame
     for _, row in pubs.iterrows():
-        st.markdown(f"**{row['Year']}** — **[{row['Title']}]({row['Link']})** \n*📖 {row['Journal']}*")
-        st.write("") # Add a little spacing between items
-    
+        st.markdown(f"**{row['Year']}** | **[{row['Title']}]({row['Link']})**")
+        st.caption(f"Journal: {row['Journal']}")
+        
     st.divider()
+    with st.expander("📌 Professional References"):
+        st.caption("Available for contact regarding academic and professional tenure:")
+        for ref in references_data:
+            st.markdown(f"**{ref['name']}** | {ref['title']} | `{ref['contact']}`")
+
+# =====================================================================
+# PAGE: ✉️ CONTACT
+# Purpose: Lead generation via direct email integration.
+# =====================================================================
+elif page == "✉️ Contact":
+    st.title("Inquiries")
+    st.write("Send a message directly to my inbox for consulting or research collaboration.")
     
-    st.markdown("### 📄 Academic Credentials")
-    if os.path.exists(ACADEMIC_CV_FILE):
-        with open(ACADEMIC_CV_FILE, "rb") as pdf_file:
-            st.download_button("🔬 Download Academic CV", data=pdf_file.read(), file_name="Kyle_Killebrew_Academic_CV.pdf", mime="application/pdf")
-    else:
-         st.warning(f"Save your CV as '{ACADEMIC_CV_FILE}' in the folder to enable the download.")
-
-
-
-```python
-# ... (all previous imports and logic) ...
-
-# =====================================================================
-# ADD THIS AT THE VERY BOTTOM OF THE FILE
-# =====================================================================
-if __name__ == "__main__":
-    # This block allows the app to run on professional cloud hosts like Koyeb/Render
-    # which assign a dynamic Port via environment variables.
-    port = int(os.environ.get("PORT", 8501))
-    # Note: When running locally or on Streamlit Cloud, it uses 8501 by default.
-
-```
+    with st.form("contact"):
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        msg = st.text_area("Message")
+        
+        if st.form_submit_button("Send"):
+            # Fetching the API Key from Streamlit Secrets (for DigitalOcean/Cloud)
+            key = st.secrets.get("WEB3FORMS_KEY", "")
+            
+            if key and name and email and msg:
+                # API Call to Web3Forms to bridge the email to your inbox
+                res = requests.post(
+                    "https://api.web3forms.com/submit", 
+                    json={"access_key": key, "name": name, "email": email, "message": msg}
+                )
+                if res.status_code == 200: 
+                    st.success("Message Sent! I will get back to you shortly.")
+                else: 
+                    st.error("Error sending message. Please email me at kylewkillebrew@1mail.com")
+            else: 
+                st.warning("Please fill out all fields and ensure the API key is configured.")
