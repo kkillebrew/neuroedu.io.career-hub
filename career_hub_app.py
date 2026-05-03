@@ -89,7 +89,7 @@ with st.sidebar:
 # We keep the landing page focused on Bio, CV, Skills, and Social Proof
 st.title("Professional Summary")
 
-col1, col2 = st.columns([1, 3], gap="large")
+col_img, col_text, col1, col2 = st.columns([1, 5], gap="large")
 
 with col_img:
     img_path = "documents/kyle.jpg"
@@ -99,8 +99,6 @@ with col_img:
 with col_text:
     st.title(bio['name'])
     st.subheader(bio['title'])
-
-st.divider()
 
 with col1:
     st.markdown("### Strategic Vision")
