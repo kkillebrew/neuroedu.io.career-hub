@@ -1,18 +1,22 @@
-# Use the official lightweight Python image.
+# Use a lightweight Python 3.11 image
 FROM python:3.11-slim
 
-# Set working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install dependencies
+# Copy the dependency list first to leverage Docker's caching
 COPY requirements.txt .
+
+# Install necessary libraries
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your app's code
+# Copy the rest of your application code
 COPY . .
 
-# Streamlit uses 8501 by default, but DigitalOcean prefers 8080
+# DigitalOcean requires the app to listen on port 8080
 EXPOSE 8080
 
-# Command to run the app
-CMD ["streamlit", "run", "app.py", "--server.port
+# Execute the main career_hub_app.py
+# --server.port 8080 is mandatory for the health checks to pass
+# --server.address 0.0.0.0 ensures the app is accessible outside the container
+CMD ["streamlit", "run", "career_hub_app.py", "--server.port", "8080", "--server.address", "0.0.0.0"]
