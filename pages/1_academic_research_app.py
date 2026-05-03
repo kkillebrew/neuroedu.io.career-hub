@@ -20,6 +20,12 @@ pubs_df = get_publications_data()
 expertise = get_research_expertise()
 assets = get_academic_assets()
 
+from career_hub_loader import (
+    get_portfolio_metadata
+)
+
+pubs, skills, academic = get_portfolio_metadata()
+
 st.title("Academic Career & Research")
 
 # --- SIDEBAR ---
