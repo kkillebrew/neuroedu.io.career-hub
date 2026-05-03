@@ -21,10 +21,12 @@ expertise = get_research_expertise()
 assets = get_academic_assets()
 
 from career_hub_loader import (
+    get_biographic_metadata
     get_portfolio_metadata
 )
 
-pubs, skills, academic = get_portfolio_metadata()
+bio = get_biographic_metadata()
+_, _, academic = get_portfolio_metadata()
 
 st.title("Academic Career & Research")
 

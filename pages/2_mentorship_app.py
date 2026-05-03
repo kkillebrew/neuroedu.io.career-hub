@@ -23,10 +23,13 @@ from loaders.mentorship_loader import get_mentorship_data
 mentorship = get_mentorship_data()
 
 from career_hub_loader import (
+    get_biographic_metadata
     get_portfolio_metadata
 )
 
-pubs, skills, academic = get_portfolio_metadata()
+pubs, skills, academic = get_portfolio_metadata()   
+bio = get_biographic_metadata()
+_, _, academic = get_portfolio_metadata()
 
 # --- UI CONFIGURATION ---
 st.set_page_config(page_title="Mentorship | Kyle Killebrew", layout="wide")

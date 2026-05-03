@@ -177,7 +177,7 @@ with t1:
     """, unsafe_allow_html=True)
     # This button uses the Streamlit MPA command to switch pages
     if st.button("View Research Spoke", key="goto_research"):
-        st.switch_page("pages/3_academic_research_app.py")
+        st.switch_page("pages/1_academic_research_app.py")
 
 with t2:
     st.write("For detailed analytical projects, including financial forecasting, signal processing pipelines, and machine learning models, please visit my dedicated Data Science Hub.")
