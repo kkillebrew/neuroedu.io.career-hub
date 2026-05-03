@@ -86,10 +86,8 @@ with st.sidebar:
     st.caption("PhD Portfolio System | 2026")
 
 # --- MAIN HUB LAYOUT ---
-# We keep the landing page focused on Bio, CV, Skills, and Social Proof
-st.title("Professional Summary")
-
-col_img, col_text, col1, col2 = st.columns([1, 5], gap="large")
+# 1. TOP ROW: Profile Image and Title
+col_img, col_text = st.columns([1, 4], gap="large")
 
 with col_img:
     img_path = "documents/kyle.jpg"
@@ -99,6 +97,11 @@ with col_img:
 with col_text:
     st.title(bio['name'])
     st.subheader(bio['title'])
+
+st.divider()
+
+# 2. BOTTOM ROW: Bio/CV and Radar Chart
+col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
     st.markdown("### Strategic Vision")
