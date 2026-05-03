@@ -74,7 +74,7 @@ st.markdown("""
 with st.sidebar:
     img_path = "documents/kyle.jpg"
     if os.path.exists(img_path):
-        st.image(img_path, width='stretch')
+        st.image(img_path, use_container_width=True)
     
     st.markdown(f"## {bio['name']}")
     st.markdown(f"**{bio['title']}**")
