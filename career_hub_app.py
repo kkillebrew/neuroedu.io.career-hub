@@ -109,7 +109,7 @@ with col1:
     
     st.divider()
     st.markdown("### Professional Documentation")
-    cv_path = "documents/kyle_killebrew_cv.pdf"
+    cv_path = "documents/KWK_Academic_CV_20240520.pdf"
     if os.path.exists(cv_path):
         with open(cv_path, "rb") as f:
             st.download_button("📂 Download Professional CV", f.read(), "Killebrew_CV.pdf")

@@ -71,8 +71,8 @@ def get_portfolio_metadata():
     
     # 3. Academic IDs
     academic_ids = {
-        'orcid': '0000-0002-6112-9214',
-        'google_scholar': 'https://scholar.google.com/citations?user=vPIdl8kAAAAJ&hl=en',
+        'orcid': '0000-0002-9662-9844',
+        'google_scholar': 'https://scholar.google.com/citations?user=y-2G-voAAAAJ&hl=en',
         'linkedin': 'https://www.linkedin.com/in/kylewkillebrew/'
     }
     
