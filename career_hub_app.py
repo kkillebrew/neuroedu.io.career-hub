@@ -90,9 +90,15 @@ with st.sidebar:
 col_img, col_text = st.columns([1, 4], gap="large")
 
 with col_img:
-    img_path = "documents/kyle.jpg"
+    # This forces Streamlit to look relative to exactly where career_hub_app.py lives
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    img_path = os.path.join(base_dir, "documents", "kyle.jpg")
+    
     if os.path.exists(img_path):
         st.image(img_path, width='stretch')
+    else:
+        # Now it will tell you exactly what path it is failing to find!
+        st.warning(f"Image not found. Looked in: {img_path}")
 
 with col_text:
     st.title(bio['name'])
@@ -112,7 +118,7 @@ with col1:
     cv_path = "documents/KWK_Academic_CV_20240520.pdf"
     if os.path.exists(cv_path):
         with open(cv_path, "rb") as f:
-            st.download_button("📂 Download Professional CV", f.read(), "Killebrew_CV.pdf")
+            st.download_button("📂 Download Professional CV", f.read(), "KWK_Academic_CV_20240520.pdf")
     else:
         st.button("📄 CV Not Found in /documents", disabled=True)
 
@@ -146,7 +152,7 @@ with t1:
     """, unsafe_allow_html=True)
     # This button uses the Streamlit MPA command to switch pages
     if st.button("View Research Spoke", key="goto_research"):
-        st.switch_page("pages/1_academic_research.py")
+        st.switch_page("pages/1_academic_research_app.py")
 
 with t2:
     st.write("For detailed analytical projects, including financial forecasting, signal processing pipelines, and machine learning models, please visit my dedicated Data Science Hub.")
