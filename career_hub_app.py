@@ -22,7 +22,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from career_hub_loader import (
     get_biographic_metadata, 
     get_portfolio_metadata, 
-    get_references_metadata
+    get_references_metadata,
 )
 
 # --- DATA HYDRATION ---
