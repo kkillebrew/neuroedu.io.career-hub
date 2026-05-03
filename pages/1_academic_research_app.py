@@ -1,4 +1,25 @@
 # Inside pages/1_academic_research.py
+import streamlit as st
+import sys
+import os
+import pandas as pd
+
+# --- PATH CONFIGURATION ---
+# This tells the script to look one folder up to find the 'loaders' directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# --- IMPORT DATA ---
+from loaders.academic_research_loader import (
+    get_publications_data, 
+    get_research_expertise, 
+    get_academic_assets
+)
+
+# Initialize the data from the loader
+pubs_df = get_publications_data()
+expertise = get_research_expertise()
+assets = get_academic_assets()
+
 st.title("Academic Career & Research")
 
 # --- SIDEBAR ---

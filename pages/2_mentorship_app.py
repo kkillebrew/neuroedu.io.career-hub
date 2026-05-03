@@ -8,17 +8,18 @@ DESCRIPTION:
     Utilizes the 1-to-1 mentorship_loader.py.
 =============================================================================
 """
-
 import streamlit as st
 import os
 import sys
 
-# Ensure the app can find the loaders folder from the pages sub-directory
+# --- PATH CONFIGURATION ---
+# This tells the script to look one folder up to find the 'loaders' directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# --- IMPORT DATA ---
 from loaders.mentorship_loader import get_mentorship_data
 
-# --- DATA LOAD ---
+# Initialize the data from the loader
 mentorship = get_mentorship_data()
 
 # --- UI CONFIGURATION ---
