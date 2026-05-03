@@ -14,7 +14,7 @@ import os
 import sys
 
 # Ensure the app can find the loaders folder from the pages sub-directory
-sys.path.append(os.getcwd())
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from loaders.publications_loader import get_publications_data, get_publication_metrics
 

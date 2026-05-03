@@ -72,10 +72,7 @@ st.markdown("""
 
 # --- SIDEBAR ---
 with st.sidebar:
-    img_path = "documents/kyle.jpg"
-    if os.path.exists(img_path):
-        st.image(img_path, use_container_width=True)
-    
+
     st.markdown(f"## {bio['name']}")
     st.markdown(f"**{bio['title']}**")
     
@@ -92,7 +89,18 @@ with st.sidebar:
 # We keep the landing page focused on Bio, CV, Skills, and Social Proof
 st.title("Professional Summary")
 
-col1, col2 = st.columns([1, 1], gap="large")
+col1, col2 = st.columns([1, 3], gap="large")
+
+with col_img:
+    img_path = "documents/kyle.jpg"
+    if os.path.exists(img_path):
+        st.image(img_path, width='stretch')
+
+with col_text:
+    st.title(bio['name'])
+    st.subheader(bio['title'])
+
+st.divider()
 
 with col1:
     st.markdown("### Strategic Vision")
@@ -121,9 +129,44 @@ with col2:
 st.divider()
 
 # GATEWAY TO THE SPOKE HUB
-st.header("🔬 Interactive Data Portfolio")
-st.write("For detailed analytical projects, including financial forecasting, signal processing pipelines, and machine learning models, please visit my dedicated Data Science Hub.")
-st.markdown('<a href="https://data-projects.neuro-edu.io" target="_blank" class="data-gate">Launch Data Science Projects Hub →</a>', unsafe_allow_html=True)
+st.header("Explore My Work")
+t1, t2, t3 = st.columns(3)
+
+# st.header("🔬 Interactive Data Portfolio")
+# st.write("For detailed analytical projects, including financial forecasting, signal processing pipelines, and machine learning models, please visit my dedicated Data Science Hub.")
+# st.markdown('<a href="https://data-projects.neuro-edu.io" target="_blank" class="data-gate">Launch Data Science Projects Hub →</a>', unsafe_allow_html=True)
+
+with t1:
+    st.markdown("""
+        <div class="ref-card">
+            <div class="ref-name">🔬 Academic Research</div>
+            <p style="font-size:0.9rem; color:#475569;">Peer-reviewed publications, neural variance modeling, and academic tenure.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    # This button uses the Streamlit MPA command to switch pages
+    if st.button("View Research Spoke", key="goto_research"):
+        st.switch_page("pages/1_academic_research.py")
+
+with t2:
+    st.write("For detailed analytical projects, including financial forecasting, signal processing pipelines, and machine learning models, please visit my dedicated Data Science Hub.")
+    st.markdown("""
+        <div class="ref-card">
+            <div class="ref-name">📊 Data Science Hub</div>
+            <p style="font-size:0.9rem; color:#475569;">Predictive analytics, machine learning, and interactive signal processing dashboards.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    # External link for the unique domain
+    st.markdown('<a href="https://data-projects.neuro-edu.io" target="_blank" class="data-gate" style="font-size:0.9rem; padding:10px;">Launch External Data Hub</a>', unsafe_allow_html=True)
+
+with t3:
+    st.markdown("""
+        <div class="ref-card">
+            <div class="ref-name">🎓 Mentorship</div>
+            <p style="font-size:0.9rem; color:#475569;">Educational design, personalized tutoring, and MATLAB-to-Python transition strategies.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("View Mentorship Spoke", key="goto_edu"):
+        st.switch_page("pages/2_mentorship_app.py")
 
 st.divider()
 

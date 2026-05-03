@@ -97,6 +97,31 @@ for i, method in enumerate(mentorship['methodology']):
             </div>
         """, unsafe_allow_html=True)
 
+# Mentorship section
+st.title("Education & Mentorship")
+
+tab1, tab2, tab3 = st.tabs(["🎓 Qualifications", "📝 Learner Profiles", "💡 Strategies"])
+
+with tab1:
+    st.header("Teaching Resume")
+    # Download button for Teaching-specific resume
+    t_cv = "documents/kyle_teaching_cv.pdf"
+    if os.path.exists(t_cv):
+         with open(t_cv, "rb") as f:
+            st.download_button("📂 Download Teaching Resume", f.read(), "Killebrew_Teaching.pdf")
+    
+    st.markdown("[Visit my Wyzant Profile](https://www.wyzant.com/tutors/your_link_here)")
+
+with tab2:
+    st.header("Inquiry-Based Learner Profiles")
+    st.write("I utilize standardized learner profile documents to track progress in:")
+    st.markdown("- Programming Logic\n- Mathematical Intuition\n- Research Reproducibility")
+
+with tab3:
+    st.header("Educational Strategies")
+    st.write("Specialized methodologies for MATLAB-to-Python transitions...")
+    # Add your learning strategies here
+
 # --- CONTACT CTA ---
 st.divider()
 st.info("💡 **Ready to accelerate your learning?** Use the Contact tab on the main page to inquire about session availability.")
