@@ -137,6 +137,13 @@ def render_sidebar():
         # We use st.page_link for internal pages to maintain Single-Page App speeds.
         # Setting icon=None removes the default Streamlit emojis.
         # Career Hub spokes #
+        # Replacing st.page_link with explicit HTML links to ensure they always render
+        st.markdown("""
+            <a href="/" target="_self" class="sidebar-link">Career Hub (Home)</a>
+            <a href="pages/1_academic_profile.py" target="_self" class="sidebar-link">Academic Research Profile</a>
+            <a href="pages/2_tutoring_mentorship.py" target="_self" class="sidebar-link">Tutoring and Career Mentorship</a>
+        """, unsafe_allow_html=True)
+
         try:
             st.page_link("career_hub_app.py", label="Career Hub (Home)", icon=None)
             st.page_link("pages/1_academic_profile.py", label="Academic Research Profile", icon=None)
