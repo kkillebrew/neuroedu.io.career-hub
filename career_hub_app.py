@@ -37,78 +37,11 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- AESTHETIC STYLING (High-Contrast Professional) ---
-st.markdown("""
-    <style>
-    .stApp { background-color: #fdfdfd; }
-    html, body, [class*="st-"] { font-size: 1.15rem; color: #1e293b; font-family: 'Inter', sans-serif; }
-    h1, h2, h3 { color: #0f172a !important; font-weight: 800 !important; }
-
-    /* Sidebar: Deep Navy contrast */
-    section[data-testid="stSidebar"] { background-color: #0f172a; color: #f8fafc; border-right: 1px solid #334155; }
-    section[data-testid="stSidebar"] .stText, section[data-testid="stSidebar"] p, 
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 { color: #f8fafc !important; }
-
-    /* Reference Cards - Modern minimalist */
-    .ref-card {
-        background-color: #ffffff; padding: 24px; border-radius: 12px;
-        border-left: 5px solid #2563eb; margin-bottom: 20px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #f1f5f9;
-    }
-    .ref-name { font-weight: 800; color: #1e3a8a; font-size: 1.2rem; }
-    .ref-title { font-size: 0.95rem; color: #64748b; font-style: italic; display: block; margin-bottom: 8px; }
-    .ref-contact { font-size: 0.9rem; color: #2563eb; font-family: monospace; }
-
-    /* Data Projects Gateway Button */
-    .data-gate {
-        background-color: #2563eb; color: white !important; padding: 18px;
-        border-radius: 10px; text-align: center; font-weight: bold; 
-        text-decoration: none; display: block; font-size: 1.2rem;
-        transition: background-color 0.3s ease;
-    }
-    .data-gate:hover { background-color: #1d4ed8; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- SIDEBAR ---
-with st.sidebar:
-
-    # --- 1. HIDE DEFAULT NAVIGATION ---
-    # This CSS turns off Streamlit's ugly auto-generated file list
-    st.markdown("""
-        <style>
-            [data-testid="stSidebarNav"] {display: none !important;}
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- 2. CUSTOM DIRECTORY MENU ---
-    st.divider()
-    st.subheader("🧭 Directory")
-    
-    # Internal Pages (Make sure these filenames perfectly match your GitHub!)
-    st.page_link("career_hub_app.py", label="Hub", icon="🏠")
-    st.page_link("pages/1_academic_research_app.py", label="Academic Research Profile", icon="🔬")
-    st.page_link("pages/2_mentorship_app.py", label="Academic Mentorship", icon="🎓")
-    
-    # External Data Hub Link (Styled to match your deep navy sidebar text)
-    st.markdown("""
-        <div style="padding: 0.35rem 0;">
-            <a href="https://data-projects.neuro-edu.io" target="_blank" style="text-decoration: none; color: #f8fafc; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                📊 <span>Data Science Projects ↗</span>
-            </a>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.divider()
-
-    # --- 3. MY SOCIALS ---
-    st.subheader("🌐 Presence")
-    st.markdown(f"🔬 [ORCID Profile](https://orcid.org/{academic.get('orcid', '')})")
-    st.markdown(f"📈 [Google Scholar]({academic.get('google_scholar', '#')})")
-    st.markdown(f"💼 [LinkedIn Profile]({academic.get('linkedin', '#')})")
-    
-    st.divider()
-    st.caption("PhD Portfolio System | 2026")
+########################################
+#  RENDER THE SIDEBAR FOR CAREER-HUB   #
+########################################
+from career_hub_sidebar import render_sidebar
+    render_sidebar()
 
 # --- MAIN HUB LAYOUT ---
 # 1. TOP ROW: Profile Image and Title
