@@ -138,7 +138,7 @@ def render_sidebar():
         with col1:
         # Dynamically locate the image to prevent pathing errors
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            logo_path = os.path.join(base_dir, "documents", "Neuro-Edu_Logo.png")
+            logo_path = os.path.join(base_dir, "documents", "Neuro-Edu_Logo_Transparent.png")
             
             if os.path.exists(logo_path):
                 st.image(logo_path, use_container_width=True)
