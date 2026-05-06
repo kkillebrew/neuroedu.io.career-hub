@@ -15,29 +15,32 @@ from loaders.academic_research_loader import (
     get_academic_assets
 )
 
-# Initialize the data from the loader
-pubs_df = get_publications_data()
-expertise = get_research_expertise()
-assets = get_academic_assets()
-
 from career_hub_loader import (
     get_biographic_metadata,
     get_portfolio_metadata
 )
 
-bio = get_biographic_metadata()
-_, _, academic = get_portfolio_metadata()
+from career_hub_sidebar import apply_global_settings, render_sidebar
 
-st.title("Academic Career & Research")
+########################################
+#        APPLY GLOBAL SETTINGS         #
+########################################
+apply_global_settings("Kyle W. Killebrew, PhD | Academic Research")
 
 ########################################
 #  RENDER THE SIDEBAR FOR CAREER-HUB   #
 ########################################
-# Point Python to the root directory so it can find the sidebar file
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from career_hub_sidebar import render_sidebar
 render_sidebar()
 
+bio = get_biographic_metadata()
+_, _, academic = get_portfolio_metadata()
+
+# Initialize the data from the loader
+pubs_df = get_publications_data()
+expertise = get_research_expertise()
+assets = get_academic_assets()
+
+st.title("Academic Career & Research")
 c1, c2 = st.columns([2, 1])
 
 with c1:

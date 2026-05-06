@@ -19,27 +19,29 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # --- IMPORT DATA ---
 from loaders.mentorship_loader import get_mentorship_data
 
-# Initialize the data from the loader
-mentorship = get_mentorship_data()
-
 from career_hub_loader import (
     get_biographic_metadata,
     get_portfolio_metadata
 )
 
-bio = get_biographic_metadata()
-_, _, academic = get_portfolio_metadata()
+from career_hub_sidebar import apply_global_settings, render_sidebar
 
-# --- UI CONFIGURATION ---
-st.set_page_config(page_title="Mentorship | Kyle Killebrew", layout="wide")
+########################################
+#        APPLY GLOBAL SETTINGS         #
+########################################
+apply_global_settings("Kyle W. Killebrew, PhD | Tutoring and Career Mentorship")
 
 ########################################
 #  RENDER THE SIDEBAR FOR CAREER-HUB   #
 ########################################
 # Point Python to the root directory so it can find the sidebar file
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from career_hub_sidebar import render_sidebar
 render_sidebar()
+
+# Initialize the data from the loader
+bio = get_biographic_metadata()
+_, _, academic = get_portfolio_metadata()
+
+mentorship = get_mentorship_data()
 
 # --- HEADER ---
 st.title("Mentorship & Educational Design")

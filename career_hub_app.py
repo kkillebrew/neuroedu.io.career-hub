@@ -16,8 +16,9 @@ import os
 import sys
 import requests
 
-# Ensure local imports work correctly
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# --- PATH CONFIGURATION ---
+# This tells the script to look one folder up to find the 'loaders' directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from career_hub_loader import (
     get_biographic_metadata, 
@@ -25,24 +26,22 @@ from career_hub_loader import (
     get_references_metadata,
 )
 
-# --- DATA HYDRATION ---
-bio = get_biographic_metadata()
-pubs, skills, academic = get_portfolio_metadata()
-references = get_references_metadata()
+from career_hub_sidebar import apply_global_settings, render_sidebar
 
-# --- UI CONFIGURATION ---
-st.set_page_config(
-    page_title=f"{bio['name']} | PhD Portfolio",
-    page_icon="🔬",
-    layout="wide",
-    initial_sidebar_state="expanded" # Add this line!
-)
+########################################
+#        APPLY GLOBAL SETTINGS         #
+########################################
+apply_global_settings("Kyle W. Killebrew, PhD | Career Hub")
 
 ########################################
 #  RENDER THE SIDEBAR FOR CAREER-HUB   #
 ########################################
-from career_hub_sidebar import render_sidebar
 render_sidebar()
+
+# --- DATA HYDRATION ---
+bio = get_biographic_metadata()
+pubs, skills, academic = get_portfolio_metadata()
+references = get_references_metadata()
 
 # --- MAIN HUB LAYOUT ---
 # 1. TOP ROW: Profile Image and Title
