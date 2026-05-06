@@ -140,7 +140,7 @@ def render_sidebar():
         # Using native st.page_link for Streamlit's internal router
         st.page_link("career_hub_app.py", label="Career Hub (Home)", icon=None)
         st.page_link("pages/1_academic_research_app.py", label="Academic Research Profile", icon=None)
-        st.page_link("pages/2_mentorship_ap.py", label="Tutoring and Career Mentorship", icon=None)
+        st.page_link("pages/2_mentorship_app.py", label="Tutoring and Career Mentorship", icon=None)
 
         # We keep the raw HTML ONLY for the external jump to the Data Hub!
         data_hub_url = "https://data-projects.neuro-edu.io"
