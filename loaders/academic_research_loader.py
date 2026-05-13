@@ -18,10 +18,9 @@ import numpy as np
 import plotly.express as px
 from scipy import stats # <--- NEW STATS ENGINE
 import re # Import Python's Regular Expression library
-
-    import requests
-    from io import BytesIO, StringIO
-    import streamlit as st
+import requests
+from io import BytesIO, StringIO
+import streamlit as st
 
 # --- PLOTLY CONFIGURATION ---
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
