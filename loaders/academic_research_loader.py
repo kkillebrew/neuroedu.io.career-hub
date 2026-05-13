@@ -165,10 +165,17 @@ def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     # ==========================================
     # NEW: QUALITY CONTROL FILTERING
     # ==========================================
-    # If the user toggled QC on, and the new column exists in the parquet file
-    if apply_qc and 'illusoryCutoff' in df.columns:
-        # Drop anyone who scored a 0 (failed the 4s / 7-switch threshold)
-        df = df[df['illusoryCutoff'] == 1].copy()
+    if apply_qc:
+        if 'QC_Pass' in df.columns:
+            start_len = len(df)
+            # Drop anyone who scored a 0 on the master QC mask
+            df = df[df['QC_Pass'] == 1].copy()
+            end_len = len(df)
+            if start_len != end_len:
+                # This will put a green success banner at the top of your app so you KNOW it worked!
+                st.success(f"🧪 QC Applied: Removed {start_len - end_len} excluded runs.")
+        else:
+            st.error("⚠️ 'QC_Pass' column not found in Parquet file. Ensure Colab script ran successfully.")
 
     if 'Bistable' in df.columns:
         df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
