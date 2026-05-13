@@ -136,8 +136,8 @@ def get_sfm_data(grouping_mode, metric_mode):
     """
     
     # PASTE YOUR RAW GITHUB URLS HERE:
-    PARQUET_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/sfm_dashboard_data.parquet"
-    DEMOG_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/SYON-3TDemographics-DATA-2023-05-11-1249.csv"
+    PARQUET_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/refs/heads/main/sfm_dashboard_data.parquet"
+    DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/refs/heads/main/SYON-3TDemographics-DATA-2023-05-11-1249.csv"
     
     # Securely pull the token from DigitalOcean's environment variables (or local secrets)
     try:
