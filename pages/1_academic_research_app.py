@@ -15,14 +15,13 @@ import os
 # --- PATH CONFIGURATION ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# --- IMPORT DATA LOADERS ---
 from loaders.academic_research_loader import (
     get_publications_data, 
     get_research_expertise, 
     get_academic_assets,
     get_project_narratives,
-    get_sfm_switch_rate_data,
-    plot_sfm_group_comparisons,
+    get_sfm_data,               # <--- NEW NAME
+    plot_sfm_dashboard,         # <--- NEW NAME
     PLOTLY_CONFIG
 )
 
