@@ -19,6 +19,10 @@ import plotly.express as px
 from scipy import stats # <--- NEW STATS ENGINE
 import re # Import Python's Regular Expression library
 
+    import requests
+    from io import BytesIO, StringIO
+    import streamlit as st
+
 # --- PLOTLY CONFIGURATION ---
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
 
@@ -131,15 +135,10 @@ def get_sfm_data(grouping_mode, metric_mode):
     Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
     from Private GitHub using secure tokens, merges, and applies de-identification.
     """
-    import os
-    import pandas as pd
-    import requests
-    from io import BytesIO, StringIO
-    import streamlit as st
-
+    
     # PASTE YOUR RAW GITHUB URLS HERE:
-    PARQUET_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/sfm_dashboard_data.parquet"
-    DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv"
+    PARQUET_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/sfm_dashboard_data.parquet"
+    DEMOG_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/SYON-3TDemographics-DATA-2023-05-11-1249.csv"
     
     # Securely pull the token from DigitalOcean's environment variables (or local secrets)
     try:
