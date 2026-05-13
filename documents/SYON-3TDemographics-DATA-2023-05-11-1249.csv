@@ -1,0 +1,118 @@
+record_id,redcap_event_name,redcap_repeat_instrument,redcap_repeat_instance,demo_date,gender,race,age,years_education,wais_estiq,snellen_numerator_v2,snellen_denom_v2,snellen_eye_dominance_v2,syon_prelim_dx,syon_consensus_dx,initial_dx_group,mri_3t_date_completed
+9999,clinical_arm_1,,,,,,,,,,,,,,,
+999999,clinical_arm_1,,,,,,,,,,,,,,,
+S1006397,clinical_arm_1,,,2021-11-11,1,4,40,19,95,,,,,,5,2022-01-22
+S1006397,mri_arm_1,,1,,,,,,,,,,,,,
+S1006912,clinical_arm_1,,,2020-01-27,1,4,60,16,114,,,,"alcohol dependence, in full remission",,5,
+S1007161,clinical_arm_1,,,2019-12-19,1,4,60,16,111,,,,,,5,
+S1010098,clinical_arm_1,,,2021-04-08,2,4,55,16,120,,,,,,5,2021-05-03
+S1010098,mri_arm_1,,1,,,,,,,,,,,,,
+S1010299,clinical_arm_1,,,2020-02-04,1,4,39,16,133,,,,Control,,5,2020-03-02
+S1010299,mri_arm_1,,1,,,,,,,,,,,,,
+S1010309,clinical_arm_1,,,2022-02-16,2,7,40,12,117,,,,,,5,2022-03-29
+S1010309,mri_arm_1,,1,,,,,,,,,,,,,
+S1010859,clinical_arm_1,,,2022-06-30,2,4,51,16,95,,,,,,5,2022-07-26
+S1010859,mri_arm_1,,1,,,,,,,20,15,1,,,,
+S1011129,clinical_arm_1,,,2020-02-24,1,4,58,14,98,,,,,,,2021-03-02
+S1011129,mri_arm_1,,1,,,,,,,,,,,,,
+S1011139,clinical_arm_1,,,2022-05-16,2,4,47,16,120,,,,,,5,2022-06-29
+S1011139,mri_arm_1,,1,,,,,,,20,15,,,,,
+S1011399,clinical_arm_1,,,2022-03-09,2,4,44,18,122,,,,,,5,2022-04-04
+S1011399,mri_arm_1,,1,,,,,,,,,,,,,
+S1012371,clinical_arm_1,,,2022-04-13,2,3,31,16,111,,,,,,5,2022-05-10
+S1012371,mri_arm_1,,1,,,,,,,,,,,,,
+S1012381,clinical_arm_1,,,2022-05-02,1,4,34,16,117,,,,,,5,2022-05-26
+S1012381,mri_arm_1,,1,,,,,,,20,20,,,,,
+S1012391,clinical_arm_1,,,2022-07-09,1,4,33,16,131,,,,None,,5,
+S1012401,clinical_arm_1,,,2022-05-04,1,1,35,16,109,,,,"past MDE, alcohol and substance dependence in full remission",,5,2022-07-18
+S1012401,mri_arm_1,,1,,,,,,,20,20,1,,,,
+S1012411,clinical_arm_1,,,2022-05-09,1,4,40,16,117,,,,"alcohol abuse, full remission",,5,2022-07-14
+S1012411,mri_arm_1,,1,,,,,,,20,20,2,,,,
+S1012421,clinical_arm_1,,,2022-05-23,2,4,33,15,122,,,,,,5,2022-06-21
+S1012421,mri_arm_1,,1,,,,,,,20,30,1,,,,
+S1012432,clinical_arm_1,,,2022-06-04,2,4,23,16,133,,,,"Generalized anxiety disorder",,5,2022-07-13
+S1012432,mri_arm_1,,1,,,,,,,20,15,,,,,
+S1012451,clinical_arm_1,,,2022-03-14,1,4,36,18,125,,,,,,5,2022-04-11
+S1012451,mri_arm_1,,1,,,,,,,,,,,,,
+S1012517,clinical_arm_1,,,2023-04-18,1,1,32,16,103,,,,,,5,
+S1015018,clinical_arm_1,,,2021-04-16,1,4,35,18,103,,,,,,5,2021-06-11
+S1015018,mri_arm_1,,1,,,,,,,,,,,,,
+S1015022,clinical_arm_1,,,2022-04-09,1,5,26,16,117,,,,,,5,2022-06-16
+S1015022,mri_arm_1,,1,,,,,,,20,30,,,,,
+S1015022,mri_arm_1,,2,,,,,,,20,25,2,,,,
+S1015038,clinical_arm_1,,,2020-02-27,1,2,40,18,117,,,,Control,,5,2020-03-13
+S1015038,mri_arm_1,,1,,,,,,,,,,,,,
+S1015073,clinical_arm_1,,,2020-02-07,2,4,22,16,117,,,,Control,,5,2021-03-09
+S1015073,mri_arm_1,,1,,,,,,,,,,,,,
+S1015151,clinical_arm_1,,,2021-11-05,1,4,52,18,125,,,,"past alcohol dependence, sustained full remission",,5,2021-12-03
+S1015151,mri_arm_1,,1,,,,,,,,,,,,,
+S3101501,clinical_arm_1,,,2022-10-28,2,4,55,16,95,,,,,,12,2022-11-04
+S3101501,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S3104113,clinical_arm_1,,,2022-11-19,2,2,33,14,84,,,,,,6,
+S3110475,clinical_arm_1,,,,2,0,22,,,,,,,,,
+S3111899,clinical_arm_1,,,2023-03-17,2,4,42,18,120,,,,,,8,
+S3112322,clinical_arm_1,,,2022-08-19,2,2,23,12,84,,,,none,,6,
+S3211899,clinical_arm_1,,,2022-11-14,2,4,33,16,103,,,,,,8,2023-01-13
+S3211899,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S4111666,clinical_arm_1,,,2023-04-03,1,4,42,20,120,,,,,,8,
+S4112468,clinical_arm_1,,,2023-03-27,1,4,32,18,106,,,,,,8,
+S6001403,clinical_arm_1,,,2021-10-20,1,3,47,13,89,,,,"schizophrenia ",,1,2021-12-01
+S6001403,mri_arm_1,,1,,,,,,,,,,,,,
+S6001501,clinical_arm_1,,,2022-08-05,1,4,45,14,92,,,,"schizoaffective depressed type",,11,
+S6002165,clinical_arm_1,,,2022-08-12,1,4,56,14,89,,,,Schizophrenia,,1,2022-09-23
+S6002165,mri_arm_1,,1,,,,,,,20,20,1,,,,
+S6002663,clinical_arm_1,,,2022-09-06,1,4,58,16,120,,,,Schizophrenia,,1,2023-01-07
+S6002663,mri_arm_1,,1,,,,,,,20,25,2,,,,
+S6003691,clinical_arm_1,,,2022-10-05,1,4,59,16,103,,,,Schizophrenia,,1,2022-11-12
+S6003691,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S6004002,clinical_arm_1,,,2022-12-20,2,4,41,18,98,,,,"Bipolar I Disorder w/ psychosis",,3,
+S6004113,clinical_arm_1,,,2022-09-16,2,2,33,12,78,,,,Schizophrenia,,1,
+S6004231,clinical_arm_1,,,2022-02-26,1,2,51,13,106,,,,"schizophrenia, specific phobia, alcohol dependence (past, in full remission)",,1,2022-03-23
+S6004231,mri_arm_1,,1,,,,,,,,,,,,,
+S6004687,clinical_arm_1,,,2023-04-29,2,4,55,16,114,,,,schizophrenia,,1,
+S6010363,clinical_arm_1,,,2022-02-15,2,4,52,16,106,,,,"schizophrenia, past manic episode, past MDE, alcohol abuse and dependence (past, sustained full remission), cannabis dependence past sustained full remission",,1,2022-03-24
+S6010363,mri_arm_1,,1,,,,,,,,,,,,,
+S6010387,clinical_arm_1,,,2022-12-10,1,4,42,12,87,,,,Schizophrenia,,1,
+S6010475,clinical_arm_1,,,2022-11-11,2,0,29,15,114,,,,"Bipolar I Disorder w/ psychosis",,3,2023-03-03
+S6010475,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S6010566,clinical_arm_1,,,2022-10-20,1,4,33,10,87,,,,Schizophrenia,,1,2023-01-05
+S6010566,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S6010671,clinical_arm_1,,,2023-03-28,1,7,57,14,95,,,,"Schizophrenia ",,1,
+S6010836,clinical_arm_1,,,2023-02-08,1,7,45,9,95,,,,Schizophrenia,,1,2023-03-21
+S6010836,mri_arm_1,,1,,,,,,,20,25,2,,,,
+S6010877,clinical_arm_1,,,2023-01-20,2,4,57,18,109,,,,"Schizoaffective Bipolar",,1,2023-03-31
+S6010877,mri_arm_1,,1,,,,,,,20,30,1,,,,
+S6010962,clinical_arm_1,,,2022-03-29,1,4,38,16,103,,,,"Bipolar 1",,3,
+S6011159,clinical_arm_1,,,2023-01-24,2,4,29,16,114,,,,"Schizoaffective Bipolar",,2,2023-03-28
+S6011159,mri_arm_1,,1,,,,,,,20,25,2,,,,
+S6011427,clinical_arm_1,,,2022-11-21,2,4,39,18,100,,,,"Bipolar I Disorder w/ psychosis",,3,
+S6011437,clinical_arm_1,,,2022-11-10,2,2,22,15,89,,,,"Bipolar with psychotic features ",,3,2023-04-25
+S6011437,mri_arm_1,,1,,,,,,,20,15,1,,,,
+S6011467,clinical_arm_1,,,2022-10-26,2,4,35,18,120,,,,"Bipolar 1 with psychosis ",,2,
+S6011571,clinical_arm_1,,,2023-01-31,1,3,35,13,106,,,,,,2,2023-03-14
+S6011571,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S6011596,clinical_arm_1,,,,,,,,,,,,,,11,
+S6011666,clinical_arm_1,,,2022-11-08,1,4,39,16,103,,,,"Bipolar I Disorder w/ psychosis",,3,2023-02-08
+S6011666,mri_arm_1,,1,,,,,,,20,25,2,,,,
+S6011694,clinical_arm_1,,,2021-08-21,2,4,53,14,100,,,,"schizoaffective disorder, bipolar type or schizophrenia ",,1,2021-10-26
+S6011694,mri_arm_1,,1,,,,,,,,,,,,,
+S6011899,clinical_arm_1,,,2022-10-01,2,4,43,14,92,,,,"Bipolar I Disorder w/ psychosis",,3,2023-03-25
+S6011899,mri_arm_1,,1,,,,,,,20,30,2,,,,
+S6011899,mri_arm_1,,2,,,,,,,20,30,2,,,,
+S6012127,clinical_arm_1,,,2022-07-20,1,4,53,12,,,,,"schizoaffective depressed type",,11,
+S6012322,clinical_arm_1,,,2022-06-28,2,2,30,12,70,,,,schizophrenia,,1,2022-07-19
+S6012322,mri_arm_1,,1,,,,,,,20,25,2,,,,
+S6012441,clinical_arm_1,,,2022-09-22,1,2,56,13,84,,,,"Schizoaffective ",,11,2022-11-09
+S6012441,mri_arm_1,,1,,,,,,,20,30,1,,,,
+S6012468,clinical_arm_1,,,2022-11-02,2,4,38,16,114,,,,"Bipolar Disorder ",,3,2023-01-30
+S6012468,mri_arm_1,,1,,,,,,,20,30,1,,,,
+S6012475,clinical_arm_1,,,2022-12-16,1,4,56,14,98,,,,"Bipolar I with psychosis ",,3,2023-01-11
+S6012475,mri_arm_1,,1,,,,,,,20,25,2,,,,
+S6012481,clinical_arm_1,,,2023-03-22,2,4,52,15,109,,,,Schizophrenia,,1,
+S6012501,clinical_arm_1,,,2023-04-06,1,2,60,11,67,,,,"Bipolar I Disorder",,3,
+S6015107,clinical_arm_1,,,2023-03-04,1,4,37,16,111,,,,Schizophrenia,,1,2023-04-15
+S6015107,mri_arm_1,,1,,,,,,,20,20,2,,,,
+S6015284,clinical_arm_1,,,2022-09-27,2,4,34,21,117,,,,"Bipolar I Disorder",,3,2023-03-29
+S6015284,mri_arm_1,,1,,,,,,,20,10,2,,,,
+S6015293,clinical_arm_1,,,2023-03-13,1,4,22,15,106,,,,"Schizoaffective disorder, bipolar type",,2,
+S6015421,clinical_arm_1,,,2023-01-26,1,4,34,14,78,,,,"Schizoaffective Bipolar",,2,
