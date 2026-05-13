@@ -16,6 +16,7 @@ import os
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import re # Import Python's Regular Expression library
 
 def get_publications_data():
     """
