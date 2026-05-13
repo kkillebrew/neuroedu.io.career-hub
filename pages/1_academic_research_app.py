@@ -95,7 +95,6 @@ with tabs[0]:
     st.subheader("Data Exploration: Switch Rates & Percept Durations")
     
     # --- UI CONTROLLERS ---
-    # We use columns to place the two dropdowns side-by-side
     ui_c1, ui_c2 = st.columns(2)
     
     with ui_c1:
@@ -108,6 +107,12 @@ with tabs[0]:
                 "Standard + Total Combined (Includes Sample Average)"
             ]
         )
+        # NEW: The Quality Control Toggle
+        apply_qc_filter = st.checkbox(
+            "Apply Quality Control Exclusions (Drop participants failing control task)", 
+            value=True, # Default to True (exclusions applied)
+            help="Filters out participants who failed to detect at least 7 real switches within 4 seconds."
+        )
         
     with ui_c2:
         selected_metric = st.selectbox(
@@ -116,8 +121,9 @@ with tabs[0]:
         )
     
     # --- DATA HYDRATION ---
+    # NEW: Pass the checkbox state into the loader!
     # Pass BOTH UI states directly into the loader engine
-    df_sfm = get_sfm_data(grouping_mode=selected_grouping, metric_mode=selected_metric)
+    df_sfm = get_sfm_data(grouping_mode=selected_grouping, metric_mode=selected_metric, apply_qc=apply_qc_filter)
     
     if df_sfm.empty:
         st.warning("⚠️ Data files not found. Please ensure `sfm_dashboard_data.parquet` and `SYON-3TDemographics...csv` are in the documents folder.")
