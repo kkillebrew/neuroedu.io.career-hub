@@ -126,18 +126,31 @@ def get_category_colors():
         'Unknown': '#cbd5e1'
     }
 
-def get_sfm_data(grouping_mode, metric_mode):
+
+    def get_sfm_data(grouping_mode, metric_mode):
     """
-    Loads data, derives duration, merges demographics, and dynamically splits groups.
+    Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
+    from Private GitHub using secure tokens.
     """
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    behav_path = os.path.join(base_dir, "documents", "sfm_dashboard_data.parquet")
-    # PASTE YOUR RAW GITHUB URL HERE:
+    # PASTE YOUR RAW GITHUB URLS HERE:
+    PARQUET_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/sfm_dashboard_data.parquet" # <--- UPDATE THIS
     DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv"
     
-    if not os.path.exists(behav_path): return pd.DataFrame() 
+    # Securely pull the token from DigitalOcean's environment variables
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {"Authorization": f"token {token}"} if token else {}
     
-    df = pd.read_parquet(behav_path)
+    # --- 1. FETCH BEHAVIORAL DATA (.parquet) ---
+    try:
+        p_res = requests.get(PARQUET_RAW_URL, headers=headers)
+        if p_res.status_code == 200:
+            # BytesIO handles the binary format of a parquet file
+            df = pd.read_parquet(BytesIO(p_res.content))
+        else:
+            return pd.DataFrame() # Fail gracefully if file isn't found
+    except Exception as e:
+        return pd.DataFrame()
+
     if 'Bistable' in df.columns:
         df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
         
@@ -146,36 +159,20 @@ def get_sfm_data(grouping_mode, metric_mode):
     df['Real_Switch_Dur'] = 1 / df['Real_Switch_Hz']
     df['Merge_ID'] = df['Subject'].astype(str).str.replace(r'\D', '', regex=True)
 
-    # --- FETCH DEMOGRAPHICS FROM PRIVATE GITHUB ---
+    # --- 2. FETCH DEMOGRAPHICS (.csv) ---
     dx_col = None
     try:
-        # Look for DigitalOcean's Environment Variable first. If it's not there, fall back to local secrets.toml.
-        token = os.environ.get("GITHUB_TOKEN", st.secrets.get("GITHUB_TOKEN"))
-        headers = {"Authorization": f"token {token}"}
-        
-        # Ping GitHub for the CSV
-        response = requests.get(DEMOG_RAW_URL, headers=headers)
-        
-        if response.status_code == 200:
-            # StringIO converts the raw text response into a format Pandas can read
-            df_demog = pd.read_csv(StringIO(response.text))
-            
+        c_res = requests.get(DEMOG_RAW_URL, headers=headers)
+        if c_res.status_code == 200:
+            df_demog = pd.read_csv(StringIO(c_res.text))
             id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
             df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
             dx_col = next((c for c in df_demog.columns if 'dx' in c.lower() or 'diagnos' in c.lower() and 'id' not in c.lower()), None)
             
-            # Merge the tables in memory
             df = pd.merge(df, df_demog, on='Merge_ID', how='left')
-        else:
-            print(f"⚠️ GitHub Fetch Failed. Status Code: {response.status_code}")
-    except FileNotFoundError:
-        print("⚠️ secrets.toml not found! Make sure you created the .streamlit folder.")
-    except KeyError:
-        print("⚠️ GITHUB_TOKEN not found in secrets.toml!")
     except Exception as e:
-        print(f"⚠️ An error occurred fetching the CSV: {e}")
-
-    # --- DYNAMIC GROUPING LOGIC ---
+        pass # If demog fails, we still have the behavioral data to show
+    
 
     # --- DYNAMIC GROUPING LOGIC ---
     def assign_group(row):
