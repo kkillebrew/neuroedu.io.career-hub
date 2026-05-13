@@ -230,12 +230,12 @@ def plot_sfm_group_comparisons(df):
     
     # 4. Apply strict MATLAB Axes Formatting
     # MATLAB Equivalent: set(gca,'YScale','log','ylim',[0.007 0.5],'ytick',...)
-    import numpy as np
     fig.update_yaxes(
         type="log",
-        # Plotly quirk: log axis ranges require the exponent (log10) of the target limits
-        range=[np.log10(0.007), np.log10(0.5)], 
-        tickvals=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
+        # Extended the upper range to 1.5 Hz to comfortably fit the 1.1 Hz data points
+        range=[np.log10(0.005), np.log10(1.5)], 
+        # Added 1.0 and 1.5 to the tick marks so the axis labels render correctly
+        tickvals=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 1.5],
         showgrid=True, gridwidth=1, gridcolor='#e2e8f0',
         title_text="Switch Rate (Hz)"
     )
