@@ -128,50 +128,50 @@ def get_category_colors():
 
 
     def get_sfm_data(grouping_mode, metric_mode):
-    """
-    Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
-    from Private GitHub using secure tokens.
-    """
-    # PASTE YOUR RAW GITHUB URLS HERE:
-    PARQUET_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/sfm_dashboard_data.parquet" # <--- UPDATE THIS
-    DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv"
-    
-    # Securely pull the token from DigitalOcean's environment variables
-    token = os.environ.get("GITHUB_TOKEN")
-    headers = {"Authorization": f"token {token}"} if token else {}
-    
-    # --- 1. FETCH BEHAVIORAL DATA (.parquet) ---
-    try:
-        p_res = requests.get(PARQUET_RAW_URL, headers=headers)
-        if p_res.status_code == 200:
-            # BytesIO handles the binary format of a parquet file
-            df = pd.read_parquet(BytesIO(p_res.content))
-        else:
-            return pd.DataFrame() # Fail gracefully if file isn't found
-    except Exception as e:
-        return pd.DataFrame()
-
-    if 'Bistable' in df.columns:
-        df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
+        """
+        Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
+        from Private GitHub using secure tokens.
+        """
+        # PASTE YOUR RAW GITHUB URLS HERE:
+        PARQUET_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/sfm_dashboard_data.parquet" # <--- UPDATE THIS
+        DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv"
         
-    df = df[df['Bistable_Hz'] > 0].copy()
-    df['Bistable_Dur'] = 1 / df['Bistable_Hz']
-    df['Real_Switch_Dur'] = 1 / df['Real_Switch_Hz']
-    df['Merge_ID'] = df['Subject'].astype(str).str.replace(r'\D', '', regex=True)
+        # Securely pull the token from DigitalOcean's environment variables
+        token = os.environ.get("GITHUB_TOKEN")
+        headers = {"Authorization": f"token {token}"} if token else {}
+        
+        # --- 1. FETCH BEHAVIORAL DATA (.parquet) ---
+        try:
+            p_res = requests.get(PARQUET_RAW_URL, headers=headers)
+            if p_res.status_code == 200:
+                # BytesIO handles the binary format of a parquet file
+                df = pd.read_parquet(BytesIO(p_res.content))
+            else:
+                return pd.DataFrame() # Fail gracefully if file isn't found
+        except Exception as e:
+            return pd.DataFrame()
 
-    # --- 2. FETCH DEMOGRAPHICS (.csv) ---
-    dx_col = None
-    try:
-        c_res = requests.get(DEMOG_RAW_URL, headers=headers)
-        if c_res.status_code == 200:
-            df_demog = pd.read_csv(StringIO(c_res.text))
-            id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
-            df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
-            dx_col = next((c for c in df_demog.columns if 'dx' in c.lower() or 'diagnos' in c.lower() and 'id' not in c.lower()), None)
+        if 'Bistable' in df.columns:
+            df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
             
-            df = pd.merge(df, df_demog, on='Merge_ID', how='left')
-    except Exception as e:
-        pass # If demog fails, we still have the behavioral data to show
+        df = df[df['Bistable_Hz'] > 0].copy()
+        df['Bistable_Dur'] = 1 / df['Bistable_Hz']
+        df['Real_Switch_Dur'] = 1 / df['Real_Switch_Hz']
+        df['Merge_ID'] = df['Subject'].astype(str).str.replace(r'\D', '', regex=True)
+
+        # --- 2. FETCH DEMOGRAPHICS (.csv) ---
+        dx_col = None
+        try:
+            c_res = requests.get(DEMOG_RAW_URL, headers=headers)
+            if c_res.status_code == 200:
+                df_demog = pd.read_csv(StringIO(c_res.text))
+                id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
+                df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
+                dx_col = next((c for c in df_demog.columns if 'dx' in c.lower() or 'diagnos' in c.lower() and 'id' not in c.lower()), None)
+                
+                df = pd.merge(df, df_demog, on='Merge_ID', how='left')
+        except Exception as e:
+            pass # If demog fails, we still have the behavioral data to show
     
 
     # --- DYNAMIC GROUPING LOGIC ---
