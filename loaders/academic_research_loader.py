@@ -187,33 +187,85 @@ def get_sfm_switch_rate_data(grouping_mode="Standard"):
     return df_merged
 
 def plot_sfm_group_comparisons(df):
+    """
+    Generates a faceted Plotly box plot with underlying swarm points.
+    MATLAB Equivalent: subplot(1,2,iTask) loop inside summarize_SFM_results.m
+    """
     if df.empty: return None
         
     colors = get_category_colors()
     
-    # Dynamically determine order based on what's in the dataframe
+    # 1. Dynamically determine X-axis order based on the user's dropdown choice
     order = []
     if 'Controls' in df['Group'].values: order.append('Controls')
     if 'Healthy (Con + Rel)' in df['Group'].values: order.append('Healthy (Con + Rel)')
     if 'Relatives' in df['Group'].values: order.append('Relatives')
     if 'Probands (PwPP)' in df['Group'].values: order.append('Probands (PwPP)')
     
+    # 2. Reshape (Melt) the Data
+    # MATLAB Equivalent: stack(Table, {'Real_Switch_Hz', 'Bistable_Hz'})
+    # This transforms the data so we can automatically generate subplots (facets)
+    df_plot = df.melt(
+        id_vars=['Subject', 'Group'], 
+        value_vars=['Real_Switch_Hz', 'Bistable_Hz'],
+        var_name='Task', 
+        value_name='Hz'
+    )
+    
+    # Clean up the task names for the plot titles
+    df_plot['Task'] = df_plot['Task'].replace({
+        'Real_Switch_Hz': 'Control Task', 
+        'Bistable_Hz': 'Bistable Task'
+    })
+    
+    # 3. Build the Faceted Plot (The subplot equivalent)
     fig = px.box(
-        df, x="Group", y="Bistable_Hz", color="Group",
-        color_discrete_map=colors, points="all", 
-        title="Bistable Task Switch Rates",
-        labels={"Bistable_Hz": "Switch Rate (Hz)"},
-        category_orders={"Group": order} # Apply dynamic order
+        df_plot, x="Group", y="Hz", color="Group",
+        facet_col="Task", # This creates the 1x2 Subplot!
+        points="all", 
+        color_discrete_map=colors,
+        category_orders={"Group": order, "Task": ["Control Task", "Bistable Task"]}
     )
     
+    # 4. Apply strict MATLAB Axes Formatting
+    # MATLAB Equivalent: set(gca,'YScale','log','ylim',[0.007 0.5],'ytick',...)
+    import numpy as np
+    fig.update_yaxes(
+        type="log",
+        # Plotly quirk: log axis ranges require the exponent (log10) of the target limits
+        range=[np.log10(0.007), np.log10(0.5)], 
+        tickvals=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
+        showgrid=True, gridwidth=1, gridcolor='#e2e8f0',
+        title_text="Switch Rate (Hz)"
+    )
+    
+    # 5. Add the Control Task Baseline Dotted Line
+    # MATLAB Equivalent: if iTask == 1; plot([0 4],[0.09 0.09],'--k');
+    # row=1, col=1 ensures this only draws on the Control Task subplot
+    fig.add_hline(
+        y=0.09, line_dash="dash", line_color="black", line_width=2,
+        row=1, col=1, 
+        annotation_text="Expected Rate (0.09 Hz)", 
+        annotation_position="bottom right",
+        annotation_font=dict(color="black", size=11)
+    )
+    
+    # 6. Global Layout Clean-up
     fig.update_layout(
-        xaxis_title=None,
-        yaxis=dict(range=[0, df['Bistable_Hz'].max() * 1.2]),
-        showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)'
+        showlegend=False, 
+        plot_bgcolor='rgba(0,0,0,0)', 
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=14),
+        title="SFM Task Performance Across Clinical Populations"
     )
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#e2e8f0')
-    fig.update_traces(boxmean=True) 
     
-    return fig
+    # Remove the default "Task=" text that Plotly puts above subplots
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    
+    # Remove redundant X-axis labels
+    fig.update_xaxes(title_text="")
+    
+    # Add mean lines to the boxes (MATLAB equivalent: plotting mean overlays)
+    fig.update_traces(boxmean=True) 
     
     return fig
