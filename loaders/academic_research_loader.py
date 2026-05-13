@@ -19,6 +19,9 @@ import plotly.express as px
 from scipy import stats # <--- NEW STATS ENGINE
 import re # Import Python's Regular Expression library
 
+# --- PLOTLY CONFIGURATION ---
+PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
+
 def get_publications_data():
     """
     Returns a structured DataFrame of all peer-reviewed academic publications.
