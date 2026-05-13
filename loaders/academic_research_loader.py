@@ -129,7 +129,7 @@ def get_category_colors():
         'Unknown': '#cbd5e1'
     }
 
-def get_sfm_data(grouping_mode, metric_mode):
+def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     """
     Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
     from Private GitHub using secure tokens, merges, and applies de-identification.
@@ -161,6 +161,14 @@ def get_sfm_data(grouping_mode, metric_mode):
     except Exception as e:
         print(f"⚠️ Parquet Fetch Error: {e}")
         return pd.DataFrame()
+
+    # ==========================================
+    # NEW: QUALITY CONTROL FILTERING
+    # ==========================================
+    # If the user toggled QC on, and the new column exists in the parquet file
+    if apply_qc and 'illusoryCutoff' in df.columns:
+        # Drop anyone who scored a 0 (failed the 4s / 7-switch threshold)
+        df = df[df['illusoryCutoff'] == 1].copy()
 
     if 'Bistable' in df.columns:
         df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
