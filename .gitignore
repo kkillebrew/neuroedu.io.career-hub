@@ -1,0 +1,21 @@
+# ==========================================
+# 1. CREDENTIALS & SECRETS (CRITICAL)
+# ==========================================
+# Prevents your GitHub Token from uploading to the internet!
+.streamlit/
+
+# ==========================================
+# 2. RAW DATA & PIPELINE OUTPUTS
+# ==========================================
+# Prevents sensitive clinical data or cached dashboards from uploading
+documents/*.csv
+documents/*.parquet
+documents/*.pickle
+
+# ==========================================
+# 3. PYTHON & OS CACHE FILES
+# ==========================================
+# Standard cleanup to prevent junk files from cluttering your repository
+__pycache__/
+*.pyc
+.DS_Store
