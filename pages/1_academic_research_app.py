@@ -95,8 +95,18 @@ with tabs[0]:
     # --- LIVE DATA DASHBOARD ---
     st.subheader("Data Exploration: Switch Rates Across Populations")
     
-    # Fetch Data
-    df_sfm = get_sfm_switch_rate_data()
+    # 1. THE DROPDOWN TOGGLE (The UI Controller)
+    selected_model = st.selectbox(
+        "Select Clinical Grouping Model:",
+        [
+            "Standard (Controls vs. Relatives vs. Probands)",
+            "Liability Model (Healthy [Con+Rel] vs. Probands)",
+            "Direct Comparison (Controls vs. Probands)"
+        ]
+    )
+    
+    # 2. Fetch Data (Passing the selected model to the loader!)
+    df_sfm = get_sfm_switch_rate_data(grouping_mode=selected_model)
     
     if df_sfm.empty:
         st.warning("⚠️ Data files not found. Please ensure `sfm_dashboard_data.parquet` and `SYON-3TDemographics...csv` are in the documents folder.")
@@ -115,10 +125,10 @@ with tabs[0]:
             Interestingly, biological relatives exhibit an intermediate phenotype, suggesting that the perceptual switch rate ($Hz$) may serve as a viable **endophenotype** for genetic liability to schizophrenia.
             """)
             
-            with st.expander("View Raw Subject Data"):
-                # Display a clean subset of the merged dataframe
-                display_cols = ['Subject', 'Group', 'Bistable_Hz']
-                st.dataframe(df_sfm[[c for c in display_cols if c in df_sfm.columns]].sample(min(10, len(df_sfm))), hide_index=True)
+            with st.expander("View Full Raw Subject Data"):
+                display_cols = ['Subject', 'Group', 'Bistable_Hz', 'Real_Switch_Hz']
+                available_cols = [c for c in display_cols if c in df_sfm.columns]
+                st.dataframe(df_sfm[available_cols], use_container_width=True, hide_index=True)
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---
 for i in range(1, 5):

@@ -111,119 +111,109 @@ PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': Fal
 
 def get_category_colors():
     """
-    Standardized color palette matching your MATLAB options.col_list
-    Controls = Green, Relatives = Blue, PwPP (SZ/SCA) = Red
+    Standardized color palette. Expanded to handle dynamic grouping toggles.
     """
     return {
-        'Controls': '#10b981', 
-        'Relatives': '#3b82f6', 
-        'PwPP': '#ef4444',
+        'Controls': '#10b981',             # Green
+        'Relatives': '#3b82f6',            # Blue
+        'Probands (PwPP)': '#ef4444',      # Red
+        'Healthy (Con + Rel)': '#0ea5e9',  # Cyan/Teal
         'Unknown': '#94a3b8'
     }
 
-def get_sfm_switch_rate_data():
+# Notice we added 'grouping_mode' as an input variable!
+def get_sfm_switch_rate_data(grouping_mode="Standard"):
     """
-    Loads behavioral .parquet data, merges with clinical .csv demographics, 
-    and assigns groups based on dx_list logic.
-    MATLAB Equivalent: innerjoin(SFMdata, demogDataHolder, 'Keys', 'SubjectID')
+    Loads behavioral data and dynamically assigns groups based on user UI selection.
+    MATLAB Equivalent: Changing options.subj_group_def and re-running the script.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     behav_path = os.path.join(base_dir, "documents", "sfm_dashboard_data.parquet")
     demog_path = os.path.join(base_dir, "documents", "SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv")
     
-    # 1. Load Behavioral Data
     if not os.path.exists(behav_path):
-        return pd.DataFrame() # Return empty if missing
+        return pd.DataFrame() 
     
     df_behav = pd.read_parquet(behav_path)
     if 'Bistable' in df_behav.columns:
         df_behav = df_behav.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
         
-    # Clean up 0 Hz (non-responders)
     df_behav = df_behav[df_behav['Bistable_Hz'] > 0]
-    
-    # Standardize Subject ID (Strip 'S' or 'P' prefixes to ensure clean merge)
-    df_behav['Merge_ID'] = df_behav['Subject'].astype(str).str.replace(r'^[a-zA-Z]+', '', regex=True)
+    df_behav['Merge_ID'] = df_behav['Subject'].astype(str).str.replace(r'\D', '', regex=True)
 
-    # 2. Load and Merge Demographics
     if os.path.exists(demog_path):
         df_demog = pd.read_csv(demog_path)
-        
-        # Assuming your RedCap CSV uses 'Record_ID' or similar. 
-        # We find the ID column dynamically.
-        id_col = [col for col in df_demog.columns if 'id' in col.lower() or 'record' in col.lower()][0]
-        
-        # Standardize Demographic ID
-        df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'^[a-zA-Z]+', '', regex=True)
-        
-        # Join the tables!
-        df_merged = pd.merge(df_behav, df_demog, on='Merge_ID', how='left')
-        
-        # 3. Apply Grouping Logic (Mimicking run_subj_group_def_SYON.m)
-        # We will look for a diagnosis column. If we can't find it dynamically, 
-        # we will provide a safe fallback for the UI.
-        dx_col_candidates = [col for col in df_demog.columns if 'dx' in col.lower() or 'diagnosis' in col.lower() or 'group' in col.lower()]
-        
-        def assign_group(row):
-            # This is a safe fallback mapping. 
-            # In production, replace 'dx_column' with your exact CSV column name.
-            if len(dx_col_candidates) > 0:
-                dx_val = str(row[dx_col_candidates[0]]).lower()
-                if 'control' in dx_val or dx_val == '0':
-                    return 'Controls'
-                elif 'rel' in dx_val:
-                    return 'Relatives'
-                elif 'schiz' in dx_val or dx_val in ['2', '3']:
-                    return 'PwPP'
+        if 'record_id' in df_demog.columns:
+            id_col = 'record_id'
+        else:
+            id_col = [col for col in df_demog.columns if 'id' in col.lower() or 'record' in col.lower()][0]
             
-            # If logic fails, randomly assign for demonstration purposes 
-            # (Remove this fallback once your exact column names are locked in)
-            np.random.seed(int(row['Merge_ID']) % 1000)
-            return np.random.choice(['Controls', 'Relatives', 'PwPP'], p=[0.4, 0.3, 0.3])
-
-        df_merged['Group'] = df_merged.apply(assign_group, axis=1)
-        return df_merged
-        
+        df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
+        df_merged = pd.merge(df_behav, df_demog, on='Merge_ID', how='left')
     else:
-        # Fallback if Demographics CSV is missing
-        df_behav['Group'] = 'Unknown'
-        return df_behav
+        df_merged = df_behav.copy()
+
+    # --- THE DYNAMIC GROUPING LOGIC ---
+    def assign_group_by_number(row):
+        try:
+            subj_num = int(row['Merge_ID'])
+            
+            # Mode 1: Standard (options.subj_group_def == 1)
+            if "Standard" in grouping_mode:
+                if subj_num < 2000000: return 'Controls'
+                elif 2000000 <= subj_num < 6000000: return 'Relatives'
+                elif subj_num >= 6000000: return 'Probands (PwPP)'
+            
+            # Mode 2: Liability Model (Healthy vs. Probands)
+            elif "Liability" in grouping_mode:
+                if subj_num < 6000000: return 'Healthy (Con + Rel)'
+                elif subj_num >= 6000000: return 'Probands (PwPP)'
+                
+            # Mode 3: Direct Comparison (Drops Relatives)
+            elif "Direct" in grouping_mode:
+                if subj_num < 2000000: return 'Controls'
+                elif 2000000 <= subj_num < 6000000: return 'EXCLUDE' # Tag for removal
+                elif subj_num >= 6000000: return 'Probands (PwPP)'
+                
+            return 'Unknown'
+        except ValueError:
+            return 'Parse Error'
+
+    df_merged['Group'] = df_merged.apply(assign_group_by_number, axis=1)
+    
+    # Drop anyone tagged for exclusion in Mode 3
+    df_merged = df_merged[df_merged['Group'] != 'EXCLUDE']
+    
+    return df_merged
 
 def plot_sfm_group_comparisons(df):
-    """
-    Generates a Plotly box plot with underlying swarm points.
-    MATLAB Equivalent: summarize_SFM_results.m -> plotSpread()
-    """
-    if df.empty:
-        return None
+    if df.empty: return None
         
     colors = get_category_colors()
     
-    # px.box with points="all" perfectly recreates the MATLAB plotSpread effect
+    # Dynamically determine order based on what's in the dataframe
+    order = []
+    if 'Controls' in df['Group'].values: order.append('Controls')
+    if 'Healthy (Con + Rel)' in df['Group'].values: order.append('Healthy (Con + Rel)')
+    if 'Relatives' in df['Group'].values: order.append('Relatives')
+    if 'Probands (PwPP)' in df['Group'].values: order.append('Probands (PwPP)')
+    
     fig = px.box(
-        df, 
-        x="Group", 
-        y="Bistable_Hz", 
-        color="Group",
-        color_discrete_map=colors,
-        points="all", 
-        title="Bistable Task Switch Rates Across Clinical Populations",
+        df, x="Group", y="Bistable_Hz", color="Group",
+        color_discrete_map=colors, points="all", 
+        title="Bistable Task Switch Rates",
         labels={"Bistable_Hz": "Switch Rate (Hz)"},
-        category_orders={"Group": ["Controls", "Relatives", "PwPP"]} # Enforce X-axis order
+        category_orders={"Group": order} # Apply dynamic order
     )
     
     fig.update_layout(
         xaxis_title=None,
-        yaxis=dict(range=[0, df['Bistable_Hz'].max() * 1.2]), # Auto-scale Y axis
-        showlegend=False,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(size=14)
+        yaxis=dict(range=[0, df['Bistable_Hz'].max() * 1.2]),
+        showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)'
     )
-    
     fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#e2e8f0')
-    
-    # Add the mean line (like the dashed lines in your MATLAB plots)
     fig.update_traces(boxmean=True) 
+    
+    return fig
     
     return fig
