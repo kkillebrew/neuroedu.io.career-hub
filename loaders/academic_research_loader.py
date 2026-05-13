@@ -256,8 +256,9 @@ def plot_sfm_dashboard(df, metric_mode):
     if "Switch Rate" in metric_mode:
         target_cols = ['Real_Switch_Hz', 'Bistable_Hz']
         y_title = "Switch Rate (Hz)"
-        y_range = [np.log10(0.007), np.log10(0.5)] # MATLAB: [0.007 0.5]
-        y_ticks = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5]
+        # Re-expanding the limits to 1.5 Hz to capture fast-switching outliers
+        y_range = [np.log10(0.005), np.log10(1.5)] 
+        y_ticks = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 1.5]
         baseline_val = 0.09
     else:
         target_cols = ['Real_Switch_Dur', 'Bistable_Dur']
