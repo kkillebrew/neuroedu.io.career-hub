@@ -16,6 +16,7 @@ import os
 import pandas as pd
 import numpy as np
 import plotly.express as px
+from scipy import stats # <--- NEW STATS ENGINE
 import re # Import Python's Regular Expression library
 
 def get_publications_data():
@@ -108,165 +109,191 @@ def get_project_narratives():
 #---   Load in the SFM Behavioral Data   ---#
 #############################################
 # --- PLOTLY CONFIGURATION ---
-PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
-
 def get_category_colors():
-    """
-    Standardized color palette. Expanded to handle dynamic grouping toggles.
-    """
+    """Expanded palette for new psychosis subgroups."""
     return {
         'Controls': '#10b981',             # Green
         'Relatives': '#3b82f6',            # Blue
-        'Probands (PwPP)': '#ef4444',      # Red
-        'Healthy (Con + Rel)': '#0ea5e9',  # Cyan/Teal
-        'Unknown': '#94a3b8'
+        'PwPP (All)': '#ef4444',           # Red
+        'SZ (Schizophrenia)': '#dc2626',   # Dark Red
+        'SCA (Schizoaffective)': '#f97316',# Orange
+        'BIP (Bipolar)': '#8b5cf6',        # Purple
+        'BIP_COM (Bipolar + Other)': '#d946ef', # Pink
+        'Total Sample': '#64748b',         # Slate Gray
+        'Unknown': '#cbd5e1'
     }
 
-# Notice we added 'grouping_mode' as an input variable!
-def get_sfm_switch_rate_data(grouping_mode="Standard"):
+def get_sfm_data(grouping_mode, metric_mode):
     """
-    Loads behavioral data and dynamically assigns groups based on user UI selection.
-    MATLAB Equivalent: Changing options.subj_group_def and re-running the script.
+    Loads data, derives duration, merges demographics, and dynamically splits groups.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     behav_path = os.path.join(base_dir, "documents", "sfm_dashboard_data.parquet")
     demog_path = os.path.join(base_dir, "documents", "SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv")
     
-    if not os.path.exists(behav_path):
-        return pd.DataFrame() 
+    if not os.path.exists(behav_path): return pd.DataFrame() 
     
-    df_behav = pd.read_parquet(behav_path)
-    if 'Bistable' in df_behav.columns:
-        df_behav = df_behav.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
+    df = pd.read_parquet(behav_path)
+    if 'Bistable' in df.columns:
+        df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
         
-    df_behav = df_behav[df_behav['Bistable_Hz'] > 0]
-    df_behav['Merge_ID'] = df_behav['Subject'].astype(str).str.replace(r'\D', '', regex=True)
+    df = df[df['Bistable_Hz'] > 0].copy()
+    
+    # Derive Average Percept Duration (sec) mathematically: 1 / Hz
+    df['Bistable_Dur'] = 1 / df['Bistable_Hz']
+    df['Real_Switch_Dur'] = 1 / df['Real_Switch_Hz']
+    
+    df['Merge_ID'] = df['Subject'].astype(str).str.replace(r'\D', '', regex=True)
 
+    # Merge Demographics
+    dx_col = None
     if os.path.exists(demog_path):
         df_demog = pd.read_csv(demog_path)
-        if 'record_id' in df_demog.columns:
-            id_col = 'record_id'
-        else:
-            id_col = [col for col in df_demog.columns if 'id' in col.lower() or 'record' in col.lower()][0]
-            
+        id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
         df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
-        df_merged = pd.merge(df_behav, df_demog, on='Merge_ID', how='left')
-    else:
-        df_merged = df_behav.copy()
+        
+        # Find the DX column (e.g., initial_dx, diagnosis, etc.)
+        dx_col = next((c for c in df_demog.columns if 'dx' in c.lower() or 'diagnos' in c.lower() and 'id' not in c.lower()), None)
+        df = pd.merge(df, df_demog, on='Merge_ID', how='left')
 
-    # --- THE DYNAMIC GROUPING LOGIC ---
-    def assign_group_by_number(row):
+    # --- DYNAMIC GROUPING LOGIC ---
+    def assign_group(row):
         try:
             subj_num = int(row['Merge_ID'])
+            raw_dx = str(row[dx_col]).lower() if dx_col and pd.notna(row[dx_col]) else ""
             
-            # Mode 1: Standard (options.subj_group_def == 1)
+            # Helper booleans based on read_in_demog_data_syon.m
+            is_control = subj_num < 2000000
+            is_relative = 2000000 <= subj_num < 6000000
+            is_pwpp = subj_num >= 6000000
+            
+            is_sz = is_pwpp and ('schiz' in raw_dx or 'sz' in raw_dx or raw_dx == '2') and 'aff' not in raw_dx
+            is_sca = is_pwpp and ('aff' in raw_dx or 'sca' in raw_dx or raw_dx == '3')
+            is_bip = is_pwpp and ('bip' in raw_dx or raw_dx in ['4', '5'])
+            
+            # Model 1: Standard
             if "Standard" in grouping_mode:
-                if subj_num < 2000000: return 'Controls'
-                elif 2000000 <= subj_num < 6000000: return 'Relatives'
-                elif subj_num >= 6000000: return 'Probands (PwPP)'
-            
-            # Mode 2: Liability Model (Healthy vs. Probands)
-            elif "Liability" in grouping_mode:
-                if subj_num < 6000000: return 'Healthy (Con + Rel)'
-                elif subj_num >= 6000000: return 'Probands (PwPP)'
+                if is_control: return 'Controls'
+                if is_relative: return 'Relatives'
+                if is_pwpp: return 'PwPP (All)'
                 
-            # Mode 3: Direct Comparison (Drops Relatives)
-            elif "Direct" in grouping_mode:
-                if subj_num < 2000000: return 'Controls'
-                elif 2000000 <= subj_num < 6000000: return 'EXCLUDE' # Tag for removal
-                elif subj_num >= 6000000: return 'Probands (PwPP)'
+            # Model 2: Detailed Psychosis (4 Box Plots)
+            elif "Detailed Psychosis" in grouping_mode:
+                if is_control: return 'Controls'
+                if is_sz: return 'SZ (Schizophrenia)'
+                if is_sca: return 'SCA (Schizoaffective)'
+                if is_bip: return 'BIP (Bipolar)'
+                return 'EXCLUDE' # Drop unclassified patients
+                
+            # Model 3: SZ vs Bip_Com vs Control
+            elif "SZ vs Bip_Com" in grouping_mode:
+                if is_control: return 'Controls'
+                if is_sz: return 'SZ (Schizophrenia)'
+                if is_pwpp and not is_sz: return 'BIP_COM (Bipolar + Other)'
+                return 'EXCLUDE'
+                
+            # Model 4: Standard + Total Combined Sample
+            elif "Total Combined" in grouping_mode:
+                if is_control: return 'Controls'
+                if is_relative: return 'Relatives'
+                if is_pwpp: return 'PwPP (All)'
                 
             return 'Unknown'
-        except ValueError:
-            return 'Parse Error'
+        except ValueError: return 'Parse Error'
 
-    df_merged['Group'] = df_merged.apply(assign_group_by_number, axis=1)
+    df['Group'] = df.apply(assign_group, axis=1)
+    df = df[df['Group'] != 'EXCLUDE'].copy()
     
-    # Drop anyone tagged for exclusion in Mode 3
-    df_merged = df_merged[df_merged['Group'] != 'EXCLUDE']
-    
-    return df_merged
+    # If "Total Combined" is selected, we duplicate the entire dataset into a new "Total Sample" group
+    if "Total Combined" in grouping_mode:
+        df_total = df.copy()
+        df_total['Group'] = 'Total Sample'
+        df = pd.concat([df, df_total], ignore_index=True)
+        
+    return df
 
-def plot_sfm_group_comparisons(df):
+def generate_live_statistics(df, metric_col):
     """
-    Generates a faceted Plotly box plot with underlying swarm points.
-    MATLAB Equivalent: subplot(1,2,iTask) loop inside summarize_SFM_results.m
+    MATLAB Equivalent: Running kruskalwallis() and ttest2().
+    Computes live non-parametric stats for the dashboard.
     """
+    groups = df['Group'].unique()
+    if len(groups) < 2: return "Not enough groups for statistical comparison."
+    
+    # Extract data arrays for each group
+    data_arrays = [df[df['Group'] == g][metric_col].dropna().values for g in groups]
+    
+    # 1. Global Kruskal-Wallis Test
+    try:
+        kw_stat, kw_p = stats.kruskal(*data_arrays)
+        stats_text = f"**Global Kruskal-Wallis Test:** \n$H = {kw_stat:.2f}$, $p = {kw_p:.4f}$  \n"
+    except ValueError:
+        return "Variance issue. Cannot compute statistics."
+        
+    # 2. Pairwise Post-Hoc (Controls vs others)
+    stats_text += "\n**Post-Hoc Comparisons (Mann-Whitney U):** \n"
+    controls_data = df[df['Group'] == 'Controls'][metric_col].dropna().values
+    
+    if len(controls_data) > 0:
+        for g in groups:
+            if g not in ['Controls', 'Total Sample']:
+                comp_data = df[df['Group'] == g][metric_col].dropna().values
+                if len(comp_data) > 0:
+                    u_stat, p_val = stats.mannwhitneyu(controls_data, comp_data, alternative='two-sided')
+                    sig = "⭐" if p_val < 0.05 else ""
+                    stats_text += f"- Controls vs {g}: $p = {p_val:.4f}$ {sig}  \n"
+                    
+    return stats_text
+
+def plot_sfm_dashboard(df, metric_mode):
+    """Renders the Plotly graph with dynamic Y-axes matching MATLAB summarize_SFM_results.m"""
     if df.empty: return None
         
-    colors = get_category_colors()
-    
-    # 1. Dynamically determine X-axis order based on the user's dropdown choice
-    order = []
-    if 'Controls' in df['Group'].values: order.append('Controls')
-    if 'Healthy (Con + Rel)' in df['Group'].values: order.append('Healthy (Con + Rel)')
-    if 'Relatives' in df['Group'].values: order.append('Relatives')
-    if 'Probands (PwPP)' in df['Group'].values: order.append('Probands (PwPP)')
-    
-    # 2. Reshape (Melt) the Data
-    # MATLAB Equivalent: stack(Table, {'Real_Switch_Hz', 'Bistable_Hz'})
-    # This transforms the data so we can automatically generate subplots (facets)
+    # Determine which columns to plot based on user UI selection
+    if "Switch Rate" in metric_mode:
+        target_cols = ['Real_Switch_Hz', 'Bistable_Hz']
+        y_title = "Switch Rate (Hz)"
+        y_range = [np.log10(0.007), np.log10(0.5)] # MATLAB: [0.007 0.5]
+        y_ticks = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5]
+        baseline_val = 0.09
+    else:
+        target_cols = ['Real_Switch_Dur', 'Bistable_Dur']
+        y_title = "Average Percept Duration (sec)"
+        y_range = [np.log10(1), np.log10(60)] # MATLAB: [1 60]
+        y_ticks = [1, 2.5, 5, 10, 25, 50]
+        baseline_val = 11
+
     df_plot = df.melt(
-        id_vars=['Subject', 'Group'], 
-        value_vars=['Real_Switch_Hz', 'Bistable_Hz'],
-        var_name='Task', 
-        value_name='Hz'
+        id_vars=['Subject', 'Group'], value_vars=target_cols,
+        var_name='Task', value_name='Metric'
     )
+    df_plot['Task'] = df_plot['Task'].replace({target_cols[0]: 'Control Task', target_cols[1]: 'Bistable Task'})
     
-    # Clean up the task names for the plot titles
-    df_plot['Task'] = df_plot['Task'].replace({
-        'Real_Switch_Hz': 'Control Task', 
-        'Bistable_Hz': 'Bistable Task'
-    })
-    
-    # 3. Build the Faceted Plot (The subplot equivalent)
+    # Custom ordering to keep Controls first, Total Sample last
+    order = sorted(list(df['Group'].unique()))
+    if 'Controls' in order: order.insert(0, order.pop(order.index('Controls')))
+    if 'Total Sample' in order: order.append(order.pop(order.index('Total Sample')))
+
     fig = px.box(
-        df_plot, x="Group", y="Hz", color="Group",
-        facet_col="Task", # This creates the 1x2 Subplot!
-        points="all", 
-        color_discrete_map=colors,
+        df_plot, x="Group", y="Metric", color="Group",
+        facet_col="Task", points="all", color_discrete_map=get_category_colors(),
         category_orders={"Group": order, "Task": ["Control Task", "Bistable Task"]}
     )
     
-    # 4. Apply strict MATLAB Axes Formatting
-    # MATLAB Equivalent: set(gca,'YScale','log','ylim',[0.007 0.5],'ytick',...)
     fig.update_yaxes(
-        type="log",
-        # Extended the upper range to 1.5 Hz to comfortably fit the 1.1 Hz data points
-        range=[np.log10(0.005), np.log10(1.5)], 
-        # Added 1.0 and 1.5 to the tick marks so the axis labels render correctly
-        tickvals=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 1.5],
-        showgrid=True, gridwidth=1, gridcolor='#e2e8f0',
-        title_text="Switch Rate (Hz)"
+        type="log", range=y_range, tickvals=y_ticks,
+        showgrid=True, gridwidth=1, gridcolor='#e2e8f0', title_text=y_title
     )
     
-    # 5. Add the Control Task Baseline Dotted Line
-    # MATLAB Equivalent: if iTask == 1; plot([0 4],[0.09 0.09],'--k');
-    # row=1, col=1 ensures this only draws on the Control Task subplot
+    # Add expected physical baseline to Control subplot
     fig.add_hline(
-        y=0.09, line_dash="dash", line_color="black", line_width=2,
-        row=1, col=1, 
-        annotation_text="Expected Rate (0.09 Hz)", 
-        annotation_position="bottom right",
-        annotation_font=dict(color="black", size=11)
+        y=baseline_val, line_dash="dash", line_color="black", line_width=2,
+        row=1, col=1, annotation_text=f"Expected ({baseline_val})", annotation_position="bottom right"
     )
     
-    # 6. Global Layout Clean-up
-    fig.update_layout(
-        showlegend=False, 
-        plot_bgcolor='rgba(0,0,0,0)', 
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(size=14),
-        title="SFM Task Performance Across Clinical Populations"
-    )
-    
-    # Remove the default "Task=" text that Plotly puts above subplots
+    fig.update_layout(showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(size=14))
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-    
-    # Remove redundant X-axis labels
     fig.update_xaxes(title_text="")
-    
-    # Add mean lines to the boxes (MATLAB equivalent: plotting mean overlays)
     fig.update_traces(boxmean=True) 
     
     return fig

@@ -93,40 +93,56 @@ with tabs[0]:
     st.divider()
     
     # --- LIVE DATA DASHBOARD ---
-    st.subheader("Data Exploration: Switch Rates Across Populations")
+    st.subheader("Data Exploration: Switch Rates & Percept Durations")
     
-    # 1. THE DROPDOWN TOGGLE (The UI Controller)
-    selected_model = st.selectbox(
-        "Select Clinical Grouping Model:",
-        [
-            "Standard (Controls vs. Relatives vs. Probands)",
-            "Liability Model (Healthy [Con+Rel] vs. Probands)",
-            "Direct Comparison (Controls vs. Probands)"
-        ]
-    )
+    # --- UI CONTROLLERS ---
+    # We use columns to place the two dropdowns side-by-side
+    ui_c1, ui_c2 = st.columns(2)
     
-    # 2. Fetch Data (Passing the selected model to the loader!)
-    df_sfm = get_sfm_switch_rate_data(grouping_mode=selected_model)
+    with ui_c1:
+        selected_grouping = st.selectbox(
+            "Select grouping for analysis:",
+            [
+                "Standard (Controls vs. Relatives vs. PwPP)",
+                "Detailed Psychosis (SZ vs. SCA vs. BIP vs. Controls)",
+                "SZ vs Bip_Com (Schizophrenia vs. Bipolar+Other vs. Controls)",
+                "Standard + Total Combined (Includes Sample Average)"
+            ]
+        )
+        
+    with ui_c2:
+        selected_metric = st.selectbox(
+            "Select metric to visualize:",
+            ["Switch Rate (Hz)", "Average Percept Duration (sec)"]
+        )
+    
+    # --- DATA HYDRATION ---
+    # Pass BOTH UI states directly into the loader engine
+    df_sfm = get_sfm_data(grouping_mode=selected_grouping, metric_mode=selected_metric)
     
     if df_sfm.empty:
         st.warning("⚠️ Data files not found. Please ensure `sfm_dashboard_data.parquet` and `SYON-3TDemographics...csv` are in the documents folder.")
     else:
-        # Render Plot
+        # --- PLOTTING & STATS ---
         c1, c2 = st.columns([2, 1])
         with c1:
-            fig = plot_sfm_group_comparisons(df_sfm)
+            fig = plot_sfm_dashboard(df_sfm, selected_metric)
             st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
             
         with c2:
-            st.markdown("### Statistical Insights")
-            st.markdown("""
-            Individuals with psychosis (PwPP) demonstrate **significantly faster switch rates** compared to healthy controls. 
+            st.markdown("### Live Statistical Insights")
+            st.caption("Non-parametric K-W and Mann-Whitney U models dynamically computed based on current parameters.")
             
-            Interestingly, biological relatives exhibit an intermediate phenotype, suggesting that the perceptual switch rate ($Hz$) may serve as a viable **endophenotype** for genetic liability to schizophrenia.
-            """)
+            # Determine which column to run the stats on based on the dropdown
+            stat_target = 'Bistable_Hz' if "Rate" in selected_metric else 'Bistable_Dur'
+            
+            # Fetch and display the live stats!
+            from loaders.academic_research_loader import generate_live_statistics
+            stats_output = generate_live_statistics(df_sfm, stat_target)
+            st.info(stats_output)
             
             with st.expander("View Full Raw Subject Data"):
-                display_cols = ['Subject', 'Group', 'Bistable_Hz', 'Real_Switch_Hz']
+                display_cols = ['Subject', 'Group', 'Bistable_Hz', 'Bistable_Dur']
                 available_cols = [c for c in display_cols if c in df_sfm.columns]
                 st.dataframe(df_sfm[available_cols], use_container_width=True, hide_index=True)
 
