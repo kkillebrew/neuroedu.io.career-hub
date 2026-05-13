@@ -115,72 +115,85 @@ def get_project_narratives():
 def get_category_colors():
     """Expanded palette for new psychosis subgroups."""
     return {
-        'Controls': '#10b981',             # Green
-        'Relatives': '#3b82f6',            # Blue
-        'PwPP (All)': '#ef4444',           # Red
-        'SZ (Schizophrenia)': '#dc2626',   # Dark Red
-        'SCA (Schizoaffective)': '#f97316',# Orange
-        'BIP (Bipolar)': '#8b5cf6',        # Purple
-        'BIP_COM (Bipolar + Other)': '#d946ef', # Pink
-        'Total Sample': '#64748b',         # Slate Gray
+        'Controls': '#10b981',             
+        'Relatives': '#3b82f6',            
+        'PwPP (All)': '#ef4444',           
+        'SZ (Schizophrenia)': '#dc2626',   
+        'SCA (Schizoaffective)': '#f97316',
+        'BIP (Bipolar)': '#8b5cf6',        
+        'BIP_COM (Bipolar + Other)': '#d946ef', 
+        'Total Sample': '#64748b',         
         'Unknown': '#cbd5e1'
     }
 
+def get_sfm_data(grouping_mode, metric_mode):
+    """
+    Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
+    from Private GitHub using secure tokens, merges, and applies de-identification.
+    """
+    import os
+    import pandas as pd
+    import requests
+    from io import BytesIO, StringIO
+    import streamlit as st
 
-    def get_sfm_data(grouping_mode, metric_mode):
-        """
-        Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
-        from Private GitHub using secure tokens.
-        """
-        # PASTE YOUR RAW GITHUB URLS HERE:
-        PARQUET_RAW_URL = "https://github.com/kkillebrew/SFM/blob/main/sfm_dashboard_data.parquet" # <--- UPDATE THIS
-        DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv"
-        
-        # Securely pull the token from DigitalOcean's environment variables
-        token = os.environ.get("GITHUB_TOKEN")
-        headers = {"Authorization": f"token {token}"} if token else {}
-        
-        # --- 1. FETCH BEHAVIORAL DATA (.parquet) ---
-        try:
-            p_res = requests.get(PARQUET_RAW_URL, headers=headers)
-            if p_res.status_code == 200:
-                # BytesIO handles the binary format of a parquet file
-                df = pd.read_parquet(BytesIO(p_res.content))
-            else:
-                return pd.DataFrame() # Fail gracefully if file isn't found
-        except Exception as e:
-            return pd.DataFrame()
-
-        if 'Bistable' in df.columns:
-            df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
-            
-        df = df[df['Bistable_Hz'] > 0].copy()
-        df['Bistable_Dur'] = 1 / df['Bistable_Hz']
-        df['Real_Switch_Dur'] = 1 / df['Real_Switch_Hz']
-        df['Merge_ID'] = df['Subject'].astype(str).str.replace(r'\D', '', regex=True)
-
-        # --- 2. FETCH DEMOGRAPHICS (.csv) ---
-        dx_col = None
-        try:
-            c_res = requests.get(DEMOG_RAW_URL, headers=headers)
-            if c_res.status_code == 200:
-                df_demog = pd.read_csv(StringIO(c_res.text))
-                id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
-                df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
-                dx_col = next((c for c in df_demog.columns if 'dx' in c.lower() or 'diagnos' in c.lower() and 'id' not in c.lower()), None)
-                
-                df = pd.merge(df, df_demog, on='Merge_ID', how='left')
-        except Exception as e:
-            pass # If demog fails, we still have the behavioral data to show
+    # PASTE YOUR RAW GITHUB URLS HERE:
+    PARQUET_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/sfm_dashboard_data.parquet"
+    DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/main/Demographics/SYON-3TDemographics_DATA_LABELS_2024-04-29_0027.csv"
     
+    # Securely pull the token from DigitalOcean's environment variables (or local secrets)
+    try:
+        local_secret = st.secrets["GITHUB_TOKEN"]
+    except:
+        local_secret = None
+        
+    token = os.environ.get("GITHUB_TOKEN", local_secret)
+    headers = {"Authorization": f"token {token}"} if token else {}
+    
+    df = pd.DataFrame()
+    
+    # --- 1. FETCH BEHAVIORAL DATA (.parquet) ---
+    try:
+        p_res = requests.get(PARQUET_RAW_URL, headers=headers)
+        if p_res.status_code == 200:
+            df = pd.read_parquet(BytesIO(p_res.content))
+        else:
+            print(f"⚠️ Parquet Fetch Failed. Status Code: {p_res.status_code}")
+            return pd.DataFrame() 
+    except Exception as e:
+        print(f"⚠️ Parquet Fetch Error: {e}")
+        return pd.DataFrame()
 
-    # --- DYNAMIC GROUPING LOGIC ---
+    if 'Bistable' in df.columns:
+        df = df.rename(columns={'Bistable': 'Bistable_Hz', 'Control': 'Real_Switch_Hz'})
+        
+    df = df[df['Bistable_Hz'] > 0].copy()
+    df['Bistable_Dur'] = 1 / df['Bistable_Hz']
+    df['Real_Switch_Dur'] = 1 / df['Real_Switch_Hz']
+    df['Merge_ID'] = df['Subject'].astype(str).str.replace(r'\D', '', regex=True)
+
+    # --- 2. FETCH DEMOGRAPHICS (.csv) ---
+    dx_col = None
+    try:
+        c_res = requests.get(DEMOG_RAW_URL, headers=headers)
+        if c_res.status_code == 200:
+            df_demog = pd.read_csv(StringIO(c_res.text))
+            id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
+            df_demog['Merge_ID'] = df_demog[id_col].astype(str).str.replace(r'\D', '', regex=True)
+            dx_col = next((c for c in df_demog.columns if 'dx' in c.lower() or 'diagnos' in c.lower() and 'id' not in c.lower()), None)
+            
+            df = pd.merge(df, df_demog, on='Merge_ID', how='left')
+        else:
+            print(f"⚠️ CSV Fetch Failed. Status Code: {c_res.status_code}")
+    except Exception as e:
+        print(f"⚠️ CSV Fetch Error: {e}")
+
+    # --- 3. DYNAMIC GROUPING LOGIC ---
     def assign_group(row):
         try:
             subj_num = int(row['Merge_ID'])
             raw_dx = str(row[dx_col]).lower() if dx_col and pd.notna(row[dx_col]) else ""
             
-            # Helper booleans based on read_in_demog_data_syon.m
             is_control = subj_num < 2000000
             is_relative = 2000000 <= subj_num < 6000000
             is_pwpp = subj_num >= 6000000
@@ -189,28 +202,24 @@ def get_category_colors():
             is_sca = is_pwpp and ('aff' in raw_dx or 'sca' in raw_dx or raw_dx == '3')
             is_bip = is_pwpp and ('bip' in raw_dx or raw_dx in ['4', '5'])
             
-            # Model 1: Standard
             if "Standard" in grouping_mode:
                 if is_control: return 'Controls'
                 if is_relative: return 'Relatives'
                 if is_pwpp: return 'PwPP (All)'
                 
-            # Model 2: Detailed Psychosis (4 Box Plots)
             elif "Detailed Psychosis" in grouping_mode:
                 if is_control: return 'Controls'
                 if is_sz: return 'SZ (Schizophrenia)'
                 if is_sca: return 'SCA (Schizoaffective)'
                 if is_bip: return 'BIP (Bipolar)'
-                return 'EXCLUDE' # Drop unclassified patients
+                return 'EXCLUDE'
                 
-            # Model 3: SZ vs Bip_Com vs Control
             elif "SZ vs Bip_Com" in grouping_mode:
                 if is_control: return 'Controls'
                 if is_sz: return 'SZ (Schizophrenia)'
                 if is_pwpp and not is_sz: return 'BIP_COM (Bipolar + Other)'
                 return 'EXCLUDE'
                 
-            # Model 4: Standard + Total Combined Sample
             elif "Total Combined" in grouping_mode:
                 if is_control: return 'Controls'
                 if is_relative: return 'Relatives'
@@ -222,16 +231,12 @@ def get_category_colors():
     df['Group'] = df.apply(assign_group, axis=1)
     df = df[df['Group'] != 'EXCLUDE'].copy()
     
-    # If "Total Combined" is selected, we duplicate the entire dataset into a new "Total Sample" group
     if "Total Combined" in grouping_mode:
         df_total = df.copy()
         df_total['Group'] = 'Total Sample'
         df = pd.concat([df, df_total], ignore_index=True)
         
-    # ==========================================
-    # DE-IDENTIFICATION / MASKING BLOCK
-    # ==========================================
-    # We do this after all grouping logic is finished, but before returning to UI
+    # --- 4. DE-IDENTIFICATION / MASKING ---
     unique_ids = sorted(df['Merge_ID'].unique())
     counters = {'1': 1, '2': 1, '3': 1, '8': 1}
     id_map = {}
@@ -239,22 +244,17 @@ def get_category_colors():
     for uid in unique_ids:
         try:
             num = int(uid)
-            # Assign prefixes based on original numerical boundary
             if num < 2000000: prefix = '1'
             elif 2000000 <= num < 6000000: prefix = '2'
             elif num >= 6000000: prefix = '3'
-            else: prefix = '8' # Fallback for unknown
+            else: prefix = '8'
         except ValueError:
             prefix = '8'
 
-        # Formats as 1001, 1002, 3001, 3002, etc.
         id_map[uid] = f"{prefix}{counters[prefix]:03d}"
         counters[prefix] += 1
 
-    # Overwrite the Subject column with the fake IDs
     df['Subject'] = df['Merge_ID'].map(id_map)
-    
-    # Purge the real IDs from the dataframe memory completely
     df = df.drop(columns=['Merge_ID']) 
     
     return df
@@ -264,20 +264,18 @@ def generate_live_statistics(df, metric_col):
     MATLAB Equivalent: Running kruskalwallis() and ttest2().
     Computes live non-parametric stats for the dashboard.
     """
+    from scipy import stats
     groups = df['Group'].unique()
     if len(groups) < 2: return "Not enough groups for statistical comparison."
     
-    # Extract data arrays for each group
     data_arrays = [df[df['Group'] == g][metric_col].dropna().values for g in groups]
     
-    # 1. Global Kruskal-Wallis Test
     try:
         kw_stat, kw_p = stats.kruskal(*data_arrays)
         stats_text = f"**Global Kruskal-Wallis Test:** \n$H = {kw_stat:.2f}$, $p = {kw_p:.4f}$  \n"
     except ValueError:
         return "Variance issue. Cannot compute statistics."
         
-    # 2. Pairwise Post-Hoc (Controls vs others)
     stats_text += "\n**Post-Hoc Comparisons (Mann-Whitney U):** \n"
     controls_data = df[df['Group'] == 'Controls'][metric_col].dropna().values
     
@@ -294,20 +292,21 @@ def generate_live_statistics(df, metric_col):
 
 def plot_sfm_dashboard(df, metric_mode):
     """Renders the Plotly graph with dynamic Y-axes matching MATLAB summarize_SFM_results.m"""
+    import plotly.express as px
+    import numpy as np
+    
     if df.empty: return None
         
-    # Determine which columns to plot based on user UI selection
     if "Switch Rate" in metric_mode:
         target_cols = ['Real_Switch_Hz', 'Bistable_Hz']
         y_title = "Switch Rate (Hz)"
-        # Re-expanding the limits to 1.5 Hz to capture fast-switching outliers
         y_range = [np.log10(0.005), np.log10(1.5)] 
         y_ticks = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 1.5]
         baseline_val = 0.09
     else:
         target_cols = ['Real_Switch_Dur', 'Bistable_Dur']
         y_title = "Average Percept Duration (sec)"
-        y_range = [np.log10(1), np.log10(60)] # MATLAB: [1 60]
+        y_range = [np.log10(1), np.log10(60)]
         y_ticks = [1, 2.5, 5, 10, 25, 50]
         baseline_val = 11
 
@@ -317,7 +316,6 @@ def plot_sfm_dashboard(df, metric_mode):
     )
     df_plot['Task'] = df_plot['Task'].replace({target_cols[0]: 'Control Task', target_cols[1]: 'Bistable Task'})
     
-    # Custom ordering to keep Controls first, Total Sample last
     order = sorted(list(df['Group'].unique()))
     if 'Controls' in order: order.insert(0, order.pop(order.index('Controls')))
     if 'Total Sample' in order: order.append(order.pop(order.index('Total Sample')))
@@ -333,7 +331,6 @@ def plot_sfm_dashboard(df, metric_mode):
         showgrid=True, gridwidth=1, gridcolor='#e2e8f0', title_text=y_title
     )
     
-    # Add expected physical baseline to Control subplot
     fig.add_hline(
         y=baseline_val, line_dash="dash", line_color="black", line_width=2,
         row=1, col=1, annotation_text=f"Expected ({baseline_val})", annotation_position="bottom right"
