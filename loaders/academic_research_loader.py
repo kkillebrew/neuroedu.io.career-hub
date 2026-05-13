@@ -213,6 +213,35 @@ def get_sfm_data(grouping_mode, metric_mode):
         df_total['Group'] = 'Total Sample'
         df = pd.concat([df, df_total], ignore_index=True)
         
+    # ==========================================
+    # DE-IDENTIFICATION / MASKING BLOCK
+    # ==========================================
+    # We do this after all grouping logic is finished, but before returning to UI
+    unique_ids = sorted(df['Merge_ID'].unique())
+    counters = {'1': 1, '2': 1, '3': 1, '8': 1}
+    id_map = {}
+
+    for uid in unique_ids:
+        try:
+            num = int(uid)
+            # Assign prefixes based on original numerical boundary
+            if num < 2000000: prefix = '1'
+            elif 2000000 <= num < 6000000: prefix = '2'
+            elif num >= 6000000: prefix = '3'
+            else: prefix = '8' # Fallback for unknown
+        except ValueError:
+            prefix = '8'
+
+        # Formats as 1001, 1002, 3001, 3002, etc.
+        id_map[uid] = f"{prefix}{counters[prefix]:03d}"
+        counters[prefix] += 1
+
+    # Overwrite the Subject column with the fake IDs
+    df['Subject'] = df['Merge_ID'].map(id_map)
+    
+    # Purge the real IDs from the dataframe memory completely
+    df = df.drop(columns=['Merge_ID']) 
+    
     return df
 
 def generate_live_statistics(df, metric_col):
