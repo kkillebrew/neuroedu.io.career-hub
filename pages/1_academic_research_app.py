@@ -118,11 +118,12 @@ for i, ref in enumerate(references):
     # i % 3 ensures the cards wrap around the 3 columns cleanly
     with ref_cols[i % 3]:
         # We use unsafe_allow_html=True to utilize the custom CSS classes 
-        # defined in your global sidebar/styling setup.
+        # defined in your global sidebar/styling setup. Notice we changed 'text' to 'contact'
+        # and wrapped it in an HTML mailto anchor tag (<a>).
         st.markdown(f"""
             <div class="ref-card">
                 <p class="ref-name" style="font-weight: bold; font-size: 1.1rem; margin-bottom: 0;">{ref['name']}</p>
-                <p class="ref-title" style="font-size: 0.9rem; color: #475569;">{ref['title']}</p>
-                <p style="font-style: italic; font-size: 0.95rem;">"{ref['text']}"</p>
+                <p class="ref-title" style="font-size: 0.9rem; color: #475569; margin-bottom: 0.5rem;">{ref['title']}</p>
+                <p style="font-size: 0.95rem;"><a href="mailto:{ref['contact']}" style="text-decoration: none; color: #0284c7;">✉️ {ref['contact']}</a></p>
             </div>
         """, unsafe_allow_html=True)
