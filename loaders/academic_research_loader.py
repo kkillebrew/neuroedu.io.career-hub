@@ -452,3 +452,30 @@ def get_percept_duration_data(df):
             
     if not all_durations: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Block', 'Direction', 'Duration_Sec'])
     return pd.DataFrame(all_durations)
+
+def get_response_counts_data(df):
+    """Counts total, left, and right button presses for the Response Histogram."""
+    # Defensive check for visit 1
+    df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
+    
+    all_counts = []
+    for _, row in df_main.iterrows():
+        try:
+            raw_json = row.get('Raw_Events_JSON')
+            if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
+            
+            events = json.loads(raw_json)
+            left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
+            right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
+            
+            all_counts.append({
+                'Subject': row['Subject'],
+                'Task_Type': row.get('Task_Type', 'SFM'),
+                'Total_Presses': len(events),
+                'Left_Presses': left_count,
+                'Right_Presses': right_count
+            })
+        except: continue
+            
+    if not all_counts: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Total_Presses', 'Left_Presses', 'Right_Presses'])
+    return pd.DataFrame(all_counts)
