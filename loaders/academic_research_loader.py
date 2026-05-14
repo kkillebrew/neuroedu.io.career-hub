@@ -378,7 +378,12 @@ def get_test_retest_data(df):
         aggfunc='first' 
     ).dropna()
     
-    # Rename columns and calculate difference
+    # Check if both Visit 1 and Visit 2 actually exist in the data
+    if 1 not in df_tr.columns or 2 not in df_tr.columns:
+        return pd.DataFrame(columns=['Subject', 'Visit_1_Hz', 'Visit_2_Hz', 'Hz_Difference'])
+    
+    # Isolate strictly the two columns and rename them safely
+    df_tr = df_tr[[1, 2]]
     df_tr.columns = ['Visit_1_Hz', 'Visit_2_Hz']
     df_tr['Hz_Difference'] = df_tr['Visit_2_Hz'] - df_tr['Visit_1_Hz']
     
