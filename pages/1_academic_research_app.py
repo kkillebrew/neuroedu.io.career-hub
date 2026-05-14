@@ -166,7 +166,7 @@ with tabs[0]:
             
             # --- SECTION 2: Control Task Performance ---
             st.subheader("2. Control Task Performance")
-            col1, col2 = st.columns(3)
+            col1, col2 = st.columns(2)
             
             with col1:
                 import json # Safely ensuring json is available
