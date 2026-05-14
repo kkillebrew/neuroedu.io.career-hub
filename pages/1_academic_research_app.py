@@ -299,7 +299,7 @@ with tabs[0]:
                 if "Rate" in selected_metric:
                     ctrl_col, bi_col = 'Real_Switch_Hz', 'Bistable_Hz'
                 else:
-                    ctrl_col, bi_col = 'Control_Dur', 'Bistable_Dur' 
+                    ctrl_col, bi_col = 'Real_Switch_Dur', 'Bistable_Dur'  # <--- Fixed!
                 
                 # Split the main chart area into two side-by-side graphs
                 chart_col1, chart_col2 = st.columns(2)
