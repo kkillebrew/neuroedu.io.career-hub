@@ -429,3 +429,52 @@ def get_percept_duration_data(df):
                 })
         except Exception:
             continue
+
+
+def get_block_switch_rates(df):
+    """Calculates Switch Rate (Hz) for each individual block."""
+    df_events = get_percept_duration_data(df)
+    
+    if df_events.empty:
+        return pd.DataFrame()
+    
+    # Count switches per block and sum duration per block
+    block_summary = df_events.groupby(['Subject', 'Task_Type', 'Block']).agg(
+        Total_Switches=('Direction', 'count'),
+        Block_Duration_Sec=('Duration_Sec', 'sum')
+    ).reset_index()
+    
+    # Calculate Hz safely (avoid dividing by zero)
+    block_summary['Switch_Rate_Hz'] = np.where(
+        block_summary['Block_Duration_Sec'] > 0, 
+        block_summary['Total_Switches'] / block_summary['Block_Duration_Sec'], 
+        0
+    )
+    
+    return block_summary
+
+
+def get_response_counts_data(df):
+    """Counts total, left, and right button presses for the Response Histogram."""
+    df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    all_counts = []
+    
+    for _, row in df_main.iterrows():
+        try:
+            events = json.loads(row.get('Raw_Events_JSON', '[]'))
+            
+            # Count occurrences of 'left' and 'right'
+            left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
+            right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
+            
+            all_counts.append({
+                'Subject': row['Subject'],
+                'Task_Type': row['Task_Type'],
+                'Total_Presses': len(events),
+                'Left_Presses': left_count,
+                'Right_Presses': right_count
+            })
+        except Exception:
+            continue
+            
+    return pd.DataFrame(all_counts)
