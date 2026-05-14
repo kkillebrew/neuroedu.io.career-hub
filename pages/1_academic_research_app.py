@@ -185,25 +185,46 @@ with tabs[0]:
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                df_pd_ctrl = get_percept_duration_data(df_tab1)
+                import json # Safely ensuring json is available
+                away_towards_data = []
                 
-                # 1. Strictly filter out Bi-stable data
-                df_control_only = df_pd_ctrl[df_pd_ctrl['Task_Type'] == 'Control']
+                for _, row in df_tab1.iterrows():
+                    # Unpack 'Towards' (Correct) Durations
+                    towards_json = row.get("Control_Durations_Towards_JSON")
+                    if pd.notna(towards_json) and towards_json != '[]':
+                        try:
+                            for dur in json.loads(towards_json):
+                                away_towards_data.append({'Subject': row['Subject'], 'Type': 'Towards (Correct)', 'Duration_Sec': float(dur)})
+                        except Exception: pass
+                    
+                    # Unpack 'Away' (Incorrect) Durations
+                    away_json = row.get("Control_Durations_Away_JSON")
+                    if pd.notna(away_json) and away_json != '[]':
+                        try:
+                            for dur in json.loads(away_json):
+                                away_towards_data.append({'Subject': row['Subject'], 'Type': 'Away (Incorrect)', 'Duration_Sec': float(dur)})
+                        except Exception: pass
+                            
+                df_dir = pd.DataFrame(away_towards_data)
                 
-                if not df_control_only.empty:
-                    # 2. Use .mean() to get the AVERAGE duration
-                    df_dir = df_control_only.groupby(['Subject', 'Direction'])['Duration_Sec'].mean().reset_index()
+                if not df_dir.empty:
+                    # Average per subject so the box plot isn't distorted by one person with 50 micro-blinks
+                    df_dir_ave = df_dir.groupby(['Subject', 'Type'])['Duration_Sec'].mean().reset_index()
                     
                     fig_dir = px.box(
-                        df_dir, 
-                        x="Direction", 
+                        df_dir_ave, 
+                        x="Type", 
                         y="Duration_Sec", 
                         points="all", 
                         title="Average Duration (Control Task)",
-                        color_discrete_sequence=["#10b981"]
+                        color="Type",
+                        color_discrete_map={"Towards (Correct)": "#10b981", "Away (Incorrect)": "#ef4444"}
                     )
                     fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                    fig_dir.update_layout(showlegend=False, xaxis_title="")
                     st.plotly_chart(fig_dir, use_container_width=True)
+                else:
+                    st.warning("⚠️ No Towards/Away data found in the current dataset.")
                     
             with col2:
                 df_acc = get_accuracy_data(df_tab1)
