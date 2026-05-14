@@ -429,6 +429,8 @@ def get_percept_duration_data(df):
                 })
         except Exception:
             continue
+            
+    return pd.DataFrame(all_durations) # <--- ADD THIS EXACT LINE
 
 
 def get_block_switch_rates(df):

@@ -106,96 +106,104 @@ with tabs[0]:
 
     with tab1:
         st.header("Control Data Analysis")
-        # Fetch a baseline copy of the data just for Tab 1
-        df_tab1 = get_sfm_data(apply_qc=True) 
         
-        # --- SECTION 1: Histograms ---
-        st.subheader("1. Distribution Profiles")
-        hist_choice = st.selectbox(
-            "Select Distribution to View:", 
-            ["Percept Durations", "Participant Responses", "Reaction Times"],
-            index=0 
+        # Safely fetch the REAL baseline data using the required positional arguments
+        df_tab1 = get_sfm_data(
+            grouping_mode="Standard (Controls vs. Relatives vs. PwPP)", 
+            metric_mode="Switch Rate (Hz)", 
+            apply_qc=True
         )
         
-        if hist_choice == "Percept Durations":
-            df_pd = get_percept_duration_data(df_tab1)
-            fig_hist = px.histogram(df_pd, x="Duration_Sec", color="Task_Type", barmode="overlay", nbins=50, title="Percept Durations")
-            st.plotly_chart(fig_hist, use_container_width=True)
+        if df_tab1.empty:
+            st.warning("Data not loaded. Please check your data sources.")
+        else:
+            # --- SECTION 1: Histograms ---
+            st.subheader("1. Distribution Profiles")
+            hist_choice = st.selectbox(
+                "Select Distribution to View:", 
+                ["Percept Durations", "Participant Responses", "Reaction Times"],
+                index=0 
+            )
             
-        elif hist_choice == "Participant Responses":
-            df_counts = get_response_counts_data(df_tab1)
-            df_melt = df_counts.melt(id_vars=['Subject', 'Task_Type'], value_vars=['Left_Presses', 'Right_Presses'], var_name='Key', value_name='Count')
-            fig_hist = px.box(df_melt, x="Key", y="Count", color="Task_Type", points="all", title="Participant Responses (Left vs Right)")
-            fig_hist.update_traces(jitter=0.6, pointpos=0, width=0.3) # Narrow box, wide dots
-            st.plotly_chart(fig_hist, use_container_width=True)
-            
-        elif hist_choice == "Reaction Times":
-            df_rt = get_rt_histogram_data(df_tab1)
-            fig_hist = px.histogram(df_rt, x="Reaction_Time_Sec", nbins=50, title="Reaction Times (Control Task)")
-            st.plotly_chart(fig_hist, use_container_width=True)
-        
-        with st.expander("View Legacy pHCP Reference (EPS)"):
             if hist_choice == "Percept Durations":
-                st.image("documents/pHCP_EPS_Files/HistOfPercDurations.png")
-            elif hist_choice == "Participant Responses":
-                st.image("documents/pHCP_EPS_Files/HistOfPartResponses.png")
-            elif hist_choice == "Reaction Times":
-                st.image("documents/pHCP_EPS_Files/HistOfReactionTimes.png")
+                df_pd = get_percept_duration_data(df_tab1)
+                fig_hist = px.histogram(df_pd, x="Duration_Sec", color="Task_Type", barmode="overlay", nbins=50, title="Percept Durations")
+                st.plotly_chart(fig_hist, use_container_width=True)
                 
-        st.divider()
-        
-        # --- SECTION 2: Control Task Performance ---
-        st.subheader("2. Control Task Performance")
-        col1, col2, col3 = st.columns(3) # <-- Changed to 3 columns
-        
-        with col1:
-            df_pd_ctrl = get_percept_duration_data(df_tab1)
-            df_dir = df_pd_ctrl[df_pd_ctrl['Task_Type'] == 'Control'].groupby(['Subject', 'Direction'])['Duration_Sec'].sum().reset_index()
-            fig_dir = px.box(df_dir, x="Direction", y="Duration_Sec", points="all", title="Duration Away/Towards")
-            fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
-            st.plotly_chart(fig_dir, use_container_width=True)
-
-        with col2:
-            df_acc = get_accuracy_data(df_tab1)
-            fig_acc = px.box(df_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
-            fig_acc.update_traces(jitter=0.6, pointpos=0, width=0.3)
-            st.plotly_chart(fig_acc, use_container_width=True)
+            elif hist_choice == "Participant Responses":
+                df_counts = get_response_counts_data(df_tab1)
+                df_melt = df_counts.melt(id_vars=['Subject', 'Task_Type'], value_vars=['Left_Presses', 'Right_Presses'], var_name='Key', value_name='Count')
+                fig_hist = px.box(df_melt, x="Key", y="Count", color="Task_Type", points="all", title="Participant Responses (Left vs Right)")
+                fig_hist.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                st.plotly_chart(fig_hist, use_container_width=True)
+                
+            elif hist_choice == "Reaction Times":
+                df_rt = get_rt_histogram_data(df_tab1)
+                fig_hist = px.histogram(df_rt, x="Reaction_Time_Sec", nbins=50, title="Reaction Times (Control Task)")
+                st.plotly_chart(fig_hist, use_container_width=True)
             
-        with col3:
-            df_rt_all = get_rt_histogram_data(df_tab1)
-            df_rt_ave = df_rt_all.groupby('Subject')['Reaction_Time_Sec'].mean().reset_index()
-            fig_rt_ave = px.box(df_rt_ave, y="Reaction_Time_Sec", points="all", title="Average RT")
-            fig_rt_ave.update_traces(jitter=0.6, pointpos=0, width=0.3)
-            st.plotly_chart(fig_rt_ave, use_container_width=True)
+            with st.expander("View Legacy pHCP Reference (EPS)"):
+                if hist_choice == "Percept Durations":
+                    st.image("documents/pHCP_EPS_Files/HistOfPercDurations.png")
+                elif hist_choice == "Participant Responses":
+                    st.image("documents/pHCP_EPS_Files/HistOfPartResponses.png")
+                elif hist_choice == "Reaction Times":
+                    st.image("documents/pHCP_EPS_Files/HistOfReactionTimes.png")
+                    
+            st.divider()
             
-        with st.expander("View Legacy pHCP References (EPS)"):
-            ref_col1, ref_col2, ref_col3 = st.columns(3)
-            with ref_col1: st.image("documents/pHCP_EPS_Files/AveDurAwayTowards.png", caption="pHCP Ave Dur Away/Towards")
-            with ref_col2: st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
-            with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
-
-        st.divider()
-        
-        # --- SECTION 3: Test-Retest Reliability ---
-        st.subheader("3. Test-Retest Reliability")
-        col4, col5 = st.columns(2)
-        df_tr = get_test_retest_data(df_tab1)
-        
-        with col4:
-            fig_corr = px.scatter(df_tr, x="Visit_1_Hz", y="Visit_2_Hz", hover_data=['Subject'], title="Test-Retest Correlation")
-            fig_corr.add_shape(type="line", x0=0, y0=0, x1=df_tr['Visit_1_Hz'].max(), y1=df_tr['Visit_1_Hz'].max(), line=dict(dash="dash", color="gray"))
-            st.plotly_chart(fig_corr, use_container_width=True)
-
-        with col5:
-            fig_diff = px.box(df_tr, y="Hz_Difference", points="all", title="Median Range (V2 - V1)")
-            fig_diff.update_traces(jitter=0.6, pointpos=0, width=0.3)
-            fig_diff.add_hline(y=0, line_dash="dash", line_color="red")
-            st.plotly_chart(fig_diff, use_container_width=True)
+            # --- SECTION 2: Control Task Performance ---
+            st.subheader("2. Control Task Performance")
+            col1, col2, col3 = st.columns(3)
             
-        with st.expander("View Legacy pHCP References (EPS)"):
-            ref_col4, ref_col5 = st.columns(2)
-            with ref_col4: st.image("documents/pHCP_EPS_Files/TestRetestSwitchRates.png", caption="pHCP Test-Retest")
-            with ref_col5: st.image("documents/pHCP_EPS_Files/TestReTest_MedianRange.png", caption="pHCP Median Range")
+            with col1:
+                df_pd_ctrl = get_percept_duration_data(df_tab1)
+                df_dir = df_pd_ctrl[df_pd_ctrl['Task_Type'] == 'Control'].groupby(['Subject', 'Direction'])['Duration_Sec'].sum().reset_index()
+                fig_dir = px.box(df_dir, x="Direction", y="Duration_Sec", points="all", title="Duration Away/Towards")
+                fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                st.plotly_chart(fig_dir, use_container_width=True)
+
+            with col2:
+                df_acc = get_accuracy_data(df_tab1)
+                fig_acc = px.box(df_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
+                fig_acc.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                st.plotly_chart(fig_acc, use_container_width=True)
+                
+            with col3:
+                df_rt_all = get_rt_histogram_data(df_tab1)
+                df_rt_ave = df_rt_all.groupby('Subject')['Reaction_Time_Sec'].mean().reset_index()
+                fig_rt_ave = px.box(df_rt_ave, y="Reaction_Time_Sec", points="all", title="Average RT")
+                fig_rt_ave.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                st.plotly_chart(fig_rt_ave, use_container_width=True)
+                
+            with st.expander("View Legacy pHCP References (EPS)"):
+                ref_col1, ref_col2, ref_col3 = st.columns(3)
+                with ref_col1: st.image("documents/pHCP_EPS_Files/AveDurAwayTowards.png", caption="pHCP Ave Dur Away/Towards")
+                with ref_col2: st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
+                with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
+
+            st.divider()
+            
+            # --- SECTION 3: Test-Retest Reliability ---
+            st.subheader("3. Test-Retest Reliability")
+            col4, col5 = st.columns(2)
+            df_tr = get_test_retest_data(df_tab1)
+            
+            with col4:
+                fig_corr = px.scatter(df_tr, x="Visit_1_Hz", y="Visit_2_Hz", hover_data=['Subject'], title="Test-Retest Correlation")
+                fig_corr.add_shape(type="line", x0=0, y0=0, x1=df_tr['Visit_1_Hz'].max(), y1=df_tr['Visit_1_Hz'].max(), line=dict(dash="dash", color="gray"))
+                st.plotly_chart(fig_corr, use_container_width=True)
+
+            with col5:
+                fig_diff = px.box(df_tr, y="Hz_Difference", points="all", title="Median Range (V2 - V1)")
+                fig_diff.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                fig_diff.add_hline(y=0, line_dash="dash", line_color="red")
+                st.plotly_chart(fig_diff, use_container_width=True)
+                
+            with st.expander("View Legacy pHCP References (EPS)"):
+                ref_col4, ref_col5 = st.columns(2)
+                with ref_col4: st.image("documents/pHCP_EPS_Files/TestRetestSwitchRates.png", caption="pHCP Test-Retest")
+                with ref_col5: st.image("documents/pHCP_EPS_Files/TestReTest_MedianRange.png", caption="pHCP Median Range")
 
 
     with tab2:
