@@ -20,8 +20,12 @@ from loaders.academic_research_loader import (
     get_research_expertise, 
     get_academic_assets,
     get_project_narratives,
-    get_sfm_data,               # <--- NEW NAME
-    plot_sfm_dashboard,         # <--- NEW NAME
+    get_sfm_data,
+    get_percept_duration_data,  # <-- NEW
+    get_response_counts_data,   # <-- NEW
+    get_rt_histogram_data,      # <-- NEW
+    get_accuracy_data,          # <-- NEW
+    get_test_retest_data,       # <-- NEW
     PLOTLY_CONFIG
 )
 
@@ -102,68 +106,96 @@ with tabs[0]:
 
     with tab1:
         st.header("Control Data Analysis")
+        # Fetch a baseline copy of the data just for Tab 1
+        df_tab1 = get_sfm_data(apply_qc=True) 
         
         # --- SECTION 1: Histograms ---
         st.subheader("1. Distribution Profiles")
         hist_choice = st.selectbox(
             "Select Distribution to View:", 
             ["Percept Durations", "Participant Responses", "Reaction Times"],
-            index=0 # Sets Percept Durations as default
+            index=0 
         )
         
-        # (Placeholder) Call your Plotly plotting function based on hist_choice here
-        st.info(f"Plotly Interactive Graph for {hist_choice} will go here.")
+        if hist_choice == "Percept Durations":
+            df_pd = get_percept_duration_data(df_tab1)
+            fig_hist = px.histogram(df_pd, x="Duration_Sec", color="Task_Type", barmode="overlay", nbins=50, title="Percept Durations")
+            st.plotly_chart(fig_hist, use_container_width=True)
+            
+        elif hist_choice == "Participant Responses":
+            df_counts = get_response_counts_data(df_tab1)
+            df_melt = df_counts.melt(id_vars=['Subject', 'Task_Type'], value_vars=['Left_Presses', 'Right_Presses'], var_name='Key', value_name='Count')
+            fig_hist = px.box(df_melt, x="Key", y="Count", color="Task_Type", points="all", title="Participant Responses (Left vs Right)")
+            fig_hist.update_traces(jitter=0.6, pointpos=0, width=0.3) # Narrow box, wide dots
+            st.plotly_chart(fig_hist, use_container_width=True)
+            
+        elif hist_choice == "Reaction Times":
+            df_rt = get_rt_histogram_data(df_tab1)
+            fig_hist = px.histogram(df_rt, x="Reaction_Time_Sec", nbins=50, title="Reaction Times (Control Task)")
+            st.plotly_chart(fig_hist, use_container_width=True)
         
-        # Legacy EPS Expander for Section 1
         with st.expander("View Legacy pHCP Reference (EPS)"):
             if hist_choice == "Percept Durations":
                 st.image("documents/pHCP_EPS_Files/HistOfPercDurations.png")
             elif hist_choice == "Participant Responses":
                 st.image("documents/pHCP_EPS_Files/HistOfPartResponses.png")
-            else:
+            elif hist_choice == "Reaction Times":
                 st.image("documents/pHCP_EPS_Files/HistOfReactionTimes.png")
                 
-        st.divider() # Creates a clean visual line between sections
+        st.divider()
         
         # --- SECTION 2: Control Task Performance ---
         st.subheader("2. Control Task Performance")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3) # <-- Changed to 3 columns
         
         with col1:
-            # (Placeholder) Plotly Graph for AveDurAwayTowards
-            st.info("Interactive Plot for Average Duration Away/Towards")
+            df_pd_ctrl = get_percept_duration_data(df_tab1)
+            df_dir = df_pd_ctrl[df_pd_ctrl['Task_Type'] == 'Control'].groupby(['Subject', 'Direction'])['Duration_Sec'].sum().reset_index()
+            fig_dir = px.box(df_dir, x="Direction", y="Duration_Sec", points="all", title="Duration Away/Towards")
+            fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
+            st.plotly_chart(fig_dir, use_container_width=True)
+
         with col2:
-            # (Placeholder) Plotly Graph for Accuracy
-            st.info("Interactive Plot for AccFULL")
+            df_acc = get_accuracy_data(df_tab1)
+            fig_acc = px.box(df_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
+            fig_acc.update_traces(jitter=0.6, pointpos=0, width=0.3)
+            st.plotly_chart(fig_acc, use_container_width=True)
             
-        # Legacy EPS Expander for Section 2
+        with col3:
+            df_rt_all = get_rt_histogram_data(df_tab1)
+            df_rt_ave = df_rt_all.groupby('Subject')['Reaction_Time_Sec'].mean().reset_index()
+            fig_rt_ave = px.box(df_rt_ave, y="Reaction_Time_Sec", points="all", title="Average RT")
+            fig_rt_ave.update_traces(jitter=0.6, pointpos=0, width=0.3)
+            st.plotly_chart(fig_rt_ave, use_container_width=True)
+            
         with st.expander("View Legacy pHCP References (EPS)"):
-            ref_col1, ref_col2 = st.columns(2)
-            with ref_col1:
-                st.image("documents/pHCP_EPS_Files/AveDurAwayTowards.png", caption="pHCP Ave Dur Away/Towards")
-            with ref_col2:
-                st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
+            ref_col1, ref_col2, ref_col3 = st.columns(3)
+            with ref_col1: st.image("documents/pHCP_EPS_Files/AveDurAwayTowards.png", caption="pHCP Ave Dur Away/Towards")
+            with ref_col2: st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
+            with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
 
         st.divider()
         
         # --- SECTION 3: Test-Retest Reliability ---
         st.subheader("3. Test-Retest Reliability")
-        col3, col4 = st.columns(2)
+        col4, col5 = st.columns(2)
+        df_tr = get_test_retest_data(df_tab1)
         
-        with col3:
-            # (Placeholder) Plotly Graph for Test-Retest Correlation
-            st.info("Interactive Plot for Test-Retest Correlation")
         with col4:
-            # (Placeholder) Plotly Graph for Median Range
-            st.info("Interactive Plot for Median Range")
+            fig_corr = px.scatter(df_tr, x="Visit_1_Hz", y="Visit_2_Hz", hover_data=['Subject'], title="Test-Retest Correlation")
+            fig_corr.add_shape(type="line", x0=0, y0=0, x1=df_tr['Visit_1_Hz'].max(), y1=df_tr['Visit_1_Hz'].max(), line=dict(dash="dash", color="gray"))
+            st.plotly_chart(fig_corr, use_container_width=True)
+
+        with col5:
+            fig_diff = px.box(df_tr, y="Hz_Difference", points="all", title="Median Range (V2 - V1)")
+            fig_diff.update_traces(jitter=0.6, pointpos=0, width=0.3)
+            fig_diff.add_hline(y=0, line_dash="dash", line_color="red")
+            st.plotly_chart(fig_diff, use_container_width=True)
             
-        # Legacy EPS Expander for Section 3
         with st.expander("View Legacy pHCP References (EPS)"):
-            ref_col3, ref_col4 = st.columns(2)
-            with ref_col3:
-                st.image("documents/pHCP_EPS_Files/TestRetestSwitchRates.png", caption="pHCP Test-Retest Correlation")
-            with ref_col4:
-                st.image("documents/pHCP_EPS_Files/TestReTest_MedianRange.png", caption="pHCP Median Range")
+            ref_col4, ref_col5 = st.columns(2)
+            with ref_col4: st.image("documents/pHCP_EPS_Files/TestRetestSwitchRates.png", caption="pHCP Test-Retest")
+            with ref_col5: st.image("documents/pHCP_EPS_Files/TestReTest_MedianRange.png", caption="pHCP Median Range")
 
 
     with tab2:
@@ -206,10 +238,32 @@ with tabs[0]:
         else:
             # --- PLOTTING & STATS ---
             c1, c2 = st.columns([2, 1])
+            
             with c1:
-                fig = plot_sfm_dashboard(df_sfm, selected_metric)
-                st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                st.markdown("### Behavioral Performance")
                 
+                # Setup column mapping based on dropdown
+                if "Rate" in selected_metric:
+                    ctrl_col, bi_col = 'Real_Switch_Hz', 'Bistable_Hz'
+                else:
+                    ctrl_col, bi_col = 'Control_Dur', 'Bistable_Dur' 
+                
+                # Split the main chart area into two side-by-side graphs
+                chart_col1, chart_col2 = st.columns(2)
+                
+                with chart_col1:
+                    fig_ctrl = px.box(df_sfm, x="Group", y=ctrl_col, points="all", title="Control Task")
+                    fig_ctrl.update_traces(jitter=0.7, pointpos=0, width=0.3)
+                    fig_ctrl.update_layout(yaxis_title=f"Control {selected_metric}")
+                    st.plotly_chart(fig_ctrl, use_container_width=True)
+                    
+                with chart_col2:
+                    fig_bi = px.box(df_sfm, x="Group", y=bi_col, points="all", title="Bistable Task")
+                    fig_bi.update_traces(jitter=0.7, pointpos=0, width=0.3)
+                    fig_bi.update_layout(yaxis_title=f"Bistable {selected_metric}")
+                    st.plotly_chart(fig_bi, use_container_width=True)
+
+            # KEEP THIS EXACTLY AS YOU HAD IT (Just indented to match c1)
             with c2:
                 st.markdown("### Live Statistical Insights")
                 st.caption("Non-parametric K-W and Mann-Whitney U models dynamically computed based on current parameters.")
@@ -220,20 +274,22 @@ with tabs[0]:
                 # Fetch and display the live stats!
                 from loaders.academic_research_loader import generate_live_statistics
                 stats_output = generate_live_statistics(df_sfm, stat_target)
-                st.info(stats_output)
+                st.info(f"**Bistable Task Stats:**\n\n{stats_output}") # Added a bold header to clarify it's the Bistable stats
                 
                 with st.expander("View Full Raw Subject Data"):
-                    display_cols = ['Subject', 'Group', 'Bistable_Hz', 'Bistable_Dur']
+                    # Updated display_cols to show both Control and Bistable raw numbers
+                    display_cols = ['Subject', 'Group', ctrl_col, bi_col] 
                     available_cols = [c for c in display_cols if c in df_sfm.columns]
                     st.dataframe(df_sfm[available_cols], use_container_width=True, hide_index=True)
 
-        # Add the legacy expander underneath your Plotly chart
+        # Legacy EPS Expander - Centered Image
         with st.expander("View Legacy pHCP Reference (EPS)"):
-            # Assuming your metric selectbox variable is named something like 'selected_metric'
-            if selected_metric == "Bistable Switch Rate (Hz)": # Adjust text to match your actual selectbox
-                st.image("documents/pHCP_EPS_Files/AveSwitchRate.png", caption="pHCP Average Switch Rate")
-            elif selected_metric == "Percept Duration (Sec)":
-                st.image("documents/pHCP_EPS_Files/AvePercDur.png", caption="pHCP Average Percept Duration")
+            _, center_col, _ = st.columns([1, 2, 1]) # The middle column takes up 50% of the space
+            with center_col:
+                if "Switch Rate" in selected_metric:
+                    st.image("documents/pHCP_EPS_Files/AveSwitchRate.png", caption="pHCP Switch Rate")
+                elif "Percept Duration" in selected_metric:
+                    st.image("documents/pHCP_EPS_Files/AvePercDur.png", caption="pHCP Percept Duration")
 
     with tab3:
         st.header("Modeling")
