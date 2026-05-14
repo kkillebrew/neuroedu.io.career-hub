@@ -127,24 +127,6 @@ with tabs[0]:
                 ["Percept Durations", "Participant Responses", "Reaction Times"],
                 index=0 
             )
-
-            # # --- 🚨 START DIAGNOSTIC X-RAY 🚨 ---
-            # st.error("### 🔍 Parquet File Diagnostic X-Ray")
-            # if df_tab1.empty:
-            #     st.write("Dataset failed to load completely. Check the network or URL.")
-            # else:
-            #     st.write("**1. All Columns found in the downloaded Parquet file:**")
-            #     st.write(list(df_tab1.columns))
-                
-            #     # Specifically check for the JSON columns we need
-            #     json_cols = [c for c in df_tab1.columns if 'JSON' in c]
-            #     if json_cols:
-            #         st.success(f"**2. JSON Columns Found!** {json_cols}")
-            #         st.write("**3. First 5 rows of JSON data (Checking for NaN or Empty Lists):**")
-            #         st.dataframe(df_tab1[['Subject'] + json_cols].head())
-            #     else:
-            #         st.error("**2. CRITICAL FAILURE: No JSON columns found in the dataset.**")
-            # # --- 🚨 END DIAGNOSTIC X-RAY 🚨 ---
             
             if hist_choice == "Percept Durations":
                 df_pd = get_percept_duration_data(df_tab1)
@@ -184,7 +166,7 @@ with tabs[0]:
             
             # --- SECTION 2: Control Task Performance ---
             st.subheader("2. Control Task Performance")
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(3)
             
             with col1:
                 import json # Safely ensuring json is available
@@ -248,40 +230,6 @@ with tabs[0]:
                 with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
 
             st.divider()
-            
-            # --- SECTION 3: Test-Retest Reliability ---
-            st.subheader("3. Test-Retest Reliability")
-            col4, col5 = st.columns(2)
-            st.error("### 🔍 TEST-RETEST DIAGNOSTIC")
-            if 'Visit_Number' in df_tab1.columns:
-                st.write("**Total rows per visit:**", df_tab1['Visit_Number'].value_counts().to_dict())
-                v2_subs = df_tab1[df_tab1['Visit_Number'] == 2]['Subject'].unique()
-                st.write(f"**Subjects with a Visit 2:** {len(v2_subs)}")
-            else:
-                st.write("**CRITICAL:** 'Visit_Number' column is completely missing from the data!")
-            df_tr = get_test_retest_data(df_tab1)
-            
-            with col4:
-                fig_corr = px.scatter(df_tr, x="Visit_1_Hz", y="Visit_2_Hz", hover_data=['Subject'], title="Test-Retest Correlation")
-                fig_corr.add_shape(type="line", x0=0, y0=0, x1=df_tr['Visit_1_Hz'].max(), y1=df_tr['Visit_1_Hz'].max(), line=dict(dash="dash", color="gray"))
-                st.plotly_chart(fig_corr, use_container_width=True)
-
-            with col5:
-                fig_diff = px.box(df_tr, y="Hz_Difference", points="all", title="Median Range (V2 - V1)")
-                fig_diff.update_traces(jitter=0.6, pointpos=0, width=0.3)
-                fig_diff.add_hline(y=0, line_dash="dash", line_color="red")
-                st.plotly_chart(fig_diff, use_container_width=True)
-                
-            with st.expander("View Legacy pHCP References (EPS)"):
-                ref_col4, ref_col5 = st.columns(2)
-                with ref_col4: st.image("documents/pHCP_EPS_Files/TestRetestSwitchRates.png", caption="pHCP Test-Retest")
-                with ref_col5: st.image("documents/pHCP_EPS_Files/TestReTest_MedianRange.png", caption="pHCP Median Range")
-
-
-        # TEMPORARY DEBUGGER: Remove once histograms work!
-        with st.expander("🛠️ Data Debugger (Check Column Names)"):
-            st.write("Available Columns:", list(df_tab1.columns))
-            st.write("Sample JSON Content:", df_tab1[['Raw_RT_JSON', 'Raw_Events_JSON']].head() if 'Raw_RT_JSON' in df_tab1.columns else "JSON Columns Missing!")           
     
     with tab2:
         # --- LIVE DATA DASHBOARD ---
