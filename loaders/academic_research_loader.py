@@ -386,30 +386,46 @@ def get_accuracy_data(df):
     return df_main[['Subject', 'Control_Acc_Raw', 'Control_Correct_Responses']].dropna()
 
 def get_percept_duration_data(df):
-    """Unpacks button presses for both Control and Bistable tasks."""
+    """Unpacks button presses, calculates durations within the same block, and tags the block."""
     df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
     all_durations = []
     
     for _, row in df_main.iterrows():
-        # Iterate over both task types to unpack their respective columns
         for task_type in ['Control', 'Bistable']:
             raw_json = row.get(f"{task_type}_Raw_Events_JSON")
             if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
             
             try:
                 events = json.loads(raw_json)
+                
+                # 1. Sort events chronologically to guarantee no accidental negative math
+                events.sort(key=lambda x: float(x[1]) if isinstance(x, list) else float(x.get('Time', 0)))
+                
                 for i in range(len(events) - 1):
                     e1, e2 = events[i], events[i+1]
-                    t1 = e1[1] if isinstance(e1, list) else e1.get('Time')
-                    t2 = e2[1] if isinstance(e2, list) else e2.get('Time')
                     
-                    all_durations.append({
-                        'Subject': row['Subject'],
-                        'Task_Type': task_type,
-                        'Direction': str(e1[2] if isinstance(e1, list) else e1.get('Key')).lower(),
-                        'Duration_Sec': float(t2) - float(t1)
-                    })
+                    # 2. Extract block labels safely
+                    block1 = e1[0] if isinstance(e1, list) else e1.get('Block')
+                    block2 = e2[0] if isinstance(e2, list) else e2.get('Block')
+                    
+                    # 3. CRITICAL: Only calculate duration if the presses belong to the SAME block
+                    if block1 == block2:
+                        t1 = float(e1[1] if isinstance(e1, list) else e1.get('Time'))
+                        t2 = float(e2[1] if isinstance(e2, list) else e2.get('Time'))
+                        
+                        dur = t2 - t1
+                        
+                        # 4. Only keep logical durations (> 0s) and explicitly store the Block label
+                        if dur > 0:
+                            all_durations.append({
+                                'Subject': row['Subject'],
+                                'Task_Type': task_type,
+                                'Block': int(block1), # <--- Storing the correct Block label here!
+                                'Direction': str(e1[2] if isinstance(e1, list) else e1.get('Key')).lower(),
+                                'Duration_Sec': dur
+                            })
             except: continue
+            
     return pd.DataFrame(all_durations)
 
 def get_rt_histogram_data(df):
