@@ -12,6 +12,8 @@ import streamlit as st
 import sys
 import os
 import plotly.express as px
+import pandas as pd  # <--- ADD THIS LINE
+import json          # <--- ADD THIS LINE (if not already there)
 
 # --- PATH CONFIGURATION ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
