@@ -126,23 +126,23 @@ with tabs[0]:
                 index=0 
             )
 
-            # --- 🚨 START DIAGNOSTIC X-RAY 🚨 ---
-            st.error("### 🔍 Parquet File Diagnostic X-Ray")
-            if df_tab1.empty:
-                st.write("Dataset failed to load completely. Check the network or URL.")
-            else:
-                st.write("**1. All Columns found in the downloaded Parquet file:**")
-                st.write(list(df_tab1.columns))
+            # # --- 🚨 START DIAGNOSTIC X-RAY 🚨 ---
+            # st.error("### 🔍 Parquet File Diagnostic X-Ray")
+            # if df_tab1.empty:
+            #     st.write("Dataset failed to load completely. Check the network or URL.")
+            # else:
+            #     st.write("**1. All Columns found in the downloaded Parquet file:**")
+            #     st.write(list(df_tab1.columns))
                 
-                # Specifically check for the JSON columns we need
-                json_cols = [c for c in df_tab1.columns if 'JSON' in c]
-                if json_cols:
-                    st.success(f"**2. JSON Columns Found!** {json_cols}")
-                    st.write("**3. First 5 rows of JSON data (Checking for NaN or Empty Lists):**")
-                    st.dataframe(df_tab1[['Subject'] + json_cols].head())
-                else:
-                    st.error("**2. CRITICAL FAILURE: No JSON columns found in the dataset.**")
-            # --- 🚨 END DIAGNOSTIC X-RAY 🚨 ---
+            #     # Specifically check for the JSON columns we need
+            #     json_cols = [c for c in df_tab1.columns if 'JSON' in c]
+            #     if json_cols:
+            #         st.success(f"**2. JSON Columns Found!** {json_cols}")
+            #         st.write("**3. First 5 rows of JSON data (Checking for NaN or Empty Lists):**")
+            #         st.dataframe(df_tab1[['Subject'] + json_cols].head())
+            #     else:
+            #         st.error("**2. CRITICAL FAILURE: No JSON columns found in the dataset.**")
+            # # --- 🚨 END DIAGNOSTIC X-RAY 🚨 ---
             
             if hist_choice == "Percept Durations":
                 df_pd = get_percept_duration_data(df_tab1)
@@ -186,11 +186,23 @@ with tabs[0]:
             
             with col1:
                 df_pd_ctrl = get_percept_duration_data(df_tab1)
-                df_dir = df_pd_ctrl[df_pd_ctrl['Task_Type'] == 'Control'].groupby(['Subject', 'Direction'])['Duration_Sec'].sum().reset_index()
-                fig_dir = px.box(df_dir, x="Direction", y="Duration_Sec", points="all", title="Duration Away/Towards")
-                fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
-                st.plotly_chart(fig_dir, use_container_width=True)
-
+                if not df_pd_ctrl.empty:
+                    # Group by Subject, Task_Type, AND Direction to keep them separate
+                    df_dir = df_pd_ctrl.groupby(['Subject', 'Task_Type', 'Direction'])['Duration_Sec'].sum().reset_index()
+                    
+                    # Plot with 'color="Task_Type"' to show them side-by-side!
+                    fig_dir = px.box(
+                        df_dir, 
+                        x="Direction", 
+                        y="Duration_Sec", 
+                        color="Task_Type", 
+                        points="all", 
+                        title="Duration Away vs Towards",
+                        color_discrete_map={"Control": "#10b981", "Bistable": "#ef4444"}
+                    )
+                    fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                    st.plotly_chart(fig_dir, use_container_width=True)
+                    
             with col2:
                 df_acc = get_accuracy_data(df_tab1)
                 fig_acc = px.box(df_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
