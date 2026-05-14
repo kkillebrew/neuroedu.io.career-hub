@@ -385,99 +385,70 @@ def get_accuracy_data(df):
         
     return df_main[['Subject', 'Control_Acc_Raw', 'Control_Correct_Responses']].dropna()
 
-def get_rt_histogram_data(df):
-    """Unpacks the raw reaction times for the RT Histogram."""
-    # Find the RT column even if the name shifted slightly
-    rt_col = next((c for c in df.columns if 'RT' in c and 'JSON' in c), 'Raw_RT_JSON')
-    
-    if 'Visit_Number' in df.columns:
-        df_main = df[df['Visit_Number'] == 1].copy()
-    else:
-        df_main = df.copy()
-        
-    all_rts = []
-    for _, row in df_main.iterrows():
-        try:
-            raw_json = row.get(rt_col)
-            # Check for NaN, None, or empty strings
-            if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
-            
-            rts = json.loads(raw_json)
-            for rt in rts:
-                # MATLAB/Psychopy sometimes saves RTs as a list of lists or single list
-                val = rt[0] if isinstance(rt, list) else rt
-                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(val)})
-        except Exception:
-            continue
-            
-    if not all_rts: return pd.DataFrame(columns=['Subject', 'Reaction_Time_Sec'])
-    return pd.DataFrame(all_rts)
-
 def get_percept_duration_data(df):
-    """Unpacks button presses to calculate every single percept duration."""
-    event_col = next((c for c in df.columns if 'Events' in c and 'JSON' in c), 'Raw_Events_JSON')
-    
-    if 'Visit_Number' in df.columns:
-        df_main = df[df['Visit_Number'] == 1].copy()
-    else:
-        df_main = df.copy()
-        
+    """Unpacks button presses for both Control and Bistable tasks."""
+    df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
     all_durations = []
+    
     for _, row in df_main.iterrows():
-        try:
-            raw_json = row.get(event_col)
+        # Iterate over both task types to unpack their respective columns
+        for task_type in ['Control', 'Bistable']:
+            raw_json = row.get(f"{task_type}_Raw_Events_JSON")
             if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
             
-            events = json.loads(raw_json)
-            task_name = row.get('Task_Type', 'SFM Task') 
-            
-            for i in range(len(events) - 1):
-                # Psychopy format: [block, time, key]
-                # Some versions save as dicts, some as lists. This handles both.
-                e1 = events[i]
-                e2 = events[i+1]
-                
-                block = e1[0] if isinstance(e1, list) else e1.get('Block')
-                time_start = e1[1] if isinstance(e1, list) else e1.get('Time')
-                time_end = e2[1] if isinstance(e2, list) else e2.get('Time')
-                direction = e1[2] if isinstance(e1, list) else e1.get('Key')
-                
-                all_durations.append({
-                    'Subject': row['Subject'],
-                    'Task_Type': task_name,
-                    'Block': block,
-                    'Direction': str(direction).lower(),
-                    'Duration_Sec': float(time_end) - float(time_start)
-                })
-        except Exception:
-            continue
-            
-    if not all_durations: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Block', 'Direction', 'Duration_Sec'])
+            try:
+                events = json.loads(raw_json)
+                for i in range(len(events) - 1):
+                    e1, e2 = events[i], events[i+1]
+                    t1 = e1[1] if isinstance(e1, list) else e1.get('Time')
+                    t2 = e2[1] if isinstance(e2, list) else e2.get('Time')
+                    
+                    all_durations.append({
+                        'Subject': row['Subject'],
+                        'Task_Type': task_type,
+                        'Direction': str(e1[2] if isinstance(e1, list) else e1.get('Key')).lower(),
+                        'Duration_Sec': float(t2) - float(t1)
+                    })
+            except: continue
     return pd.DataFrame(all_durations)
 
-def get_response_counts_data(df):
-    """Counts total, left, and right button presses for the Response Histogram."""
-    # Defensive check for visit 1
+def get_rt_histogram_data(df):
+    """Unpacks the raw reaction times for the Control Task."""
     df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
+    all_rts = []
     
-    all_counts = []
     for _, row in df_main.iterrows():
+        raw_json = row.get("Control_Raw_RT_JSON")
+        if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
+        
         try:
-            raw_json = row.get('Raw_Events_JSON')
+            rts = json.loads(raw_json)
+            for rt in rts:
+                val = rt[0] if isinstance(rt, list) else rt
+                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(val)})
+        except: continue
+    return pd.DataFrame(all_rts)
+
+def get_response_counts_data(df):
+    """Counts left/right button presses for both tasks."""
+    df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
+    all_counts = []
+    
+    for _, row in df_main.iterrows():
+        for task_type in ['Control', 'Bistable']:
+            raw_json = row.get(f"{task_type}_Raw_Events_JSON")
             if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
             
-            events = json.loads(raw_json)
-            left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
-            right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
-            
-            all_counts.append({
-                'Subject': row['Subject'],
-                'Task_Type': row.get('Task_Type', 'SFM'),
-                'Total_Presses': len(events),
-                'Left_Presses': left_count,
-                'Right_Presses': right_count
-            })
-        except: continue
-            
-    if not all_counts: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Total_Presses', 'Left_Presses', 'Right_Presses'])
+            try:
+                events = json.loads(raw_json)
+                l = sum(1 for e in events if 'left' in str(e[2] if isinstance(e, list) else e.get('Key')).lower())
+                r = sum(1 for e in events if 'right' in str(e[2] if isinstance(e, list) else e.get('Key')).lower())
+                
+                all_counts.append({
+                    'Subject': row['Subject'], 
+                    'Task_Type': task_type,
+                    'Left_Presses': l, 
+                    'Right_Presses': r
+                })
+            except: continue
     return pd.DataFrame(all_counts)
