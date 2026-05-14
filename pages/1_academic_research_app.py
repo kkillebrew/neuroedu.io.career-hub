@@ -216,6 +216,11 @@ with tabs[0]:
                 with ref_col5: st.image("documents/pHCP_EPS_Files/TestReTest_MedianRange.png", caption="pHCP Median Range")
 
 
+        # TEMPORARY DEBUGGER: Remove once histograms work!
+        with st.expander("🛠️ Data Debugger (Check Column Names)"):
+            st.write("Available Columns:", list(df_tab1.columns))
+            st.write("Sample JSON Content:", df_tab1[['Raw_RT_JSON', 'Raw_Events_JSON']].head() if 'Raw_RT_JSON' in df_tab1.columns else "JSON Columns Missing!")           
+    
     with tab2:
         # --- LIVE DATA DASHBOARD ---
         st.subheader("Data Exploration: Switch Rates & Percept Durations")

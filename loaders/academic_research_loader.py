@@ -385,10 +385,10 @@ def get_accuracy_data(df):
 
 def get_rt_histogram_data(df):
     """Unpacks the raw reaction times for the RT Histogram."""
-    # Removed the strict Task_Type filter to prevent KeyErrors
-    if 'Main_Analysis_Inclusion' in df.columns:
-        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
-    elif 'Visit_Number' in df.columns:
+    # Find the RT column even if the name shifted slightly
+    rt_col = next((c for c in df.columns if 'RT' in c and 'JSON' in c), 'Raw_RT_JSON')
+    
+    if 'Visit_Number' in df.columns:
         df_main = df[df['Visit_Number'] == 1].copy()
     else:
         df_main = df.copy()
@@ -396,12 +396,15 @@ def get_rt_histogram_data(df):
     all_rts = []
     for _, row in df_main.iterrows():
         try:
-            raw_json = row.get('Raw_RT_JSON')
-            if pd.isna(raw_json) or not raw_json: continue
+            raw_json = row.get(rt_col)
+            # Check for NaN, None, or empty strings
+            if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
             
             rts = json.loads(raw_json)
             for rt in rts:
-                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': rt})
+                # MATLAB/Psychopy sometimes saves RTs as a list of lists or single list
+                val = rt[0] if isinstance(rt, list) else rt
+                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(val)})
         except Exception:
             continue
             
@@ -410,9 +413,9 @@ def get_rt_histogram_data(df):
 
 def get_percept_duration_data(df):
     """Unpacks button presses to calculate every single percept duration."""
-    if 'Main_Analysis_Inclusion' in df.columns:
-        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
-    elif 'Visit_Number' in df.columns:
+    event_col = next((c for c in df.columns if 'Events' in c and 'JSON' in c), 'Raw_Events_JSON')
+    
+    if 'Visit_Number' in df.columns:
         df_main = df[df['Visit_Number'] == 1].copy()
     else:
         df_main = df.copy()
@@ -420,64 +423,32 @@ def get_percept_duration_data(df):
     all_durations = []
     for _, row in df_main.iterrows():
         try:
-            raw_json = row.get('Raw_Events_JSON')
-            if pd.isna(raw_json) or not raw_json: continue
+            raw_json = row.get(event_col)
+            if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
             
             events = json.loads(raw_json)
-            # Use safe .get() instead of strict bracket notation!
             task_name = row.get('Task_Type', 'SFM Task') 
             
             for i in range(len(events) - 1):
-                block = float(events[i][0])
-                time_start = float(events[i][1])
-                time_end = float(events[i+1][1])
-                direction = str(events[i][2]).lower()
+                # Psychopy format: [block, time, key]
+                # Some versions save as dicts, some as lists. This handles both.
+                e1 = events[i]
+                e2 = events[i+1]
                 
-                duration = time_end - time_start
+                block = e1[0] if isinstance(e1, list) else e1.get('Block')
+                time_start = e1[1] if isinstance(e1, list) else e1.get('Time')
+                time_end = e2[1] if isinstance(e2, list) else e2.get('Time')
+                direction = e1[2] if isinstance(e1, list) else e1.get('Key')
+                
                 all_durations.append({
                     'Subject': row['Subject'],
                     'Task_Type': task_name,
                     'Block': block,
-                    'Direction': direction,
-                    'Duration_Sec': duration
+                    'Direction': str(direction).lower(),
+                    'Duration_Sec': float(time_end) - float(time_start)
                 })
         except Exception:
             continue
             
     if not all_durations: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Block', 'Direction', 'Duration_Sec'])
     return pd.DataFrame(all_durations)
-
-def get_response_counts_data(df):
-    """Counts total, left, and right button presses for the Response Histogram."""
-    if 'Main_Analysis_Inclusion' in df.columns:
-        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
-    elif 'Visit_Number' in df.columns:
-        df_main = df[df['Visit_Number'] == 1].copy()
-    else:
-        df_main = df.copy()
-        
-    all_counts = []
-    for _, row in df_main.iterrows():
-        try:
-            raw_json = row.get('Raw_Events_JSON')
-            if pd.isna(raw_json) or not raw_json: continue
-            
-            events = json.loads(raw_json)
-            left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
-            right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
-            
-            # Use safe .get() instead of strict bracket notation!
-            task_name = row.get('Task_Type', 'SFM Task')
-            
-            all_counts.append({
-                'Subject': row['Subject'],
-                'Task_Type': task_name,
-                'Total_Presses': len(events),
-                'Left_Presses': left_count,
-                'Right_Presses': right_count
-            })
-        except Exception:
-            continue
-            
-    if not all_counts: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Total_Presses', 'Left_Presses', 'Right_Presses'])
-    return pd.DataFrame(all_counts)
