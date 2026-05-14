@@ -252,6 +252,13 @@ with tabs[0]:
             # --- SECTION 3: Test-Retest Reliability ---
             st.subheader("3. Test-Retest Reliability")
             col4, col5 = st.columns(2)
+            st.error("### 🔍 TEST-RETEST DIAGNOSTIC")
+            if 'Visit_Number' in df_tab1.columns:
+                st.write("**Total rows per visit:**", df_tab1['Visit_Number'].value_counts().to_dict())
+                v2_subs = df_tab1[df_tab1['Visit_Number'] == 2]['Subject'].unique()
+                st.write(f"**Subjects with a Visit 2:** {len(v2_subs)}")
+            else:
+                st.write("**CRITICAL:** 'Visit_Number' column is completely missing from the data!")
             df_tr = get_test_retest_data(df_tab1)
             
             with col4:
