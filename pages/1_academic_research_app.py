@@ -252,7 +252,7 @@ with tabs[0]:
             # --- SECTION 3: Test-Retest Reliability ---
             st.subheader("3. Test-Retest Reliability")
             col4, col5 = st.columns(2)
-            df_tr = get_test_retest_data(df_sfm)  # <-- Feed it the raw, unfiltered data!
+            df_tr = get_test_retest_data(df_tab1)
             
             with col4:
                 fig_corr = px.scatter(df_tr, x="Visit_1_Hz", y="Visit_2_Hz", hover_data=['Subject'], title="Test-Retest Correlation")
