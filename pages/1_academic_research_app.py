@@ -232,7 +232,6 @@ with tabs[0]:
             st.divider()
     
     with tab2:
-        # --- LIVE DATA DASHBOARD ---
         st.subheader("Data Exploration: Switch Rates & Percept Durations")
         
         # --- UI CONTROLLERS ---
@@ -252,7 +251,7 @@ with tabs[0]:
             apply_qc_filter = st.checkbox(
                 "Apply Quality Control Exclusions (Drop participants failing control task)", 
                 value=True, # Default to True (exclusions applied)
-                help="Filters out participants who failed to detect at least 7 real switches within 4 seconds."
+                help="Filters out participants who failed to detect at least 6 real switches within 6 seconds."
             )
             
         with ui_c2:
