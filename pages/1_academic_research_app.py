@@ -184,24 +184,26 @@ with tabs[0]:
             st.subheader("2. Control Task Performance")
             col1, col2, col3 = st.columns(3)
             
-            with c1:
-                # 1. Strictly filter out Bi-stable data; we ONLY want the Control task here
-                df_control_only = df_pd[df_pd['Task_Type'] == 'Control']
+            with col1:
+                df_pd_ctrl = get_percept_duration_data(df_tab1)
+                
+                # 1. Strictly filter out Bi-stable data
+                df_control_only = df_pd_ctrl[df_pd_ctrl['Task_Type'] == 'Control']
                 
                 if not df_control_only.empty:
-                    # 2. CRITICAL FIX: Use .mean() to get the AVERAGE duration, not .sum()!
+                    # 2. Use .mean() to get the AVERAGE duration
                     df_dir = df_control_only.groupby(['Subject', 'Direction'])['Duration_Sec'].mean().reset_index()
                     
-                    fig = px.box(
+                    fig_dir = px.box(
                         df_dir, 
                         x="Direction", 
                         y="Duration_Sec", 
                         points="all", 
                         title="Average Duration (Control Task)",
-                        color_discrete_sequence=["#10b981"] # Clean, single color
+                        color_discrete_sequence=["#10b981"]
                     )
-                    fig.update_traces(jitter=0.7, width=0.4)
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig_dir.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                    st.plotly_chart(fig_dir, use_container_width=True)
                     
             with col2:
                 df_acc = get_accuracy_data(df_tab1)
