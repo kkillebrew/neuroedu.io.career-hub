@@ -21,6 +21,7 @@ import re # Import Python's Regular Expression library
 import requests
 from io import BytesIO, StringIO
 import streamlit as st
+import json
 
 # --- PLOTLY CONFIGURATION ---
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
@@ -355,3 +356,76 @@ def plot_sfm_dashboard(df, metric_mode):
     fig.update_traces(boxmean=True) 
     
     return fig
+
+def get_test_retest_data(df):
+    """
+    Filters for subjects with multiple visits and pivots the data 
+    for Test-Retest correlation and Median Range analysis.
+    """
+    # Only keep visits 1 and 2
+    df_visits = df[df['Visit_Number'].isin([1, 2])].copy()
+    
+    # Pivot so each row is a Subject, with Visit_1 and Visit_2 columns
+    df_tr = df_visits.pivot(index='Subject', columns='Visit_Number', values='Bistable_Hz').dropna()
+    df_tr.columns = ['Visit_1_Hz', 'Visit_2_Hz']
+    
+    # Calculate the median range (difference) for each subject
+    df_tr['Hz_Difference'] = df_tr['Visit_2_Hz'] - df_tr['Visit_1_Hz']
+    
+    return df_tr.reset_index()
+
+def get_accuracy_data(df):
+    """Isolates Visit 1 Accuracy data for the main analysis figure."""
+    # Filter for Main Analysis (Visit 1)
+    df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    
+    # Return just the columns needed for the Accuracy plots
+    return df_main[['Subject', 'Control_Acc_Raw', 'Control_Correct_Responses']].dropna()
+
+def get_rt_histogram_data(df):
+    """Unpacks the raw reaction times for the RT Histogram."""
+    # Main analysis only (Visit 1), and RTs only exist in the Control Task
+    df_main = df[(df['Main_Analysis_Inclusion'] == 1) & (df['Task_Type'] == 'Control')].copy()
+    
+    all_rts = []
+    for _, row in df_main.iterrows():
+        try:
+            # Safely load the JSON string; default to empty list if missing
+            rts = json.loads(row.get('Raw_RT_JSON', '[]'))
+            for rt in rts:
+                all_rts.append({
+                    'Subject': row['Subject'], 
+                    'Reaction_Time_Sec': rt
+                })
+        except Exception:
+            continue
+            
+    return pd.DataFrame(all_rts)
+
+def get_percept_duration_data(df):
+    """Unpacks button presses to calculate every single percept duration."""
+    df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    all_durations = []
+    
+    for _, row in df_main.iterrows():
+        try:
+            events = json.loads(row.get('Raw_Events_JSON', '[]'))
+            
+            # Loop through events, stopping 1 short of the end so we can calculate duration
+            for i in range(len(events) - 1):
+                block = float(events[i][0])
+                time_start = float(events[i][1])
+                time_end = float(events[i+1][1])
+                direction = str(events[i][2]).lower()
+                
+                duration = time_end - time_start
+                
+                all_durations.append({
+                    'Subject': row['Subject'],
+                    'Task_Type': row['Task_Type'],
+                    'Block': block,
+                    'Direction': direction,
+                    'Duration_Sec': duration
+                })
+        except Exception:
+            continue
