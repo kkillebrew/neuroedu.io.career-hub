@@ -385,12 +385,13 @@ def get_accuracy_data(df):
 
 def get_rt_histogram_data(df):
     """Unpacks the raw reaction times for the RT Histogram."""
+    # Removed the strict Task_Type filter to prevent KeyErrors
     if 'Main_Analysis_Inclusion' in df.columns:
-        df_main = df[(df['Main_Analysis_Inclusion'] == 1) & (df['Task_Type'] == 'Control')].copy()
+        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
     elif 'Visit_Number' in df.columns:
-        df_main = df[(df['Visit_Number'] == 1) & (df['Task_Type'] == 'Control')].copy()
+        df_main = df[df['Visit_Number'] == 1].copy()
     else:
-        df_main = df[df['Task_Type'] == 'Control'].copy()
+        df_main = df.copy()
         
     all_rts = []
     for _, row in df_main.iterrows():
@@ -423,6 +424,9 @@ def get_percept_duration_data(df):
             if pd.isna(raw_json) or not raw_json: continue
             
             events = json.loads(raw_json)
+            # Use safe .get() instead of strict bracket notation!
+            task_name = row.get('Task_Type', 'SFM Task') 
+            
             for i in range(len(events) - 1):
                 block = float(events[i][0])
                 time_start = float(events[i][1])
@@ -432,7 +436,7 @@ def get_percept_duration_data(df):
                 duration = time_end - time_start
                 all_durations.append({
                     'Subject': row['Subject'],
-                    'Task_Type': row['Task_Type'],
+                    'Task_Type': task_name,
                     'Block': block,
                     'Direction': direction,
                     'Duration_Sec': duration
@@ -462,9 +466,12 @@ def get_response_counts_data(df):
             left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
             right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
             
+            # Use safe .get() instead of strict bracket notation!
+            task_name = row.get('Task_Type', 'SFM Task')
+            
             all_counts.append({
                 'Subject': row['Subject'],
-                'Task_Type': row['Task_Type'],
+                'Task_Type': task_name,
                 'Total_Presses': len(events),
                 'Left_Presses': left_count,
                 'Right_Presses': right_count
