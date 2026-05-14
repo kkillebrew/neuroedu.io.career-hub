@@ -362,41 +362,42 @@ def get_test_retest_data(df):
     Filters for subjects with multiple visits and pivots the data 
     for Test-Retest correlation and Median Range analysis.
     """
-    # Only keep visits 1 and 2
+    # Defensive check: if Visit_Number doesn't exist, return empty safe dataframe
+    if 'Visit_Number' not in df.columns:
+        return pd.DataFrame(columns=['Subject', 'Visit_1_Hz', 'Visit_2_Hz', 'Hz_Difference'])
+        
     df_visits = df[df['Visit_Number'].isin([1, 2])].copy()
-    
-    # Pivot so each row is a Subject, with Visit_1 and Visit_2 columns
     df_tr = df_visits.pivot(index='Subject', columns='Visit_Number', values='Bistable_Hz').dropna()
     df_tr.columns = ['Visit_1_Hz', 'Visit_2_Hz']
-    
-    # Calculate the median range (difference) for each subject
     df_tr['Hz_Difference'] = df_tr['Visit_2_Hz'] - df_tr['Visit_1_Hz']
-    
     return df_tr.reset_index()
 
 def get_accuracy_data(df):
     """Isolates Visit 1 Accuracy data for the main analysis figure."""
-    # Filter for Main Analysis (Visit 1)
-    df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
-    
-    # Return just the columns needed for the Accuracy plots
+    if 'Main_Analysis_Inclusion' in df.columns:
+        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    elif 'Visit_Number' in df.columns:
+        df_main = df[df['Visit_Number'] == 1].copy()
+    else:
+        df_main = df.copy()
+        
     return df_main[['Subject', 'Control_Acc_Raw', 'Control_Correct_Responses']].dropna()
 
 def get_rt_histogram_data(df):
     """Unpacks the raw reaction times for the RT Histogram."""
-    # Main analysis only (Visit 1), and RTs only exist in the Control Task
-    df_main = df[(df['Main_Analysis_Inclusion'] == 1) & (df['Task_Type'] == 'Control')].copy()
-    
+    if 'Main_Analysis_Inclusion' in df.columns:
+        df_main = df[(df['Main_Analysis_Inclusion'] == 1) & (df['Task_Type'] == 'Control')].copy()
+    elif 'Visit_Number' in df.columns:
+        df_main = df[(df['Visit_Number'] == 1) & (df['Task_Type'] == 'Control')].copy()
+    else:
+        df_main = df[df['Task_Type'] == 'Control'].copy()
+        
     all_rts = []
     for _, row in df_main.iterrows():
         try:
-            # Safely load the JSON string; default to empty list if missing
             rts = json.loads(row.get('Raw_RT_JSON', '[]'))
             for rt in rts:
-                all_rts.append({
-                    'Subject': row['Subject'], 
-                    'Reaction_Time_Sec': rt
-                })
+                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': rt})
         except Exception:
             continue
             
@@ -404,14 +405,17 @@ def get_rt_histogram_data(df):
 
 def get_percept_duration_data(df):
     """Unpacks button presses to calculate every single percept duration."""
-    df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    if 'Main_Analysis_Inclusion' in df.columns:
+        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    elif 'Visit_Number' in df.columns:
+        df_main = df[df['Visit_Number'] == 1].copy()
+    else:
+        df_main = df.copy()
+        
     all_durations = []
-    
     for _, row in df_main.iterrows():
         try:
             events = json.loads(row.get('Raw_Events_JSON', '[]'))
-            
-            # Loop through events, stopping 1 short of the end so we can calculate duration
             for i in range(len(events) - 1):
                 block = float(events[i][0])
                 time_start = float(events[i][1])
@@ -430,8 +434,7 @@ def get_percept_duration_data(df):
         except Exception:
             continue
             
-    return pd.DataFrame(all_durations) # <--- ADD THIS EXACT LINE
-
+    return pd.DataFrame(all_durations)
 
 def get_block_switch_rates(df):
     """Calculates Switch Rate (Hz) for each individual block."""
@@ -440,32 +443,31 @@ def get_block_switch_rates(df):
     if df_events.empty:
         return pd.DataFrame()
     
-    # Count switches per block and sum duration per block
     block_summary = df_events.groupby(['Subject', 'Task_Type', 'Block']).agg(
         Total_Switches=('Direction', 'count'),
         Block_Duration_Sec=('Duration_Sec', 'sum')
     ).reset_index()
     
-    # Calculate Hz safely (avoid dividing by zero)
     block_summary['Switch_Rate_Hz'] = np.where(
         block_summary['Block_Duration_Sec'] > 0, 
         block_summary['Total_Switches'] / block_summary['Block_Duration_Sec'], 
         0
     )
-    
     return block_summary
-
 
 def get_response_counts_data(df):
     """Counts total, left, and right button presses for the Response Histogram."""
-    df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    if 'Main_Analysis_Inclusion' in df.columns:
+        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
+    elif 'Visit_Number' in df.columns:
+        df_main = df[df['Visit_Number'] == 1].copy()
+    else:
+        df_main = df.copy()
+        
     all_counts = []
-    
     for _, row in df_main.iterrows():
         try:
             events = json.loads(row.get('Raw_Events_JSON', '[]'))
-            
-            # Count occurrences of 'left' and 'right'
             left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
             right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
             
