@@ -128,20 +128,29 @@ with tabs[0]:
             
             if hist_choice == "Percept Durations":
                 df_pd = get_percept_duration_data(df_tab1)
-                fig_hist = px.histogram(df_pd, x="Duration_Sec", color="Task_Type", barmode="overlay", nbins=50, title="Percept Durations")
-                st.plotly_chart(fig_hist, use_container_width=True)
+                if df_pd.empty:
+                    st.warning("⚠️ No percept duration data available in the current dataset.")
+                else:
+                    fig_hist = px.histogram(df_pd, x="Duration_Sec", color="Task_Type", barmode="overlay", nbins=50, title="Percept Durations")
+                    st.plotly_chart(fig_hist, use_container_width=True)
                 
             elif hist_choice == "Participant Responses":
                 df_counts = get_response_counts_data(df_tab1)
-                df_melt = df_counts.melt(id_vars=['Subject', 'Task_Type'], value_vars=['Left_Presses', 'Right_Presses'], var_name='Key', value_name='Count')
-                fig_hist = px.box(df_melt, x="Key", y="Count", color="Task_Type", points="all", title="Participant Responses (Left vs Right)")
-                fig_hist.update_traces(jitter=0.6, pointpos=0, width=0.3)
-                st.plotly_chart(fig_hist, use_container_width=True)
+                if df_counts.empty:
+                    st.warning("⚠️ No participant response data available in the current dataset.")
+                else:
+                    df_melt = df_counts.melt(id_vars=['Subject', 'Task_Type'], value_vars=['Left_Presses', 'Right_Presses'], var_name='Key', value_name='Count')
+                    fig_hist = px.box(df_melt, x="Key", y="Count", color="Task_Type", points="all", title="Participant Responses (Left vs Right)")
+                    fig_hist.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                    st.plotly_chart(fig_hist, use_container_width=True)
                 
             elif hist_choice == "Reaction Times":
                 df_rt = get_rt_histogram_data(df_tab1)
-                fig_hist = px.histogram(df_rt, x="Reaction_Time_Sec", nbins=50, title="Reaction Times (Control Task)")
-                st.plotly_chart(fig_hist, use_container_width=True)
+                if df_rt.empty:
+                    st.warning("⚠️ No reaction time data available in the current dataset.")
+                else:
+                    fig_hist = px.histogram(df_rt, x="Reaction_Time_Sec", nbins=50, title="Reaction Times (Control Task)")
+                    st.plotly_chart(fig_hist, use_container_width=True)
             
             with st.expander("View Legacy pHCP Reference (EPS)"):
                 if hist_choice == "Percept Durations":

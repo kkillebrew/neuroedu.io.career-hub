@@ -395,12 +395,16 @@ def get_rt_histogram_data(df):
     all_rts = []
     for _, row in df_main.iterrows():
         try:
-            rts = json.loads(row.get('Raw_RT_JSON', '[]'))
+            raw_json = row.get('Raw_RT_JSON')
+            if pd.isna(raw_json) or not raw_json: continue
+            
+            rts = json.loads(raw_json)
             for rt in rts:
                 all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': rt})
         except Exception:
             continue
             
+    if not all_rts: return pd.DataFrame(columns=['Subject', 'Reaction_Time_Sec'])
     return pd.DataFrame(all_rts)
 
 def get_percept_duration_data(df):
@@ -415,7 +419,10 @@ def get_percept_duration_data(df):
     all_durations = []
     for _, row in df_main.iterrows():
         try:
-            events = json.loads(row.get('Raw_Events_JSON', '[]'))
+            raw_json = row.get('Raw_Events_JSON')
+            if pd.isna(raw_json) or not raw_json: continue
+            
+            events = json.loads(raw_json)
             for i in range(len(events) - 1):
                 block = float(events[i][0])
                 time_start = float(events[i][1])
@@ -423,7 +430,6 @@ def get_percept_duration_data(df):
                 direction = str(events[i][2]).lower()
                 
                 duration = time_end - time_start
-                
                 all_durations.append({
                     'Subject': row['Subject'],
                     'Task_Type': row['Task_Type'],
@@ -434,26 +440,8 @@ def get_percept_duration_data(df):
         except Exception:
             continue
             
+    if not all_durations: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Block', 'Direction', 'Duration_Sec'])
     return pd.DataFrame(all_durations)
-
-def get_block_switch_rates(df):
-    """Calculates Switch Rate (Hz) for each individual block."""
-    df_events = get_percept_duration_data(df)
-    
-    if df_events.empty:
-        return pd.DataFrame()
-    
-    block_summary = df_events.groupby(['Subject', 'Task_Type', 'Block']).agg(
-        Total_Switches=('Direction', 'count'),
-        Block_Duration_Sec=('Duration_Sec', 'sum')
-    ).reset_index()
-    
-    block_summary['Switch_Rate_Hz'] = np.where(
-        block_summary['Block_Duration_Sec'] > 0, 
-        block_summary['Total_Switches'] / block_summary['Block_Duration_Sec'], 
-        0
-    )
-    return block_summary
 
 def get_response_counts_data(df):
     """Counts total, left, and right button presses for the Response Histogram."""
@@ -467,7 +455,10 @@ def get_response_counts_data(df):
     all_counts = []
     for _, row in df_main.iterrows():
         try:
-            events = json.loads(row.get('Raw_Events_JSON', '[]'))
+            raw_json = row.get('Raw_Events_JSON')
+            if pd.isna(raw_json) or not raw_json: continue
+            
+            events = json.loads(raw_json)
             left_count = sum(1 for e in events if 'left' in str(e[2]).lower())
             right_count = sum(1 for e in events if 'right' in str(e[2]).lower())
             
@@ -481,4 +472,5 @@ def get_response_counts_data(df):
         except Exception:
             continue
             
+    if not all_counts: return pd.DataFrame(columns=['Subject', 'Task_Type', 'Total_Presses', 'Left_Presses', 'Right_Presses'])
     return pd.DataFrame(all_counts)
