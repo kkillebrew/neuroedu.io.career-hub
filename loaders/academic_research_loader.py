@@ -22,6 +22,7 @@ import requests
 from io import BytesIO, StringIO
 import streamlit as st
 import json
+import time
 
 # --- PLOTLY CONFIGURATION ---
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
@@ -136,8 +137,9 @@ def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     from Private GitHub using secure tokens, merges, and applies de-identification.
     """
     
-    # PASTE YOUR RAW GITHUB URLS HERE:
-    PARQUET_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/refs/heads/main/sfm_dashboard_data.parquet"
+    # Secure Cache Buster: Forces GitHub to give you the freshest file immediately
+    cache_buster = int(time.time())
+    PARQUET_RAW_URL = f"https://raw.githubusercontent.com/kkillebrew/SFM/refs/heads/main/sfm_dashboard_data.parquet?t={cache_buster}"
     DEMOG_RAW_URL = "https://raw.githubusercontent.com/kkillebrew/SFM/refs/heads/main/SYON-3TDemographics-DATA-2023-05-11-1249.csv"
     
     # Securely pull the token from DigitalOcean's environment variables (or local secrets)
