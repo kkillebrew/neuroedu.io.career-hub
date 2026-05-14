@@ -369,9 +369,19 @@ def get_test_retest_data(df):
         return pd.DataFrame(columns=['Subject', 'Visit_1_Hz', 'Visit_2_Hz', 'Hz_Difference'])
         
     df_visits = df[df['Visit_Number'].isin([1, 2])].copy()
-    df_tr = df_visits.pivot(index='Subject', columns='Visit_Number', values='Bistable_Hz').dropna()
+    
+    # CRITICAL FIX: Use pivot_table with aggfunc='first' to safely bypass duplicate rows caused by demographic merges
+    df_tr = df_visits.pivot_table(
+        index='Subject', 
+        columns='Visit_Number', 
+        values='Bistable_Hz',
+        aggfunc='first' 
+    ).dropna()
+    
+    # Rename columns and calculate difference
     df_tr.columns = ['Visit_1_Hz', 'Visit_2_Hz']
     df_tr['Hz_Difference'] = df_tr['Visit_2_Hz'] - df_tr['Visit_1_Hz']
+    
     return df_tr.reset_index()
 
 def get_accuracy_data(df):
