@@ -10,7 +10,6 @@ DESCRIPTION:
     Equivalent to a data struct or a dedicated script like `getMentorshipInfo.m`.
 =============================================================================
 """
-
 def get_mentorship_data():
     """
     Returns structured data for the mentorship and tutoring UI.
