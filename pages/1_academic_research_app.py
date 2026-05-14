@@ -11,6 +11,7 @@ DESCRIPTION:
 import streamlit as st
 import sys
 import os
+import plotly.express as px
 
 # --- PATH CONFIGURATION ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
