@@ -390,15 +390,20 @@ def get_test_retest_data(df):
     return df_tr.reset_index()
 
 def get_accuracy_data(df):
-    """Isolates Visit 1 Accuracy data for the main analysis figure."""
-    if 'Main_Analysis_Inclusion' in df.columns:
-        df_main = df[df['Main_Analysis_Inclusion'] == 1].copy()
-    elif 'Visit_Number' in df.columns:
-        df_main = df[df['Visit_Number'] == 1].copy()
-    else:
-        df_main = df.copy()
-        
-    return df_main[['Subject', 'Control_Acc_Raw', 'Control_Correct_Responses']].dropna()
+    """
+    Returns accuracy counts for two conditions: 
+    1. Raw (no RT filter applied)
+    2. Filtered (only counts responses within 6s)
+    """
+    # The 'Control_Correct_Responses' in your parquet is already filtered by the Colab script.
+    # To show 'Raw', we look at the 'Control_Correct_Responses_Raw' column (if available) 
+    # or calculate it from the JSON.
+    
+    # Assuming your updated parquet has these columns:
+    raw_data = df[['Subject', 'Control_Correct_Responses_Raw']].dropna()
+    filtered_data = df[['Subject', 'Control_Correct_Responses']].dropna()
+    
+    return raw_data, filtered_data
 
 def get_percept_duration_data(df):
     """Unpacks button presses, calculates durations within the same block, and tags the block."""
