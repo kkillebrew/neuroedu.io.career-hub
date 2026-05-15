@@ -449,24 +449,39 @@ def get_percept_duration_data(df):
     return pd.DataFrame(all_durations)
 
 def get_rt_histogram_data(df):
-    """Unpacks the raw reaction times for the Control Task."""
-    # Ensure we use the right column name from the Parquet
-    rt_col = "Raw_RT_JSON" 
+    """Unpacks the raw reaction times for the Control Task with robust parsing."""
+    # Try the two most likely column names from the Parquet
+    possible_cols = ["Raw_RT_JSON", "Control_Raw_RT_JSON"]
+    rt_col = next((c for c in possible_cols if c in df.columns), None)
     
+    if not rt_col:
+        return pd.DataFrame()
+
     df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
     all_rts = []
     
     for _, row in df_main.iterrows():
-        # Using the column name we defined in Colab
         raw_json = row.get(rt_col)
-        if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
+        if pd.isna(raw_json) or not raw_json or raw_json == '[]': 
+            continue
         
         try:
             rts = json.loads(raw_json)
             for rt in rts:
-                # The data in the JSON is a simple list of numbers
-                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(rt)})
-        except: continue
+                # ROBUST PARSING:
+                # If rt is [0.45], take index 0. If rt is 0.45, take it directly.
+                if isinstance(rt, list) and len(rt) > 0:
+                    val = rt[0]
+                else:
+                    val = rt
+                
+                try:
+                    all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(val)})
+                except (ValueError, TypeError):
+                    continue
+        except Exception: 
+            continue
+            
     return pd.DataFrame(all_rts)
 
 def get_response_counts_data(df):
