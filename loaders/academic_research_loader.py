@@ -454,12 +454,14 @@ def get_rt_histogram_data(df):
     all_rts = []
     
     for _, row in df_main.iterrows():
-        raw_json = row.get("Control_Raw_RT_JSON")
+        # Ensure this matches the column name in your sfm_dashboard_data.parquet
+        raw_json = row.get("Raw_RT_JSON") 
         if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
         
         try:
             rts = json.loads(raw_json)
             for rt in rts:
+                # Handle both list and scalar formats
                 val = rt[0] if isinstance(rt, list) else rt
                 all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(val)})
         except: continue
