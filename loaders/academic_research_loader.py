@@ -391,16 +391,16 @@ def get_test_retest_data(df):
 
 def get_accuracy_data(df):
     """
-    Returns accuracy counts for two conditions: 
-    1. Raw (no RT filter applied)
-    2. Filtered (only counts responses within 6s)
+    Returns accuracy counts. 
+    If Raw column is missing, it falls back to the filtered column to prevent crashes.
     """
-    # The 'Control_Correct_Responses' in your parquet is already filtered by the Colab script.
-    # To show 'Raw', we look at the 'Control_Correct_Responses_Raw' column (if available) 
-    # or calculate it from the JSON.
-    
-    # Assuming your updated parquet has these columns:
-    raw_data = df[['Subject', 'Control_Correct_Responses_Raw']].dropna()
+    # Defensive check: if the Raw column isn't there yet, just use the Filtered one twice
+    if 'Control_Correct_Responses_Raw' not in df.columns:
+        raw_col = 'Control_Correct_Responses'
+    else:
+        raw_col = 'Control_Correct_Responses_Raw'
+        
+    raw_data = df[['Subject', raw_col]].rename(columns={raw_col: 'Control_Correct_Responses_Raw'}).dropna()
     filtered_data = df[['Subject', 'Control_Correct_Responses']].dropna()
     
     return raw_data, filtered_data
