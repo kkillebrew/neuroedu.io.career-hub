@@ -450,20 +450,22 @@ def get_percept_duration_data(df):
 
 def get_rt_histogram_data(df):
     """Unpacks the raw reaction times for the Control Task."""
+    # Ensure we use the right column name from the Parquet
+    rt_col = "Raw_RT_JSON" 
+    
     df_main = df[df['Visit_Number'] == 1] if 'Visit_Number' in df.columns else df
     all_rts = []
     
     for _, row in df_main.iterrows():
-        # Ensure this matches the column name in your sfm_dashboard_data.parquet
-        raw_json = row.get("Raw_RT_JSON") 
+        # Using the column name we defined in Colab
+        raw_json = row.get(rt_col)
         if pd.isna(raw_json) or not raw_json or raw_json == '[]': continue
         
         try:
             rts = json.loads(raw_json)
             for rt in rts:
-                # Handle both list and scalar formats
-                val = rt[0] if isinstance(rt, list) else rt
-                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(val)})
+                # The data in the JSON is a simple list of numbers
+                all_rts.append({'Subject': row['Subject'], 'Reaction_Time_Sec': float(rt)})
         except: continue
     return pd.DataFrame(all_rts)
 
