@@ -14,6 +14,7 @@ import os
 import plotly.express as px
 import pandas as pd  # <--- ADD THIS LINE
 import json          # <--- ADD THIS LINE (if not already there)
+import streamlit.components.v1 as components
 
 # --- PATH CONFIGURATION ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -72,10 +73,10 @@ st.divider()
 st.header("Interactive Research Methodologies")
 st.write("A visual summary of methodologies utilized to uncover neural biomarkers and understand visual biases.")
 
-# Create the Tabs Layout
+# UPDATE your tabs definition
 tabs = st.tabs([
     "🧩 1. Biomarkers of Psychosis (SFM)", 
-    "👁️ 2. Eye-Tracking", 
+    "🔄 2. The Rotating Line Illusion",  # <-- Renamed this tab
     "🧠 3. Neural Modeling", 
     "📊 4. Visual Biases", 
     "🎯 5. Ensemble Encoding"
@@ -371,6 +372,54 @@ with tabs[0]:
         st.header("MRS")
         st.info("MRS correlation data coming soon.")
 
+### 2-Rotating Line ###
+with tabs[1]:
+        st.header("The Rotating Line Illusion")
+        
+        # --- MASTHEAD: 2-Column Layout ---
+        # MATLAB Bridge: Think of this like setting up a subplot(1,2,x) figure.
+        demo_col_left, demo_col_right = st.columns([1, 1.5])
+        
+        with demo_col_left:
+            st.subheader("Interactive Demonstration")
+            st.markdown("""
+            **The Phenomenon:** When a line rotates at a constant speed behind an elliptical aperture, 
+            the human visual system misinterprets the shrinking and growing of the line as changes in rotational speed. 
+            It appears to slow down as it reaches the vertical axis and speed up toward the horizontal.
+            
+            **Instructions:** 1. Observe the line rotating. Does it look like it's changing speed?
+            2. Use the **Modulation** slider to artificially speed up and slow down the line. 
+            3. Find the exact point where the line appears to rotate at a perfectly constant speed (Your Point of Subjective Equality).
+            """)
+            
+            # We will use Streamlit widgets to pass parameters to our JS Canvas
+            st.markdown("### Demo Controls")
+            demo_speed = st.slider("Base Rotational Speed (RPM)", min_value=10, max_value=100, value=30, step=5)
+            demo_mod = st.slider("Speed Modulation (Nullify Effect)", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
+            demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"])
+            
+        with demo_col_right:
+            # We will render the HTML/JS Canvas here in Step 3
+            st.markdown("<br>", unsafe_allow_html=True) # Spacer
+            render_rotating_line_demo(demo_speed, demo_mod, demo_shape)
+
+        st.divider()
+
+        # --- SUB-TABS: The Analytical Breakdown ---
+        # MATLAB Bridge: This separates our raw "task" from our data analysis scripts.
+        rl_tabs = st.tabs(["🧪 1. Mini Experiment", "📊 2. Control Data & Analysis", "🧠 3. Main Findings"])
+        
+        with rl_tabs[0]:
+            st.subheader("Find Your PSE (Point of Subjective Equality)")
+            st.info("Experiment logic will go here.")
+            
+        with rl_tabs[1]:
+            st.subheader("Baseline Psychometric Functions")
+            st.info("MATLAB groupData plot translations will go here.")
+            
+        with rl_tabs[2]:
+            st.subheader("Conclusions & Mechanisms")
+            st.info("Final writeup will go here.")
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---
 for i in range(1, 5):
