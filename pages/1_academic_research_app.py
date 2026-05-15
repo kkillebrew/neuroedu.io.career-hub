@@ -35,7 +35,7 @@ from loaders.academic_research_loader import (
     PLOTLY_CONFIG
 )
 
-from pages.components.rotating_line_demo import render_rotating_line_demo
+from pages.components.rotating_line_demo import render_rotating_line_demo, render_mini_demo
 from career_hub_loader import get_references_metadata
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -534,8 +534,98 @@ with tabs[1]:
                 st.warning("Fetching secure data from GitHub pipeline... Please wait or verify your connection.")
             
         with rl_tabs[2]:
-            st.subheader("Conclusions & Mechanisms")
-            st.info("Final writeup will go here.")
+            st.subheader("Main Findings: Visual Size & The Nulling Effect")
+            
+            import plotly.graph_objects as go
+            
+            # Retrieve the PSE values calculated in the previous tab
+            control_pack, exp_pack = get_rotating_line_data()
+            c_pse_long = control_pack[3].get('Long', 60) if control_pack else 60
+            c_pse_short = control_pack[3].get('Short', 50) if control_pack else 50
+            e_pse = exp_pack[3].get('N/A', 1.5) if exp_pack else 1.5
+
+            st.divider()
+
+            # =========================================================
+            # FIGURE 1: Control (Size-Speed Illusion)
+            # =========================================================
+            st.markdown("### 1. The Size-Speed Illusion (No Aperture)")
+            st.write("Even without an aperture, human vision naturally perceives longer objects as moving slower than shorter objects rotating at the exact same physical speed.")
+            
+            fig1 = go.Figure()
+            fig1.add_trace(go.Bar(
+                x=['Long Line', 'Short Line'],
+                y=[c_pse_long, c_pse_short],
+                marker_color=['red', 'blue'],
+                width=0.4
+            ))
+
+            # --- ANNOTATION: The Difference Line ---
+            # MATLAB Bridge: Equivalent to drawing a line() and text() between the bars
+            delta = c_pse_long - c_pse_short
+            fig1.add_shape(type="line",
+                x0='Long Line', y0=c_pse_short, x1='Short Line', y1=c_pse_short,
+                line=dict(color="black", width=2, dash="dashdot")
+            )
+            fig1.add_annotation(
+                x='Long Line', y=c_pse_long + 2,
+                text=f"Long lines must be sped up by ~{delta:.1f} RPM<br>to match the subjective speed of short lines!",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="black",
+                font=dict(size=12, color="black"), align="center",
+                ax=0, ay=-40 # Offset the text above the arrow
+            )
+
+            fig1.update_layout(
+                yaxis_title="Physical RPM Required for Equality",
+                xaxis=dict(showticklabels=False), # Hide text labels so we can use demos!
+                height=350, margin=dict(l=20, r=20, t=20, b=0)
+            )
+            st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CONFIG)
+
+            # --- HTML DEMOS AS X-AXIS LABELS ---
+            # Streamlit trick: Use columns to align the canvases under the bars
+            spacer1, col_long, spacer2, col_short, spacer3 = st.columns([1.5, 2, 0.5, 2, 1.5])
+            with col_long: render_mini_demo('long', speed=c_pse_long)
+            with col_short: render_mini_demo('short', speed=c_pse_short)
+
+            st.divider()
+
+            # =========================================================
+            # FIGURE 2: Experimental (The Aperture Nulling Effect)
+            # =========================================================
+            st.markdown("### 2. Nulling the Rotating Line Illusion")
+            st.write("By mapping the speed modulation factor directly to the perceived deformation caused by the aperture, we can completely nullify the illusion.")
+
+            # Create a 3:1 layout split. Plotly on the left, Demos on the right.
+            plot_col, demo_col = st.columns([3, 1])
+
+            with plot_col:
+                fig2 = go.Figure()
+                fig2.add_trace(go.Bar(
+                    x=['Group PSE'],
+                    y=[e_pse],
+                    marker_color='green',
+                    width=0.3
+                ))
+                
+                # Add horizontal reference lines to map to the demos
+                fig2.add_hline(y=4.0, line_dash="dot", line_color="red", annotation_text="Over-Modulated")
+                fig2.add_hline(y=e_pse, line_dash="dash", line_color="green", annotation_text="Subjective Equality (PSE)")
+                fig2.add_hline(y=0.0, line_dash="solid", line_color="blue", annotation_text="Unmodulated (Max Illusion)")
+
+                fig2.update_layout(
+                    yaxis_title="Speed Modulation Factor",
+                    yaxis_range=[-0.5, 4.5],
+                    height=480, # 480px perfectly aligns with 3x 150px canvases!
+                    margin=dict(l=20, r=20, t=20, b=20)
+                )
+                st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
+
+            with demo_col:
+                # Vertically stack 3 canvases that map to the Y-axis heights
+                render_mini_demo('aperture', modulation=4.0) # Top
+                render_mini_demo('aperture', modulation=e_pse) # Middle (PSE)
+                render_mini_demo('aperture', modulation=0.0) # Bottom (Baseline)
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---
 for i in range(1, 5):
