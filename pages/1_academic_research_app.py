@@ -228,8 +228,6 @@ with tabs[0]:
                 with ref_col1: st.image("documents/pHCP_EPS_Files/AveDurAwayTowards.png", caption="pHCP Ave Dur Away/Towards")
                 with ref_col2: st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
                 with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
-
-            st.divider()
     
     with tab2:
         st.subheader("Data Exploration: Switch Rates & Percept Durations")
