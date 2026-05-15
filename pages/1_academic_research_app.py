@@ -30,6 +30,7 @@ from loaders.academic_research_loader import (
     get_rt_histogram_data,      # <-- NEW
     get_accuracy_data,          # <-- NEW
     get_test_retest_data,       # <-- NEW
+    get_rotating_line_data,     # Start of rotating line stuff
     PLOTLY_CONFIG
 )
 
@@ -431,7 +432,32 @@ with tabs[1]:
             
         with rl_tabs[1]:
             st.subheader("Baseline Psychometric Functions")
-            st.info("MATLAB groupData plot translations will go here.")
+            
+            # Fetch the data and curve fit from the Loader
+            rl_df, rl_fit, pse = get_rotating_line_data()
+            
+            if not rl_df.empty:
+                # MATLAB Bridge: Equivalent to plot(x_axis, 100*percentFaster, 'LineWidth', 2)
+                fig = px.scatter(
+                    rl_df, x="Modulation_Rate", y=rl_df["Percent_Faster"] * 100, 
+                    color="Subject_ID", 
+                    labels={"Modulation_Rate": "Amount of Modulation (deg/sec)", "y": "Test Reported as Faster (%)"},
+                    title="Nulling the Illusion: Finding the Point of Subjective Equality"
+                )
+                
+                # Add the parabola curve fit
+                fig.add_scatter(x=rl_fit['x'], y=rl_fit['y'], mode='lines', name='Quadratic Fit', line=dict(color='blue', dash='dot'))
+                
+                # Plot the 50% threshold line
+                fig.add_hline(y=50, line_dash="dash", line_color="gray", annotation_text="50% Point")
+                
+                # Update visual layout
+                fig.update_layout(yaxis_range=[0, 105], xaxis_title="Speed Modulation (Nulling Factor)", yaxis_title="% 'Faster' Responses")
+                
+                st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                
+                if pse:
+                    st.info(f"**Calculated PSE:** {pse:.2f} modulation units.")
             
         with rl_tabs[2]:
             st.subheader("Conclusions & Mechanisms")
