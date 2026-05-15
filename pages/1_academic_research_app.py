@@ -242,12 +242,12 @@ with tabs[0]:
                     st.warning("⚠️ No Towards/Away data found in the current dataset.")
                     
             with col2:
-                # FIX: Unpack the tuple so Plotly gets a single DataFrame
-                _, df_acc_box = get_accuracy_data(df_tab1)
+                # We use the underscore to ignore the first part of the tuple (raw)
+                # and assign the second part to 'filtered_acc_df' so line 250 works.
+                _, filtered_acc_df = get_accuracy_data(df_tab1) 
                 
-                # Use ONLY the filtered dataframe for the box plot
                 fig_acc = px.box(
-                    filtered_acc_df, 
+                    filtered_acc_df, # <--- This name now matches line 247
                     y="Control_Correct_Responses", 
                     points="all", 
                     title="Task Accuracy (Max 11)"
