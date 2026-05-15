@@ -504,27 +504,29 @@ def get_response_counts_data(df):
 def get_rotating_line_data():
     """
     Loads the anonymized rotating line data securely from the PRIVATE GitHub repo.
-    Fits a quadratic curve to find the Point of Subjective Equality (PSE).
-    
-    MATLAB Bridge: 
-    This is the equivalent of using webread() with an options structure containing 
-    a secure HTTP header, piping the data directly into a Table in memory.
     """
     try:
-        # 1. Retrieve the secure token from Streamlit Secrets
-        # Make sure your token is saved in DigitalOcean App Platform Environment Variables
-        # or local .streamlit/secrets.toml under the name GITHUB_TOKEN
-        try:
-            github_token = st.secrets["GITHUB_TOKEN"]
-        except KeyError:
-            st.error("GITHUB_TOKEN not found in secrets.")
+        # 1. Retrieve the secure token
+        # First, try to get it from DigitalOcean's OS Environment Variables
+        github_token = os.environ.get("GITHUB_TOKEN")
+        
+        # If not on DigitalOcean, fall back to local Streamlit secrets.toml
+        if not github_token:
+            try:
+                github_token = st.secrets["GITHUB_TOKEN"]
+            except Exception:
+                pass
+                
+        # If BOTH fail, gracefully stop
+        if not github_token:
+            st.error("GITHUB_TOKEN not found in DigitalOcean Env Vars or local secrets.")
             return pd.DataFrame(), pd.DataFrame(), None
 
         # 2. Build the secure URL
         cache_buster = int(time.time())
         username = "kkillebrew"
         repo = "RotatingLine"
-        file_path = "RotatingLine_Exp/rotating_line_clean.parquet"
+        file_path = "RotatingLine_Exp/rotating_line_clean.parquet" 
         
         raw_url = f"https://raw.githubusercontent.com/{username}/{repo}/main/{file_path}?t={cache_buster}"
         
@@ -539,7 +541,7 @@ def get_rotating_line_data():
         # 4. Load the bytestream directly into Pandas
         df = pd.read_parquet(BytesIO(response.content))
         
-        # 5. Math & Fitting Logic (Directly from MATLAB fitdata2)
+        # 5. Math & Fitting Logic
         def parabola(x, a, h, k):
             return a * (x - h)**2 + k
             
@@ -547,7 +549,6 @@ def get_rotating_line_data():
         x_data = subj_data['Modulation_Rate'].values
         y_data = subj_data['Percent_Faster'].values * 100 
         
-        # Initial guess for curve fit [a, h (vertex x), k (vertex y)]
         p0 = [10, 2.0, 50] 
         try:
             popt, _ = curve_fit(parabola, x_data, y_data, p0=p0)
@@ -556,7 +557,6 @@ def get_rotating_line_data():
             popt = p0
             calculated_pse = np.nan
             
-        # Generate smooth curve for plotting
         x_smooth = np.linspace(min(x_data), max(x_data), 100)
         y_smooth = parabola(x_smooth, *popt)
         fit_data = pd.DataFrame({'x': x_smooth, 'y': y_smooth})
