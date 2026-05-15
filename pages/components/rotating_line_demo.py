@@ -47,10 +47,10 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
     <html>
     <head>
         <style>
-            /* MATLAB Bridge: This is your backColor = [128 128 128] */
-            body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #808080; overflow: hidden; }}
-            canvas {{ background-color: #808080; border: 2px solid #333; box-shadow: 0px 4px 10px rgba(0,0,0,0.5); border-radius: 8px; }}
-        </style>
+        /* MATLAB Bridge: This is your backColor = [128 128 128] */
+        body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #808080; overflow: hidden; }}
+        canvas {{ background-color: #808080; }} /* Stripped all borders and shadows */
+    </style>
     </head>
     <body>
         <canvas id="stimulusCanvas" width="600" height="500"></canvas>
