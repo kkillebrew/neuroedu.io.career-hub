@@ -30,14 +30,18 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
     """
     
     # Map the shape string to an integer ID for the JS engine
+    # MATLAB Bridge: This is similar to passing a switch/case integer ID 
+    # instead of doing slow string comparisons inside the drawing loop.
     shape_map = {"Ellipse": 0, "Rectangle": 1, "Diamond": 2}
     shape_id = shape_map.get(shape, 0)
     
-    # Python booleans to JS booleans
+    # Convert Python boolean (True/False) to JavaScript boolean (true/false)
     js_show_dots = "true" if show_dots else "false"
 
-    # We use an f-string to inject the Python variables into the JavaScript block.
-    # Note: Because it's an f-string, standard JS curly braces {} must be doubled {{}}!
+    # --- THE HTML/JS STRING ---
+    # Note: We use f""" to start a multi-line string. 
+    # Every CSS and JS curly brace must be doubled (e.g., {{ }}) so Python 
+    # doesn't mistake them for Python variables.
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -56,17 +60,17 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
             const canvas = document.getElementById('stimulusCanvas');
             const ctx = canvas.getContext('2d');
             
-            // Injected Python Variables (From Streamlit UI)
-            const baseSpeed = {base_speed}; // Base degrees per second (approx)
-            const modulation = {modulation}; // The 'constant' variable from modulateSpeed.m
+            // Injected Python Variables (From Streamlit UI sliders)
+            const baseSpeed = {base_speed}; 
+            const modulation = {modulation}; 
             const shapeId = {shape_id};
             const drawDotsToggle = {js_show_dots};
             
-            // Monitor variables
+            // Monitor coordinates for center of screen (x0, y0)
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
             
-            // Aperture dimensions (apWidth and apHeight)
+            // Aperture dimensions
             const apWidth = 250;  // Horizontal radius (Long axis)
             const apHeight = 125; // Vertical radius (Short axis)
             
@@ -79,7 +83,7 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
                 const dt = (currentTime - lastTime) / 1000; 
                 lastTime = currentTime;
 
-                // 2. Clear screen (Psychtoolbox implicit clear on Flip)
+                // 2. Clear screen (Psychtoolbox does this implicitly on Flip)
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 // 3. Calculate current line length based on Aperture (radialLength)
@@ -87,8 +91,8 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
                 let currentLength = 0;
                 
                 if (shapeId === 0) {{ 
-                    // Ellipse Math (Direct translation from drawDemo.m)
-                    // MATLAB: radialLength = sqrt( 1 / ( (sind(orientation)/apHeight)^2 + (cosd(orientation)/apLength)^2 ) )
+                    // Ellipse Math (Direct translation from your drawDemo.m)
+                    // radialLength = sqrt( 1 / ( (sind(orientation)/apHeight)^2 + (cosd(orientation)/apLength)^2 ) )
                     currentLength = (apWidth * apHeight) / Math.sqrt(
                         Math.pow(apHeight * Math.cos(radAngle), 2) + 
                         Math.pow(apWidth * Math.sin(radAngle), 2)
@@ -105,11 +109,11 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
                     currentLength = (apWidth * apHeight) / (apHeight * absCos + apWidth * absSin);
                 }}
 
-                // 4. Update the angle (Modulate Speed)
-                // MATLAB Bridge: modulateSpeed.m & drawDemo.m actualSpeed calculation.
-                // It artificially speeds up as the line gets shorter (approaches vertical axis)
-                // Normalizing length factor: 0 when horizontal, 1 when vertical
+                // 4. Update the angle (modulateSpeed.m bridge)
+                // Normalize the length factor: 0 when horizontal, 1 when vertical
                 let lengthFactor = (apWidth - currentLength) / (apWidth - apHeight);
+                
+                // actualSpeed calculation
                 let currentSpeed = baseSpeed * (1 + (modulation * lengthFactor));
                 
                 angle += currentSpeed * dt;
@@ -124,4 +128,32 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
                 ctx.beginPath();
                 ctx.moveTo(-currentLength, 0);
                 ctx.lineTo(currentLength, 0);
-                ctx.lineWidth =
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#FFFFFF'; 
+                ctx.stroke();
+                
+                // Draw Tracking Dots (Red) if enabled
+                if (drawDotsToggle) {{
+                    ctx.beginPath();
+                    ctx.arc(-currentLength, 0, 8, 0, Math.PI * 2);
+                    ctx.arc(currentLength, 0, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = '#FF0000'; 
+                    ctx.fill();
+                }}
+
+                ctx.restore();
+
+                // 6. Loop (Screen('Flip'))
+                requestAnimationFrame(drawLoop);
+            }}
+
+            // Start the hardware-accelerated loop
+            requestAnimationFrame(drawLoop);
+        </script>
+    </body>
+    </html>
+    """ # <--- THIS IS THE CRITICAL CLOSING QUOTE! 
+    
+    # Embed the HTML string into Streamlit. 
+    # Height must be slightly larger than the 500px canvas to prevent scrollbars.
+    components.html(html_code, height=520)
