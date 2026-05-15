@@ -433,31 +433,69 @@ with tabs[1]:
         with rl_tabs[1]:
             st.subheader("Baseline Psychometric Functions")
             
-            # Fetch the data and curve fit from the Loader
-            rl_df, rl_fit, pse = get_rotating_line_data()
+            # Fetch the updated multi-subject data and average fits
+            rl_df, rl_ind_fits, rl_avg_fit, group_pse = get_rotating_line_data()
             
             if not rl_df.empty:
-                # MATLAB Bridge: Equivalent to plot(x_axis, 100*percentFaster, 'LineWidth', 2)
-                fig = px.scatter(
-                    rl_df, x="Modulation_Rate", y=rl_df["Percent_Faster"] * 100, 
-                    color="Subject_ID", 
-                    labels={"Modulation_Rate": "Amount of Modulation (deg/sec)", "y": "Test Reported as Faster (%)"},
-                    title="Nulling the Illusion: Finding the Point of Subjective Equality"
-                )
+                import plotly.graph_objects as go
                 
-                # Add the parabola curve fit
-                fig.add_scatter(x=rl_fit['x'], y=rl_fit['y'], mode='lines', name='Quadratic Fit', line=dict(color='blue', dash='dot'))
+                fig = go.Figure()
+
+                # 1. Plot Individual Raw Data Points (Dots)
+                for subj in rl_df['Subject_ID'].unique():
+                    subj_data = rl_df[rl_df['Subject_ID'] == subj]
+                    fig.add_trace(go.Scatter(
+                        x=subj_data['Modulation_Rate'], 
+                        y=subj_data['Percent_Faster'] * 100, 
+                        mode='markers', 
+                        name=f"{subj} Raw",
+                        opacity=0.5, # Slightly transparent so they don't clutter
+                        marker=dict(size=8)
+                    ))
                 
-                # Plot the 50% threshold line
-                fig.add_hline(y=50, line_dash="dash", line_color="gray", annotation_text="50% Point")
+                # 2. Plot Individual Psychometric Curves (Faint Lines)
+                if not rl_ind_fits.empty:
+                    for subj in rl_ind_fits['Subject_ID'].unique():
+                        subj_fit = rl_ind_fits[rl_ind_fits['Subject_ID'] == subj]
+                        fig.add_trace(go.Scatter(
+                            x=subj_fit['Modulation_Rate'], 
+                            y=subj_fit['Fit_Percent'], 
+                            mode='lines', 
+                            name=f"{subj} Fit",
+                            line=dict(width=1, dash='dash'),
+                            opacity=0.4
+                        ))
                 
+                # 3. Plot the Grand Average Curve (Bold Line)
+                if not rl_avg_fit.empty:
+                    fig.add_trace(go.Scatter(
+                        x=rl_avg_fit['Modulation_Rate'],
+                        y=rl_avg_fit['Fit_Percent'],
+                        mode='lines',
+                        name='Group Average Fit',
+                        line=dict(color='black', width=4)
+                    ))
+                
+                # 4. Plot the 50% Threshold Line (PSE intersection)
+                fig.add_hline(y=50, line_dash="dot", line_color="gray", annotation_text="50% Point (PSE)")
+                if group_pse and not np.isnan(group_pse):
+                    fig.add_vline(x=group_pse, line_dash="dot", line_color="red", annotation_text=f"Group PSE: {group_pse:.2f}")
+
                 # Update visual layout
-                fig.update_layout(yaxis_range=[0, 105], xaxis_title="Speed Modulation (Nulling Factor)", yaxis_title="% 'Faster' Responses")
+                fig.update_layout(
+                    title="Psychometric Functions: Nulling the Illusion",
+                    xaxis_title="Speed Modulation (Nulling Factor)",
+                    yaxis_title="% 'Faster' Responses",
+                    yaxis_range=[-5, 105], # Give a little breathing room at the top and bottom
+                    showlegend=True,
+                    height=500
+                )
                 
                 st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
                 
-                if pse:
-                    st.info(f"**Calculated PSE:** {pse:.2f} modulation units.")
+                if group_pse and not np.isnan(group_pse):
+                    st.success(f"**Group Point of Subjective Equality (PSE):** {group_pse:.2f} modulation units. "
+                               "This means, on average, participants required this much actual speed manipulation to perceive the line as rotating constantly.")
             
         with rl_tabs[2]:
             st.subheader("Conclusions & Mechanisms")
