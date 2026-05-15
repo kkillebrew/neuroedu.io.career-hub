@@ -137,78 +137,62 @@ with tabs[0]:
                     st.plotly_chart(fig_hist, use_container_width=True)
                 
             elif hist_choice == "Participant Responses":
-                # 1. Fetch the dual dataframes
-                raw_acc, filtered_acc = get_accuracy_data(df_tab1)
-                
-                # 2. Display the Upper (Unfiltered) Histogram
-                fig_upper = px.histogram(
-                    raw_acc, x="Control_Correct_Responses_Raw",
-                    nbins=12, title="UNFILTERED: Total Correct Responses",
-                    color_discrete_sequence=['#94a3b8']
-                )
-                fig_upper.add_vline(x=5.5, line_dash="dash", line_color="#ef4444")
-                st.plotly_chart(fig_upper, use_container_width=True, config=PLOTLY_CONFIG)
-                
-                # 3. Display the Lower (Filtered) Histogram
-                fig_lower = px.histogram(
-                    filtered_acc, x="Control_Correct_Responses",
-                    nbins=12, title="FILTERED: Responses within 6s Window",
-                    color_discrete_sequence=['#10b981']
-                )
-                fig_lower.add_vline(x=5.5, line_dash="dash", line_color="#ef4444")
-                st.plotly_chart(fig_lower, use_container_width=True, config=PLOTLY_CONFIG)
-                
-            elif hist_choice == "Participant Responses":
-                # Fetch both the raw and filtered data from the loader
-                # Note: This assumes you updated the loader to return two values
+                # FETCH THE DUAL DATAFRAMES
                 raw_acc, filtered_acc = get_accuracy_data(df_tab1) 
                 
                 if raw_acc.empty:
                     st.warning("⚠️ No participant response data available.")
                 else:
-                    # Create two columns to stack the histograms vertically in a nice layout
-                    # We'll use a single column to stack them, or st.container()
                     st.write("### QC Impact: Response Accuracy")
                     
-                    # --- Chart A: Upper Histogram (No Filter) ---
+                    # --- Chart A: Upper Histogram (Unfiltered) ---
                     fig_upper = px.histogram(
                         raw_acc, 
                         x="Control_Correct_Responses_Raw",
                         nbins=12, 
                         title="UNFILTERED: Total Correct Responses (No RT limit)",
                         labels={'Control_Correct_Responses_Raw': 'Number of Correct Responses'},
-                        color_discrete_sequence=['#94a3b8'] # Neutral grey
+                        color_discrete_sequence=['#94a3b8']
                     )
                     fig_upper.add_vline(x=5.5, line_dash="dash", line_color="#ef4444", annotation_text="Pass Threshold (6)")
                     fig_upper.update_layout(height=350, margin=dict(t=50, b=0, l=0, r=0))
                     fig_upper.update_xaxes(range=[-0.5, 11.5], dtick=1)
                     st.plotly_chart(fig_upper, use_container_width=True, config=PLOTLY_CONFIG)
                     
-                    st.markdown("<br>", unsafe_allow_html=True) # Add some spacing
+                    st.markdown("<br>", unsafe_allow_html=True) 
                     
-                    # --- Chart B: Lower Histogram (6s RT Filter Applied) ---
+                    # --- Chart B: Lower Histogram (Filtered) ---
                     fig_lower = px.histogram(
                         filtered_acc, 
                         x="Control_Correct_Responses",
                         nbins=12, 
                         title="FILTERED: Responses within 6s Window (QC Applied)",
                         labels={'Control_Correct_Responses': 'Number of Correct Responses'},
-                        color_discrete_sequence=['#10b981'] # Success green
+                        color_discrete_sequence=['#10b981']
                     )
                     fig_lower.add_vline(x=5.5, line_dash="dash", line_color="#ef4444", annotation_text="Pass Threshold (6)")
                     fig_lower.update_layout(height=350, margin=dict(t=50, b=0, l=0, r=0))
                     fig_lower.update_xaxes(range=[-0.5, 11.5], dtick=1)
                     st.plotly_chart(fig_lower, use_container_width=True, config=PLOTLY_CONFIG)
 
-                    st.caption("Comparing these distributions visualizes how many participants were excluded due to slow reaction times versus general task failure.")
-            
-            with st.expander("View Legacy pHCP Reference (EPS)"):
-                if hist_choice == "Percept Durations":
-                    st.image("documents/pHCP_EPS_Files/HistOfPercDurations.png")
-                elif hist_choice == "Participant Responses":
-                    st.image("documents/pHCP_EPS_Files/HistOfPartResponses.png")
-                elif hist_choice == "Reaction Times":
-                    st.image("documents/pHCP_EPS_Files/HistOfReactionTimes.png")
+            elif hist_choice == "Reaction Times":
+                df_rt = get_rt_histogram_data(df_tab1)
+                if df_rt.empty:
+                    st.warning("⚠️ No reaction time data available in the current dataset.")
+                else:
+                    fig_hist = px.histogram(
+                        df_rt, 
+                        x="Reaction_Time_Sec", 
+                        nbins=50, 
+                        title="Reaction Times (Control Task)",
+                        color_discrete_sequence=['#6366f1'] # Indigo
+                    )
+                    fig_hist.update_layout(
+                        xaxis_title="Reaction Time (Seconds)",
+                        yaxis_title="Frequency Count",
+                        bargap=0.1
+                    )
+                    st.plotly_chart(fig_hist, use_container_width=True)
                     
             st.divider()
             
@@ -259,7 +243,7 @@ with tabs[0]:
                     
             with col2:
                 # FIX: Unpack the tuple so Plotly gets a single DataFrame
-                raw_acc_df, filtered_acc_df = get_accuracy_data(df_tab1) 
+                _, df_acc_box = get_accuracy_data(df_tab1)
                 
                 # Use ONLY the filtered dataframe for the box plot
                 fig_acc = px.box(
@@ -272,11 +256,15 @@ with tabs[0]:
                 st.plotly_chart(fig_acc, use_container_width=True)
                 
             with col3:
+                # This code will now run because col2 no longer crashes!
                 df_rt_all = get_rt_histogram_data(df_tab1)
-                df_rt_ave = df_rt_all.groupby('Subject')['Reaction_Time_Sec'].mean().reset_index()
-                fig_rt_ave = px.box(df_rt_ave, y="Reaction_Time_Sec", points="all", title="Average RT")
-                fig_rt_ave.update_traces(jitter=0.6, pointpos=0, width=0.3)
-                st.plotly_chart(fig_rt_ave, use_container_width=True)
+                if not df_rt_all.empty:
+                    df_rt_ave = df_rt_all.groupby('Subject')['Reaction_Time_Sec'].mean().reset_index()
+                    fig_rt_ave = px.box(df_rt_ave, y="Reaction_Time_Sec", points="all", title="Average RT")
+                    fig_rt_ave.update_traces(jitter=0.6, pointpos=0, width=0.3)
+                    st.plotly_chart(fig_rt_ave, use_container_width=True)
+                else:
+                    st.warning("⚠️ No RT data found.")
                 
             with st.expander("View Legacy pHCP References (EPS)"):
                 ref_col1, ref_col2, ref_col3 = st.columns(3)
