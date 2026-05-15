@@ -33,6 +33,7 @@ from loaders.academic_research_loader import (
     PLOTLY_CONFIG
 )
 
+from pages.components.rotating_line_demo import render_rotating_line_demo
 from career_hub_loader import get_references_metadata
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
