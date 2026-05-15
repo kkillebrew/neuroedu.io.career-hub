@@ -384,46 +384,40 @@ with tabs[1]:
         with demo_col_left:
             st.subheader("Interactive Demonstration")
             st.markdown("""
-            **The Phenomenon:** When a line rotates at a constant speed behind an elliptical aperture... 
-            [keep your text here]
-            """)
+            **The Phenomenon:** When a line rotating at a constant speed is occluded by an elliptical aperture, 
+            the human visual system misinterprets the shrinking and growing of the line as changes in rotational speed. 
+            It appears to slow down as it reaches the vertical axis and speed up toward the horizontal.
             
+            **Instructions:** 1. Observe the line rotating. Does it look like it's changing speed?
+            2. Use the **Speed Modulation** slider to artificially speed up and slow down the line. 
+            3. Find the exact point where the line appears to rotate at a perfectly constant speed (Your Point of Subjective Equality).
+            """)
+            # Notice we removed the controls from this left column entirely!
+            
+        with demo_col_right:
+            # STREAMLIT TRICK: We want the controls below the canvas, but we need their 
+            # values BEFORE we can draw the canvas. 
+            # We create an empty container first to hold the canvas's physical space at the top.
+            canvas_placeholder = st.container()
+
+            # Now we draw the controls visually below that empty space
             st.markdown("### Demo Controls")
-            # Added unique 'key' arguments to all widgets
-            demo_speed = st.slider("Base Rotational Speed", min_value=10, max_value=150, value=50, step=5, key="demo_speed_slider")
+            demo_speed = st.slider("Base Rotational Speed (RPM)", min_value=10, max_value=150, value=50, step=5, key="demo_speed_slider")
             demo_mod = st.slider("Speed Modulation (Nullify Effect)", min_value=0.0, max_value=5.0, value=0.0, step=0.1, key="demo_mod_slider")
             
+            # Layout the dropdown and checkbox side-by-side cleanly
             ctrl_col1, ctrl_col2 = st.columns(2)
             with ctrl_col1:
                 demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"], key="demo_shape_select")
             with ctrl_col2:
-                st.write("") # Spacer to align with selectbox
+                st.write("") # Spacer to vertically align with selectbox
                 st.write("")
                 demo_dots = st.checkbox("Show Tracking Dots", value=True, key="demo_dots_check")
-            
-        with demo_col_right:
-            st.subheader("Interactive Demonstration")
-            st.markdown("""
-            **The Phenomenon:** When a line rotates at a constant speed behind an elliptical aperture... 
-            [keep your text here]
-            """)
-            
-            st.markdown("### Demo Controls")
-            demo_speed = st.slider("Base Rotational Speed", min_value=10, max_value=150, value=50, step=5)
-            demo_mod = st.slider("Speed Modulation (Nullify Effect)", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
-            
-            # Layout the dropdown and checkbox side-by-side
-            ctrl_col1, ctrl_col2 = st.columns(2)
-            with ctrl_col1:
-                demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"])
-            with ctrl_col2:
-                st.write("") # Spacer to align with selectbox
-                st.write("")
-                demo_dots = st.checkbox("Show Tracking Dots", value=True)
-            
-        with demo_col_right:
-            # Render the Canvas Component!
-            render_rotating_line_demo(demo_speed, demo_mod, demo_shape, demo_dots)
+
+            # Finally, we inject our HTML function INTO the placeholder at the top, 
+            # passing in the variables we just collected from the controls below it!
+            with canvas_placeholder:
+                render_rotating_line_demo(demo_speed, demo_mod, demo_shape, demo_dots)
 
         st.divider()
 
