@@ -178,10 +178,12 @@ with tabs[0]:
             elif hist_choice == "Reaction Times":
                 df_rt_hist = get_rt_histogram_data(df_tab1)
                 if df_rt_hist.empty:
-                    st.warning("⚠️ No reaction time data found in the file.")
+                    st.warning("⚠️ No RT data found. Check column: Raw_RT_JSON")
                 else:
                     fig_rt_dist = px.histogram(
-                        df_rt_hist, x="Reaction_Time_Sec", nbins=50, 
+                        df_rt_hist, 
+                        x="Reaction_Time_Sec", # This MUST match the Loader
+                        nbins=50, 
                         title="Distribution of All Reaction Times",
                         color_discrete_sequence=['#6366f1']
                     )
