@@ -176,23 +176,16 @@ with tabs[0]:
                     st.plotly_chart(fig_lower, use_container_width=True, config=PLOTLY_CONFIG)
 
             elif hist_choice == "Reaction Times":
-                df_rt = get_rt_histogram_data(df_tab1)
-                if df_rt.empty:
-                    st.warning("⚠️ No reaction time data available in the current dataset.")
+                df_rt_hist = get_rt_histogram_data(df_tab1)
+                if df_rt_hist.empty:
+                    st.warning("⚠️ No reaction time data found in the file.")
                 else:
-                    fig_hist = px.histogram(
-                        df_rt, 
-                        x="Reaction_Time_Sec", 
-                        nbins=50, 
-                        title="Reaction Times (Control Task)",
-                        color_discrete_sequence=['#6366f1'] # Indigo
+                    fig_rt_dist = px.histogram(
+                        df_rt_hist, x="Reaction_Time_Sec", nbins=50, 
+                        title="Distribution of All Reaction Times",
+                        color_discrete_sequence=['#6366f1']
                     )
-                    fig_hist.update_layout(
-                        xaxis_title="Reaction Time (Seconds)",
-                        yaxis_title="Frequency Count",
-                        bargap=0.1
-                    )
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                    st.plotly_chart(fig_rt_dist, use_container_width=True)
                     
             st.divider()
             
