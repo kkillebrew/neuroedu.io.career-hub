@@ -503,8 +503,8 @@ def get_response_counts_data(df):
 #########################################################
 def get_rotating_line_data():
     """
-    Fetches the combined Parquet file from GitHub.
-    Calculates psychometric curves separately for Control and Experimental tasks.
+    Fetches combined Parquet file from GitHub.
+    Calculates psychometric curves separated by Task AND Size (Long/Short).
     """
     try:
         github_token = os.environ.get("GITHUB_TOKEN")
@@ -520,7 +520,6 @@ def get_rotating_line_data():
         cache_buster = int(time.time())
         username = "kkillebrew"
         repo = "RotatingLine"
-        # Make sure this filename matches the new Parquet file!
         file_path = "RotatingLine_Exp/rotating_line_combined.parquet" 
         raw_url = f"https://raw.githubusercontent.com/{username}/{repo}/main/{file_path}?t={cache_buster}"
         
@@ -536,48 +535,55 @@ def get_rotating_line_data():
             return 1 / (1 + np.exp(-k * (x - x0).clip(-100, 100)))
 
         def process_block(task_df):
-            """Helper function to calculate individual and average fits for a given block."""
             if task_df.empty:
-                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
+                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), {}
                 
             x_smooth = np.linspace(task_df['X_Value'].min(), task_df['X_Value'].max(), 100)
             individual_fits = []
-            pse_list = []
+            avg_fits = []
+            group_pse_dict = {}
             
-            for subj in task_df['Subject_ID'].unique():
-                subj_data = task_df[task_df['Subject_ID'] == subj]
-                x_data = subj_data['X_Value'].values
-                y_data = subj_data['Percent_Faster'].values 
+            # MATLAB Bridge: Loop through 'Long' and 'Short' independently!
+            for size_cond in task_df['Size'].unique():
+                size_df = task_df[task_df['Size'] == size_cond]
                 
-                p0 = [1.0, np.median(x_data)]
-                try:
-                    popt, _ = curve_fit(psychometric_curve, x_data, y_data, p0=p0, maxfev=1000)
-                    subj_k, subj_pse = popt[0], popt[1]
-                    y_smooth = psychometric_curve(x_smooth, subj_k, subj_pse) * 100 
+                # 1. Individual Fits
+                for subj in size_df['Subject_ID'].unique():
+                    subj_data = size_df[size_df['Subject_ID'] == subj]
+                    x_data = subj_data['X_Value'].values
+                    y_data = subj_data['Percent_Faster'].values 
                     
-                    subj_fit_df = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': y_smooth})
-                    subj_fit_df['Subject_ID'] = subj
-                    individual_fits.append(subj_fit_df)
-                    pse_list.append(subj_pse)
+                    p0 = [1.0, np.median(x_data)]
+                    try:
+                        popt, _ = curve_fit(psychometric_curve, x_data, y_data, p0=p0, maxfev=1000)
+                        y_smooth = psychometric_curve(x_smooth, popt[0], popt[1]) * 100 
+                        
+                        subj_fit_df = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': y_smooth})
+                        subj_fit_df['Subject_ID'] = subj
+                        subj_fit_df['Size'] = size_cond
+                        individual_fits.append(subj_fit_df)
+                    except:
+                        pass
+
+                # 2. Group Average Fits
+                avg_raw = size_df.groupby('X_Value')['Percent_Faster'].mean().reset_index()
+                try:
+                    popt_avg, _ = curve_fit(psychometric_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'], p0=[1.0, np.median(avg_raw['X_Value'])])
+                    avg_y_smooth = psychometric_curve(x_smooth, popt_avg[0], popt_avg[1]) * 100
+                    
+                    df_avg_fit = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': avg_y_smooth})
+                    df_avg_fit['Size'] = size_cond
+                    avg_fits.append(df_avg_fit)
+                    
+                    group_pse_dict[size_cond] = popt_avg[1]
                 except:
                     pass
 
             df_ind_fits = pd.concat(individual_fits, ignore_index=True) if individual_fits else pd.DataFrame()
-            
-            # Group Average
-            avg_raw = task_df.groupby('X_Value')['Percent_Faster'].mean().reset_index()
-            try:
-                popt_avg, _ = curve_fit(psychometric_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'], p0=[1.0, np.median(avg_raw['X_Value'])])
-                avg_y_smooth = psychometric_curve(x_smooth, popt_avg[0], popt_avg[1]) * 100
-                df_avg_fit = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': avg_y_smooth})
-                group_pse = popt_avg[1]
-            except:
-                df_avg_fit = pd.DataFrame()
-                group_pse = np.nan
+            df_avg_fits = pd.concat(avg_fits, ignore_index=True) if avg_fits else pd.DataFrame()
                 
-            return task_df, df_ind_fits, df_avg_fit, group_pse
+            return task_df, df_ind_fits, df_avg_fits, group_pse_dict
 
-        # Process the blocks separately
         control_data = process_block(df[df['Task'] == 'Control'])
         experimental_data = process_block(df[df['Task'] == 'Experimental'])
         
