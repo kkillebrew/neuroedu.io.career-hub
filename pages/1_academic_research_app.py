@@ -384,20 +384,22 @@ with tabs[1]:
         with demo_col_left:
             st.subheader("Interactive Demonstration")
             st.markdown("""
-            **The Phenomenon:** When a line rotates at a constant speed behind an elliptical aperture, 
-            the human visual system misinterprets the shrinking and growing of the line as changes in rotational speed. 
-            It appears to slow down as it reaches the vertical axis and speed up toward the horizontal.
-            
-            **Instructions:** 1. Observe the line rotating. Does it look like it's changing speed?
-            2. Use the **Modulation** slider to artificially speed up and slow down the line. 
-            3. Find the exact point where the line appears to rotate at a perfectly constant speed (Your Point of Subjective Equality).
+            **The Phenomenon:** When a line rotates at a constant speed behind an elliptical aperture... 
+            [keep your text here]
             """)
             
-            # We will use Streamlit widgets to pass parameters to our JS Canvas
             st.markdown("### Demo Controls")
-            demo_speed = st.slider("Base Rotational Speed (RPM)", min_value=10, max_value=100, value=30, step=5)
-            demo_mod = st.slider("Speed Modulation (Nullify Effect)", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
-            demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"])
+            # Added unique 'key' arguments to all widgets
+            demo_speed = st.slider("Base Rotational Speed", min_value=10, max_value=150, value=50, step=5, key="demo_speed_slider")
+            demo_mod = st.slider("Speed Modulation (Nullify Effect)", min_value=0.0, max_value=5.0, value=0.0, step=0.1, key="demo_mod_slider")
+            
+            ctrl_col1, ctrl_col2 = st.columns(2)
+            with ctrl_col1:
+                demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"], key="demo_shape_select")
+            with ctrl_col2:
+                st.write("") # Spacer to align with selectbox
+                st.write("")
+                demo_dots = st.checkbox("Show Tracking Dots", value=True, key="demo_dots_check")
             
         with demo_col_right:
             st.subheader("Interactive Demonstration")
