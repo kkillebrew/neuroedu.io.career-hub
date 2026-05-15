@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from scipy import stats # <--- NEW STATS ENGINE
+from scipy.optimize import curve_fit
 import re # Import Python's Regular Expression library
 import requests
 from io import BytesIO, StringIO
@@ -274,7 +275,9 @@ def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     df = df.drop(columns=['Merge_ID']) 
     
     return df
-
+#########################################################
+#---   Analyze and Process the SFM Behavioral Data   ---#
+#########################################################
 def generate_live_statistics(df, metric_col):
     """
     MATLAB Equivalent: Running kruskalwallis() and ttest2().
@@ -494,3 +497,50 @@ def get_response_counts_data(df):
                 })
             except: continue
     return pd.DataFrame(all_counts)
+
+#########################################################
+#---    Load In the Rotating Line Behavioral Data    ---#
+#########################################################
+def get_rotating_line_data():
+    """
+    Loads the anonymized, pre-processed rotating line psychophysics data.
+    Fits a simple quadratic (parabola) to find the minimum/maximum (PSE)
+    mirroring the fitdata2 logic from the MATLAB groupData script.
+    """
+    # Define path to the secure parquet file
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'documents', 'rotating_line_clean.parquet')
+    
+    try:
+        df = pd.read_parquet(file_path)
+        
+        # We will also calculate a generic parabola fit to send to the UI
+        # MATLAB: fitdata2(:,1) = a1(1)*(xx_axis-PSE2(1)).^2 + c1(1);
+        def parabola(x, a, h, k):
+            return a * (x - h)**2 + k
+            
+        # Get x (Modulation Rate) and y (Percent Faster) for our sample subject
+        subj_data = df[df['Subject_ID'] == 'Subj_01']
+        x_data = subj_data['Modulation_Rate'].values
+        y_data = subj_data['Percent_Faster'].values * 100 # Scale to 0-100%
+        
+        # Initial guess for curve fit [a, h (vertex x), k (vertex y)]
+        p0 = [10, 2.0, 50] 
+        
+        try:
+            popt, _ = curve_fit(parabola, x_data, y_data, p0=p0)
+            calculated_pse = popt[1] # The 'h' parameter is the vertex (PSE)
+        except:
+            popt = p0
+            calculated_pse = np.nan
+            
+        # Generate smooth curve for plotting
+        x_smooth = np.linspace(min(x_data), max(x_data), 100)
+        y_smooth = parabola(x_smooth, *popt)
+        
+        fit_data = pd.DataFrame({'x': x_smooth, 'y': y_smooth})
+        
+        return df, fit_data, calculated_pse
+        
+    except Exception as e:
+        st.error(f"Error loading Rotating Line data: {e}")
+        return pd.DataFrame(), pd.DataFrame(), None
