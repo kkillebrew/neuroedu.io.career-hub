@@ -504,23 +504,24 @@ def get_response_counts_data(df):
 def get_rotating_line_data():
     """
     Loads the anonymized rotating line data securely from the PRIVATE GitHub repo.
+    Fits a logistic psychometric curve to each participant, and calculates a group average.
+    
+    MATLAB Bridge: 
+    Replaces the fitdata1 sigmoid loop.
+    Formula: y = 1 / (1 + exp(-k * (x - PSE)))
     """
     try:
         # 1. Retrieve the secure token
-        # First, try to get it from DigitalOcean's OS Environment Variables
         github_token = os.environ.get("GITHUB_TOKEN")
-        
-        # If not on DigitalOcean, fall back to local Streamlit secrets.toml
         if not github_token:
             try:
                 github_token = st.secrets["GITHUB_TOKEN"]
             except Exception:
                 pass
                 
-        # If BOTH fail, gracefully stop
         if not github_token:
-            st.error("GITHUB_TOKEN not found in DigitalOcean Env Vars or local secrets.")
-            return pd.DataFrame(), pd.DataFrame(), None
+            st.error("GITHUB_TOKEN not found.")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
 
         # 2. Build the secure URL
         cache_buster = int(time.time())
@@ -535,33 +536,77 @@ def get_rotating_line_data():
         response = requests.get(raw_url, headers=headers)
         
         if response.status_code != 200:
-            st.error(f"Failed to fetch secure data from GitHub. HTTP Status: {response.status_code}")
-            return pd.DataFrame(), pd.DataFrame(), None
+            st.error(f"Failed to fetch secure data. HTTP Status: {response.status_code}")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
             
-        # 4. Load the bytestream directly into Pandas
         df = pd.read_parquet(BytesIO(response.content))
         
-        # 5. Math & Fitting Logic
-        def parabola(x, a, h, k):
-            return a * (x - h)**2 + k
-            
-        subj_data = df[df['Subject_ID'] == 'Subj_01']
-        x_data = subj_data['Modulation_Rate'].values
-        y_data = subj_data['Percent_Faster'].values * 100 
+        # ---------------------------------------------------------
+        # 4. PSYCHOMETRIC MATH ENGINE
+        # ---------------------------------------------------------
+        def psychometric_curve(x, k, x0):
+            """
+            Logistic Function: 
+            k = slope (sensitivity)
+            x0 = PSE (Point of Subjective Equality where y = 0.5)
+            """
+            # We clip the exponent to prevent overflow warnings during scipy guessing
+            return 1 / (1 + np.exp(-k * (x - x0).clip(-100, 100)))
+
+        # Define the high-resolution X-axis for smooth curve drawing
+        x_smooth = np.linspace(df['Modulation_Rate'].min(), df['Modulation_Rate'].max(), 100)
         
-        p0 = [10, 2.0, 50] 
+        individual_fits = []
+        pse_list = []
+        
+        # MATLAB Bridge: Loop through each unique subject ID
+        for subj in df['Subject_ID'].unique():
+            subj_data = df[df['Subject_ID'] == subj]
+            x_data = subj_data['Modulation_Rate'].values
+            # Fit requires y to be between 0 and 1, not 0 and 100
+            y_data = subj_data['Percent_Faster'].values 
+            
+            # Initial guess: slope = 2, PSE = middle of the x-axis range
+            p0 = [2.0, np.median(x_data)]
+            
+            try:
+                # Bounding the slope to be positive, and PSE to be within our axis
+                popt, _ = curve_fit(psychometric_curve, x_data, y_data, p0=p0, bounds=([0, 0], [20, 10]))
+                subj_k, subj_pse = popt[0], popt[1]
+                
+                # Generate smooth y values for this specific subject
+                y_smooth = psychometric_curve(x_smooth, subj_k, subj_pse) * 100 # Convert back to %
+                
+                # Save the curve line
+                subj_fit_df = pd.DataFrame({'Modulation_Rate': x_smooth, 'Fit_Percent': y_smooth})
+                subj_fit_df['Subject_ID'] = subj
+                individual_fits.append(subj_fit_df)
+                pse_list.append(subj_pse)
+                
+            except Exception as e:
+                print(f"Failed to fit curve for {subj}: {e}")
+
+        # Combine all individual smooth curves into one DataFrame
+        df_individual_fits = pd.concat(individual_fits, ignore_index=True) if individual_fits else pd.DataFrame()
+        
+        # Calculate the Average Data Points across all subjects
+        avg_raw_data = df.groupby('Modulation_Rate')['Percent_Faster'].mean().reset_index()
+        
+        # Fit the Grand Average Curve
         try:
-            popt, _ = curve_fit(parabola, x_data, y_data, p0=p0)
-            calculated_pse = popt[1] 
+            popt_avg, _ = curve_fit(psychometric_curve, avg_raw_data['Modulation_Rate'], avg_raw_data['Percent_Faster'], p0=p0)
+            avg_k, avg_pse = popt_avg[0], popt_avg[1]
+            avg_y_smooth = psychometric_curve(x_smooth, avg_k, avg_pse) * 100
+            df_avg_fit = pd.DataFrame({'Modulation_Rate': x_smooth, 'Fit_Percent': avg_y_smooth})
         except:
-            popt = p0
-            calculated_pse = np.nan
-            
-        x_smooth = np.linspace(min(x_data), max(x_data), 100)
-        y_smooth = parabola(x_smooth, *popt)
-        fit_data = pd.DataFrame({'x': x_smooth, 'y': y_smooth})
+            df_avg_fit = pd.DataFrame()
+            avg_pse = np.nan
+
+        return df, df_individual_fits, df_avg_fit, avg_pse
         
-        return df, fit_data, calculated_pse
+    except Exception as e:
+        st.error(f"Error executing get_rotating_line_data: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
         
     except Exception as e:
         st.error(f"Error executing get_rotating_line_data: {e}")
