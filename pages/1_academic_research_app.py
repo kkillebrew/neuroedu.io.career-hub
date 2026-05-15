@@ -400,9 +400,28 @@ with tabs[1]:
             demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"])
             
         with demo_col_right:
-            # We will render the HTML/JS Canvas here in Step 3
-            st.markdown("<br>", unsafe_allow_html=True) # Spacer
-            render_rotating_line_demo(demo_speed, demo_mod, demo_shape)
+            st.subheader("Interactive Demonstration")
+            st.markdown("""
+            **The Phenomenon:** When a line rotates at a constant speed behind an elliptical aperture... 
+            [keep your text here]
+            """)
+            
+            st.markdown("### Demo Controls")
+            demo_speed = st.slider("Base Rotational Speed", min_value=10, max_value=150, value=50, step=5)
+            demo_mod = st.slider("Speed Modulation (Nullify Effect)", min_value=0.0, max_value=5.0, value=0.0, step=0.1)
+            
+            # Layout the dropdown and checkbox side-by-side
+            ctrl_col1, ctrl_col2 = st.columns(2)
+            with ctrl_col1:
+                demo_shape = st.selectbox("Aperture Shape", ["Ellipse", "Rectangle", "Diamond"])
+            with ctrl_col2:
+                st.write("") # Spacer to align with selectbox
+                st.write("")
+                demo_dots = st.checkbox("Show Tracking Dots", value=True)
+            
+        with demo_col_right:
+            # Render the Canvas Component!
+            render_rotating_line_demo(demo_speed, demo_mod, demo_shape, demo_dots)
 
         st.divider()
 
