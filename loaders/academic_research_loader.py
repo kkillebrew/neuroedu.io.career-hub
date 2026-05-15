@@ -504,7 +504,8 @@ def get_response_counts_data(df):
 def get_rotating_line_data():
     """
     Fetches combined Parquet file from GitHub.
-    Calculates psychometric curves separated by Task AND Size (Long/Short).
+    Applies Sigmoid fit to Control data, and Parabola fit to Experimental data
+    to accurately find the PSE vertex.
     """
     try:
         github_token = os.environ.get("GITHUB_TOKEN")
@@ -530,11 +531,16 @@ def get_rotating_line_data():
             
         df = pd.read_parquet(BytesIO(response.content))
         
-        # --- MATH ENGINE ---
-        def psychometric_curve(x, k, x0):
+        # --- THE MATH ENGINES ---
+        # 1. Sigmoid for Control Task
+        def sigmoid_curve(x, k, x0):
             return 1 / (1 + np.exp(-k * (x - x0).clip(-100, 100)))
+            
+        # 2. Parabola for Experimental Task (Nulling)
+        def parabola_curve(x, a, h, k):
+            return a * (x - h)**2 + k
 
-        def process_block(task_df):
+        def process_block(task_df, task_name):
             if task_df.empty:
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), {}
                 
@@ -543,7 +549,6 @@ def get_rotating_line_data():
             avg_fits = []
             group_pse_dict = {}
             
-            # MATLAB Bridge: Loop through 'Long' and 'Short' independently!
             for size_cond in task_df['Size'].unique():
                 size_df = task_df[task_df['Size'] == size_cond]
                 
@@ -551,31 +556,44 @@ def get_rotating_line_data():
                 for subj in size_df['Subject_ID'].unique():
                     subj_data = size_df[size_df['Subject_ID'] == subj]
                     x_data = subj_data['X_Value'].values
-                    y_data = subj_data['Percent_Faster'].values 
                     
-                    p0 = [1.0, np.median(x_data)]
                     try:
-                        popt, _ = curve_fit(psychometric_curve, x_data, y_data, p0=p0, maxfev=1000)
-                        y_smooth = psychometric_curve(x_smooth, popt[0], popt[1]) * 100 
-                        
+                        if task_name == 'Control':
+                            # Sigmoid needs Y from 0 to 1
+                            y_data = subj_data['Percent_Faster'].values 
+                            popt, _ = curve_fit(sigmoid_curve, x_data, y_data, p0=[1.0, np.median(x_data)], maxfev=2000)
+                            y_smooth = sigmoid_curve(x_smooth, popt[0], popt[1]) * 100 
+                            subj_pse = popt[1]
+                        else:
+                            # Parabola fits better with Y from 0 to 100
+                            y_data = subj_data['Percent_Faster'].values * 100
+                            # p0 guess: U-shape (positive 'a'), vertex 'h' at x=1.0, vertex 'k' at y=50
+                            popt, _ = curve_fit(parabola_curve, x_data, y_data, p0=[10.0, 1.0, 50.0], maxfev=2000)
+                            y_smooth = parabola_curve(x_smooth, popt[0], popt[1], popt[2])
+                            subj_pse = popt[1] # 'h' is the vertex (PSE)
+                            
                         subj_fit_df = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': y_smooth})
                         subj_fit_df['Subject_ID'] = subj
                         subj_fit_df['Size'] = size_cond
                         individual_fits.append(subj_fit_df)
                     except:
-                        pass
+                        pass # Skip if math fails to converge for a noisy participant
 
                 # 2. Group Average Fits
                 avg_raw = size_df.groupby('X_Value')['Percent_Faster'].mean().reset_index()
                 try:
-                    popt_avg, _ = curve_fit(psychometric_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'], p0=[1.0, np.median(avg_raw['X_Value'])])
-                    avg_y_smooth = psychometric_curve(x_smooth, popt_avg[0], popt_avg[1]) * 100
-                    
+                    if task_name == 'Control':
+                        popt_avg, _ = curve_fit(sigmoid_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'], p0=[1.0, np.median(avg_raw['X_Value'])])
+                        avg_y_smooth = sigmoid_curve(x_smooth, popt_avg[0], popt_avg[1]) * 100
+                        group_pse_dict[size_cond] = popt_avg[1]
+                    else:
+                        popt_avg, _ = curve_fit(parabola_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'] * 100, p0=[10.0, 1.0, 50.0])
+                        avg_y_smooth = parabola_curve(x_smooth, popt_avg[0], popt_avg[1], popt_avg[2])
+                        group_pse_dict[size_cond] = popt_avg[1]
+                        
                     df_avg_fit = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': avg_y_smooth})
                     df_avg_fit['Size'] = size_cond
                     avg_fits.append(df_avg_fit)
-                    
-                    group_pse_dict[size_cond] = popt_avg[1]
                 except:
                     pass
 
@@ -584,8 +602,9 @@ def get_rotating_line_data():
                 
             return task_df, df_ind_fits, df_avg_fits, group_pse_dict
 
-        control_data = process_block(df[df['Task'] == 'Control'])
-        experimental_data = process_block(df[df['Task'] == 'Experimental'])
+        # Pass the task name so the process_block knows which math to use!
+        control_data = process_block(df[df['Task'] == 'Control'], 'Control')
+        experimental_data = process_block(df[df['Task'] == 'Experimental'], 'Experimental')
         
         return control_data, experimental_data
         
