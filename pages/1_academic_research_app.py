@@ -441,58 +441,65 @@ with tabs[1]:
             def build_psychometric_plot(df_raw, df_ind_fits, df_avg_fit, pse_dict, title, x_label):
                 fig = go.Figure()
                 
-                # Define our MATLAB-matched color palette based on Size
-                color_map = {'Long': 'red', 'Short': 'blue', 'N/A': 'red'}
+                # --- NEW COLOR MAPPING ---
+                # MATLAB Bridge: color_map = {'Long': [1 0 0], 'Short': [0 0 1], 'N/A': [0 1 0]}
+                color_map = {'Long': 'red', 'Short': 'blue', 'N/A': 'green'}
                 
-                # Plot each Size Condition (Long vs Short)
+                # Plot each Size Condition 
                 for size_cond in df_raw['Size'].unique():
-                    bold_color = color_map.get(size_cond, 'red')
+                    base_color = color_map.get(size_cond, 'gray') # Default to gray if something goes wrong
                     
-                    # 1. Individual Subjects (Light Green Dots & Faint Lines)
+                    # 1. Individual Subjects (Transparent Colors)
                     size_raw = df_raw[df_raw['Size'] == size_cond]
                     for subj in size_raw['Subject_ID'].unique():
                         subj_data = size_raw[size_raw['Subject_ID'] == subj]
+                        
+                        # Faint Individual Dots
                         fig.add_trace(go.Scatter(
                             x=subj_data['X_Value'], y=subj_data['Percent_Faster'] * 100, 
                             mode='markers', showlegend=False,
-                            marker=dict(color='lightgreen', size=6), opacity=0.4
+                            marker=dict(color=base_color, size=6), opacity=0.3
                         ))
                         
+                        # Faint Individual Curve
                         if not df_ind_fits.empty:
                             subj_fit = df_ind_fits[(df_ind_fits['Subject_ID'] == subj) & (df_ind_fits['Size'] == size_cond)]
                             if not subj_fit.empty:
                                 fig.add_trace(go.Scatter(
                                     x=subj_fit['X_Value'], y=subj_fit['Fit_Percent'], 
                                     mode='lines', showlegend=False,
-                                    line=dict(color='lightgreen', width=1), opacity=0.3
+                                    line=dict(color=base_color, width=1), opacity=0.2
                                 ))
 
-                    # 2. Grand Average (Bold Dots & Line)
+                    # 2. Grand Average (Bold Colors)
                     if not df_avg_fit.empty:
                         size_avg_fit = df_avg_fit[df_avg_fit['Size'] == size_cond]
                         avg_raw = size_raw.groupby('X_Value')['Percent_Faster'].mean().reset_index()
                         
                         label_name = f'Group Avg ({size_cond})' if size_cond != 'N/A' else 'Group Average Fit'
                         
-                        # Average Dots
+                        # Bold Average Dots
                         fig.add_trace(go.Scatter(
                             x=avg_raw['X_Value'], y=avg_raw['Percent_Faster'] * 100,
                             mode='markers', showlegend=False,
-                            marker=dict(color=bold_color, size=10, line=dict(color='black', width=1))
+                            marker=dict(color=base_color, size=10, line=dict(color='black', width=1)),
+                            opacity=1.0
                         ))
                         
-                        # Average Curve
+                        # Bold Average Curve
                         fig.add_trace(go.Scatter(
                             x=size_avg_fit['X_Value'], y=size_avg_fit['Fit_Percent'],
                             mode='lines', name=label_name,
-                            line=dict(color=bold_color, width=4)
+                            line=dict(color=base_color, width=4),
+                            opacity=1.0
                         ))
 
                     # 3. Plot the PSE Threshold Line
                     if size_cond in pse_dict and not pd.isna(pse_dict[size_cond]):
                         pse_val = pse_dict[size_cond]
-                        fig.add_vline(x=pse_val, line_dash="dash", line_color=bold_color)
+                        fig.add_vline(x=pse_val, line_dash="dash", line_color=base_color)
 
+                # The 50% anchor line
                 fig.add_hline(y=50, line_dash="dot", line_color="gray", annotation_text="50%")
 
                 fig.update_layout(
@@ -506,7 +513,7 @@ with tabs[1]:
             # --- FETCH DATA & RENDER SIDE-BY-SIDE ---
             control_pack, exp_pack = get_rotating_line_data()
             
-            if control_pack and exp_pack:
+            if control_pack is not None and exp_pack is not None:
                 plot_col_left, plot_col_right = st.columns(2)
                 
                 c_df, c_ind, c_avg, c_pse_dict = control_pack
@@ -516,7 +523,6 @@ with tabs[1]:
                     fig_control = build_psychometric_plot(c_df, c_ind, c_avg, c_pse_dict, "Control (No Aperture)", "Rotational Speed (RPM)")
                     st.plotly_chart(fig_control, use_container_width=True, config=PLOTLY_CONFIG)
                     
-                    # Display both PSEs if they exist
                     if 'Long' in c_pse_dict: st.info(f"**Long Line PSE:** {c_pse_dict['Long']:.2f} RPM")
                     if 'Short' in c_pse_dict: st.info(f"**Short Line PSE:** {c_pse_dict['Short']:.2f} RPM")
                         
@@ -524,9 +530,9 @@ with tabs[1]:
                     fig_exp = build_psychometric_plot(e_df, e_ind, e_avg, e_pse_dict, "Experimental (With Aperture)", "Speed Modulation Amount")
                     st.plotly_chart(fig_exp, use_container_width=True, config=PLOTLY_CONFIG)
                     
-                    if 'N/A' in e_pse_dict: st.error(f"**Experimental Group PSE:** {e_pse_dict['N/A']:.2f} Mod Units")
+                    if 'N/A' in e_pse_dict: st.success(f"**Experimental Group PSE:** {e_pse_dict['N/A']:.2f} Mod Units")
             else:
-                st.warning("Fetching secure data from GitHub pipeline...")
+                st.warning("Fetching secure data from GitHub pipeline... Please wait or verify your connection.")
             
         with rl_tabs[2]:
             st.subheader("Conclusions & Mechanisms")
