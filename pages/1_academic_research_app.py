@@ -246,8 +246,11 @@ with tabs[0]:
                     st.warning("⚠️ No Towards/Away data found in the current dataset.")
                     
             with col2:
-                df_acc = get_accuracy_data(df_tab1)
-                fig_acc = px.box(df_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
+                # Unpack the two dataframes returned by the loader
+                raw_acc, filtered_acc = get_accuracy_data(df_tab1)
+                
+                # Use the 'filtered_acc' (the QC'd data) for the box plot
+                fig_acc = px.box(filtered_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
                 fig_acc.update_traces(jitter=0.6, pointpos=0, width=0.3)
                 st.plotly_chart(fig_acc, use_container_width=True)
                 
