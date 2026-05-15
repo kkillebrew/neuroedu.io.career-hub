@@ -503,32 +503,55 @@ def get_response_counts_data(df):
 #########################################################
 def get_rotating_line_data():
     """
-    Loads the anonymized, pre-processed rotating line psychophysics data.
-    Fits a simple quadratic (parabola) to find the minimum/maximum (PSE)
-    mirroring the fitdata2 logic from the MATLAB groupData script.
-    """
-    # Define path to the secure parquet file
-    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'documents', 'rotating_line_clean.parquet')
+    Loads the anonymized rotating line data securely from the PRIVATE GitHub repo.
+    Fits a quadratic curve to find the Point of Subjective Equality (PSE).
     
+    MATLAB Bridge: 
+    This is the equivalent of using webread() with an options structure containing 
+    a secure HTTP header, piping the data directly into a Table in memory.
+    """
     try:
-        df = pd.read_parquet(file_path)
+        # 1. Retrieve the secure token from Streamlit Secrets
+        # Make sure your token is saved in DigitalOcean App Platform Environment Variables
+        # or local .streamlit/secrets.toml under the name GITHUB_TOKEN
+        try:
+            github_token = st.secrets["GITHUB_TOKEN"]
+        except KeyError:
+            st.error("GITHUB_TOKEN not found in secrets.")
+            return pd.DataFrame(), pd.DataFrame(), None
+
+        # 2. Build the secure URL
+        cache_buster = int(time.time())
+        username = "kkillebrew"
+        repo = "RotatingLine"
+        file_path = "RotatingLine_Exp/rotating_line_clean.parquet"
         
-        # We will also calculate a generic parabola fit to send to the UI
-        # MATLAB: fitdata2(:,1) = a1(1)*(xx_axis-PSE2(1)).^2 + c1(1);
+        raw_url = f"https://raw.githubusercontent.com/{username}/{repo}/main/{file_path}?t={cache_buster}"
+        
+        # 3. Fetch the data securely via API
+        headers = {'Authorization': f'token {github_token}'}
+        response = requests.get(raw_url, headers=headers)
+        
+        if response.status_code != 200:
+            st.error(f"Failed to fetch secure data from GitHub. HTTP Status: {response.status_code}")
+            return pd.DataFrame(), pd.DataFrame(), None
+            
+        # 4. Load the bytestream directly into Pandas
+        df = pd.read_parquet(BytesIO(response.content))
+        
+        # 5. Math & Fitting Logic (Directly from MATLAB fitdata2)
         def parabola(x, a, h, k):
             return a * (x - h)**2 + k
             
-        # Get x (Modulation Rate) and y (Percent Faster) for our sample subject
         subj_data = df[df['Subject_ID'] == 'Subj_01']
         x_data = subj_data['Modulation_Rate'].values
-        y_data = subj_data['Percent_Faster'].values * 100 # Scale to 0-100%
+        y_data = subj_data['Percent_Faster'].values * 100 
         
         # Initial guess for curve fit [a, h (vertex x), k (vertex y)]
         p0 = [10, 2.0, 50] 
-        
         try:
             popt, _ = curve_fit(parabola, x_data, y_data, p0=p0)
-            calculated_pse = popt[1] # The 'h' parameter is the vertex (PSE)
+            calculated_pse = popt[1] 
         except:
             popt = p0
             calculated_pse = np.nan
@@ -536,11 +559,10 @@ def get_rotating_line_data():
         # Generate smooth curve for plotting
         x_smooth = np.linspace(min(x_data), max(x_data), 100)
         y_smooth = parabola(x_smooth, *popt)
-        
         fit_data = pd.DataFrame({'x': x_smooth, 'y': y_smooth})
         
         return df, fit_data, calculated_pse
         
     except Exception as e:
-        st.error(f"Error loading Rotating Line data: {e}")
+        st.error(f"Error executing get_rotating_line_data: {e}")
         return pd.DataFrame(), pd.DataFrame(), None
