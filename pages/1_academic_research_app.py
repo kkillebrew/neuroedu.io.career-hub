@@ -137,14 +137,26 @@ with tabs[0]:
                     st.plotly_chart(fig_hist, use_container_width=True)
                 
             elif hist_choice == "Participant Responses":
-                df_counts = get_response_counts_data(df_tab1)
-                if df_counts.empty:
-                    st.warning("⚠️ No participant response data available in the current dataset.")
-                else:
-                    df_melt = df_counts.melt(id_vars=['Subject', 'Task_Type'], value_vars=['Left_Presses', 'Right_Presses'], var_name='Key', value_name='Count')
-                    fig_hist = px.box(df_melt, x="Key", y="Count", color="Task_Type", points="all", title="Participant Responses (Left vs Right)")
-                    fig_hist.update_traces(jitter=0.6, pointpos=0, width=0.3)
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                # 1. Fetch the dual dataframes
+                raw_acc, filtered_acc = get_accuracy_data(df_tab1)
+                
+                # 2. Display the Upper (Unfiltered) Histogram
+                fig_upper = px.histogram(
+                    raw_acc, x="Control_Correct_Responses_Raw",
+                    nbins=12, title="UNFILTERED: Total Correct Responses",
+                    color_discrete_sequence=['#94a3b8']
+                )
+                fig_upper.add_vline(x=5.5, line_dash="dash", line_color="#ef4444")
+                st.plotly_chart(fig_upper, use_container_width=True, config=PLOTLY_CONFIG)
+                
+                # 3. Display the Lower (Filtered) Histogram
+                fig_lower = px.histogram(
+                    filtered_acc, x="Control_Correct_Responses",
+                    nbins=12, title="FILTERED: Responses within 6s Window",
+                    color_discrete_sequence=['#10b981']
+                )
+                fig_lower.add_vline(x=5.5, line_dash="dash", line_color="#ef4444")
+                st.plotly_chart(fig_lower, use_container_width=True, config=PLOTLY_CONFIG)
                 
             elif hist_choice == "Participant Responses":
                 # Fetch both the raw and filtered data from the loader
@@ -246,11 +258,16 @@ with tabs[0]:
                     st.warning("⚠️ No Towards/Away data found in the current dataset.")
                     
             with col2:
-                # Unpack the two dataframes returned by the loader
-                raw_acc, filtered_acc = get_accuracy_data(df_tab1)
+                # FIX: Unpack the tuple so Plotly gets a single DataFrame
+                raw_acc_df, filtered_acc_df = get_accuracy_data(df_tab1) 
                 
-                # Use the 'filtered_acc' (the QC'd data) for the box plot
-                fig_acc = px.box(filtered_acc, y="Control_Correct_Responses", points="all", title="Task Accuracy (Max 11)")
+                # Use ONLY the filtered dataframe for the box plot
+                fig_acc = px.box(
+                    filtered_acc_df, 
+                    y="Control_Correct_Responses", 
+                    points="all", 
+                    title="Task Accuracy (Max 11)"
+                )
                 fig_acc.update_traces(jitter=0.6, pointpos=0, width=0.3)
                 st.plotly_chart(fig_acc, use_container_width=True)
                 
