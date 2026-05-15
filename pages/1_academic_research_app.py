@@ -437,56 +437,67 @@ with tabs[1]:
             
             import plotly.graph_objects as go
 
-            def build_psychometric_plot(df_raw, df_ind_fits, df_avg_fit, group_pse, title, x_label):
+            def build_psychometric_plot(df_raw, df_ind_fits, df_avg_fit, pse_dict, title, x_label):
                 fig = go.Figure()
-
-                # 1. Plot Individual Subjects (Light Green Dots & Faint Lines)
-                if not df_raw.empty:
-                    for subj in df_raw['Subject_ID'].unique():
-                        subj_data = df_raw[df_raw['Subject_ID'] == subj]
-                        
+                
+                # Define our MATLAB-matched color palette based on Size
+                color_map = {'Long': 'red', 'Short': 'blue', 'N/A': 'red'}
+                
+                # Plot each Size Condition (Long vs Short)
+                for size_cond in df_raw['Size'].unique():
+                    bold_color = color_map.get(size_cond, 'red')
+                    
+                    # 1. Individual Subjects (Light Green Dots & Faint Lines)
+                    size_raw = df_raw[df_raw['Size'] == size_cond]
+                    for subj in size_raw['Subject_ID'].unique():
+                        subj_data = size_raw[size_raw['Subject_ID'] == subj]
                         fig.add_trace(go.Scatter(
                             x=subj_data['X_Value'], y=subj_data['Percent_Faster'] * 100, 
-                            mode='markers', name=f"{subj} Raw", showlegend=False,
+                            mode='markers', showlegend=False,
                             marker=dict(color='lightgreen', size=6), opacity=0.4
                         ))
                         
                         if not df_ind_fits.empty:
-                            subj_fit = df_ind_fits[df_ind_fits['Subject_ID'] == subj]
-                            fig.add_trace(go.Scatter(
-                                x=subj_fit['X_Value'], y=subj_fit['Fit_Percent'], 
-                                mode='lines', name=f"{subj} Fit", showlegend=False,
-                                line=dict(color='lightgreen', width=1), opacity=0.3
-                            ))
+                            subj_fit = df_ind_fits[(df_ind_fits['Subject_ID'] == subj) & (df_ind_fits['Size'] == size_cond)]
+                            if not subj_fit.empty:
+                                fig.add_trace(go.Scatter(
+                                    x=subj_fit['X_Value'], y=subj_fit['Fit_Percent'], 
+                                    mode='lines', showlegend=False,
+                                    line=dict(color='lightgreen', width=1), opacity=0.3
+                                ))
 
-                # 2. Plot the Grand Average (Bold Red Dots & Line)
-                if not df_avg_fit.empty:
-                    avg_raw = df_raw.groupby('X_Value')['Percent_Faster'].mean().reset_index()
-                    fig.add_trace(go.Scatter(
-                        x=avg_raw['X_Value'], y=avg_raw['Percent_Faster'] * 100,
-                        mode='markers', name='Group Average Data',
-                        marker=dict(color='red', size=10, line=dict(color='darkred', width=1))
-                    ))
-                    
-                    fig.add_trace(go.Scatter(
-                        x=df_avg_fit['X_Value'], y=df_avg_fit['Fit_Percent'],
-                        mode='lines', name='Group Average Fit',
-                        line=dict(color='red', width=4)
-                    ))
+                    # 2. Grand Average (Bold Dots & Line)
+                    if not df_avg_fit.empty:
+                        size_avg_fit = df_avg_fit[df_avg_fit['Size'] == size_cond]
+                        avg_raw = size_raw.groupby('X_Value')['Percent_Faster'].mean().reset_index()
+                        
+                        label_name = f'Group Avg ({size_cond})' if size_cond != 'N/A' else 'Group Average Fit'
+                        
+                        # Average Dots
+                        fig.add_trace(go.Scatter(
+                            x=avg_raw['X_Value'], y=avg_raw['Percent_Faster'] * 100,
+                            mode='markers', showlegend=False,
+                            marker=dict(color=bold_color, size=10, line=dict(color='black', width=1))
+                        ))
+                        
+                        # Average Curve
+                        fig.add_trace(go.Scatter(
+                            x=size_avg_fit['X_Value'], y=size_avg_fit['Fit_Percent'],
+                            mode='lines', name=label_name,
+                            line=dict(color=bold_color, width=4)
+                        ))
 
-                # 3. Plot the 50% Threshold Line (PSE intersection)
+                    # 3. Plot the PSE Threshold Line
+                    if size_cond in pse_dict and not pd.isna(pse_dict[size_cond]):
+                        pse_val = pse_dict[size_cond]
+                        fig.add_vline(x=pse_val, line_dash="dash", line_color=bold_color)
+
                 fig.add_hline(y=50, line_dash="dot", line_color="gray", annotation_text="50%")
-                if group_pse and not pd.isna(group_pse):
-                    fig.add_vline(x=group_pse, line_dash="dash", line_color="darkred")
 
-                # Layout formatting
                 fig.update_layout(
-                    title=title,
-                    xaxis_title=x_label,
-                    yaxis_title="% 'Faster' Responses",
-                    yaxis_range=[-5, 105],
-                    height=450,
-                    margin=dict(l=20, r=20, t=40, b=20),
+                    title=title, xaxis_title=x_label,
+                    yaxis_title="% 'Faster' Responses" if "Control" in title else "",
+                    yaxis_range=[-5, 105], height=450, margin=dict(l=20, r=20, t=40, b=20),
                     legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
                 )
                 return fig
@@ -497,21 +508,22 @@ with tabs[1]:
             if control_pack and exp_pack:
                 plot_col_left, plot_col_right = st.columns(2)
                 
-                # Unpack the tuples returned from the loader
-                c_df, c_ind, c_avg, c_pse = control_pack
-                e_df, e_ind, e_avg, e_pse = exp_pack
+                c_df, c_ind, c_avg, c_pse_dict = control_pack
+                e_df, e_ind, e_avg, e_pse_dict = exp_pack
                 
                 with plot_col_left:
-                    fig_control = build_psychometric_plot(c_df, c_ind, c_avg, c_pse, "Control (No Aperture)", "Rotational Speed (RPM)")
+                    fig_control = build_psychometric_plot(c_df, c_ind, c_avg, c_pse_dict, "Control (No Aperture)", "Rotational Speed (RPM)")
                     st.plotly_chart(fig_control, use_container_width=True, config=PLOTLY_CONFIG)
-                    if c_pse:
-                        st.info(f"**Control Group PSE:** {c_pse:.2f} RPM")
+                    
+                    # Display both PSEs if they exist
+                    if 'Long' in c_pse_dict: st.info(f"**Long Line PSE:** {c_pse_dict['Long']:.2f} RPM")
+                    if 'Short' in c_pse_dict: st.info(f"**Short Line PSE:** {c_pse_dict['Short']:.2f} RPM")
                         
                 with plot_col_right:
-                    fig_exp = build_psychometric_plot(e_df, e_ind, e_avg, e_pse, "Experimental (With Aperture)", "Speed Modulation Amount")
+                    fig_exp = build_psychometric_plot(e_df, e_ind, e_avg, e_pse_dict, "Experimental (With Aperture)", "Speed Modulation Amount")
                     st.plotly_chart(fig_exp, use_container_width=True, config=PLOTLY_CONFIG)
-                    if e_pse:
-                        st.info(f"**Experimental Group PSE:** {e_pse:.2f} Mod Units")
+                    
+                    if 'N/A' in e_pse_dict: st.error(f"**Experimental Group PSE:** {e_pse_dict['N/A']:.2f} Mod Units")
             else:
                 st.warning("Fetching secure data from GitHub pipeline...")
             
