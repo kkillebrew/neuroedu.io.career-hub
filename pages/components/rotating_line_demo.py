@@ -260,3 +260,127 @@ def render_mini_demo(demo_type, modulation=0.0, speed=50, size=150):
     import streamlit.components.v1 as components
     # Render with no scrolling allowed
     components.html(html_code, height=size, scrolling=False)
+
+### - Render the rotating line with component motion vectors displayed in real time. - ###
+def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
+    """
+    Renders a theoretical model of the rotating line, overlaying dynamic
+    component motion vectors along the line's length to visualize velocity.
+    """
+    if demo_type == 'long':
+        shape_id = -1 
+        ap_width, ap_height = 80, 80 
+    elif demo_type == 'short':
+        shape_id = -1
+        ap_width, ap_height = 40, 40 
+    else: # 'aperture'
+        shape_id = 0
+        ap_width, ap_height = 80, 40 
+
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #808080; overflow: hidden; }}
+            canvas {{ background-color: #808080; border: 1px solid #555; border-radius: 4px; }}
+            .label {{ position: absolute; bottom: 5px; font-family: sans-serif; color: white; font-size: 12px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;}}
+        </style>
+    </head>
+    <body>
+        <canvas id="vectorCanvas" width="{size}" height="{size}"></canvas>
+        <div class="label">{demo_type.upper()}</div>
+        <script>
+            const canvas = document.getElementById('vectorCanvas');
+            const ctx = canvas.getContext('2d');
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            const shapeId = {shape_id};
+            const apWidth = {ap_width};
+            const apHeight = {ap_height};
+            const modulation = {modulation};
+            const baseSpeed = {speed};
+            
+            let angle = 0;
+            let lastTime = performance.now();
+
+            function drawLoop(currentTime) {{
+                const dt = (currentTime - lastTime) / 1000; 
+                lastTime = currentTime;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                let radAngle = angle * (Math.PI / 180);
+                let currentLength = 0;
+                
+                if (shapeId === -1) {{ 
+                    currentLength = apWidth; 
+                }} else {{ 
+                    currentLength = (apWidth * apHeight) / Math.sqrt(
+                        Math.pow(apHeight * Math.cos(radAngle), 2) + 
+                        Math.pow(apWidth * Math.sin(radAngle), 2)
+                    );
+                }}
+
+                let lengthFactor = (apWidth - currentLength) / (apWidth - apHeight);
+                if (shapeId === -1) lengthFactor = 0; 
+                
+                let currentSpeed = baseSpeed * (1 + (modulation * lengthFactor));
+                angle += currentSpeed * dt;
+                if (angle >= 360) angle -= 360;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(radAngle);
+                
+                // 1. Draw the Main Line
+                ctx.beginPath();
+                ctx.moveTo(-currentLength, 0);
+                ctx.lineTo(currentLength, 0);
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#FFFFFF'; 
+                ctx.stroke();
+                
+                // 2. Draw the Component Motion Vectors (Arrows)
+                // The velocity v = r * omega. We scale it visually to fit the box.
+                const numVectors = 3; // Number of vectors per side
+                const visualScale = 0.5; // Tweak to make arrows look proportional
+                
+                ctx.strokeStyle = '#00FF00'; // Green vectors
+                ctx.fillStyle = '#00FF00';
+                ctx.lineWidth = 2;
+
+                for(let i = -numVectors; i <= numVectors; i++) {{
+                    if (i === 0) continue; // Skip center pivot point
+                    
+                    let r = (i / numVectors) * currentLength;
+                    // Vector magnitude is proportional to distance from center (r) and current rotational speed
+                    let v = r * (currentSpeed / 100) * visualScale; 
+                    
+                    // Draw vector shaft
+                    ctx.beginPath();
+                    ctx.moveTo(r, 0);
+                    ctx.lineTo(r, v);
+                    ctx.stroke();
+                    
+                    // Draw arrowhead
+                    ctx.beginPath();
+                    ctx.moveTo(r, v);
+                    let headSize = 5;
+                    let dir = v > 0 ? 1 : -1;
+                    ctx.lineTo(r - headSize, v - dir * headSize);
+                    ctx.lineTo(r + headSize, v - dir * headSize);
+                    ctx.closePath();
+                    ctx.fill();
+                }}
+
+                ctx.restore();
+                requestAnimationFrame(drawLoop);
+            }}
+            requestAnimationFrame(drawLoop);
+        </script>
+    </body>
+    </html>
+    """
+    import streamlit.components.v1 as components
+    components.html(html_code, height=size, scrolling=False)

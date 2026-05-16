@@ -35,7 +35,7 @@ from loaders.academic_research_loader import (
     PLOTLY_CONFIG
 )
 
-from pages.components.rotating_line_demo import render_rotating_line_demo, render_mini_demo
+from pages.components.rotating_line_demo import render_rotating_line_demo, render_mini_demo, render_vector_demo
 from career_hub_loader import get_references_metadata
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -627,8 +627,48 @@ with tabs[1]:
                 render_mini_demo('aperture', modulation=e_pse) # Middle (PSE)
                 render_mini_demo('aperture', modulation=0.0) # Bottom (Baseline)
 
+            st.divider()
+
+            # =========================================================
+            # THEORETICAL MODELING: Component Motion Vectors
+            # =========================================================
+            st.markdown("### 3. Theoretical Modeling: Local Motion Signals")
+            st.markdown("""
+            As detailed in **Porter et al. (2011)** regarding rotating ellipses, the human visual system relies heavily on **local orthogonal motion signals** (component vectors) to interpret global object motion. 
+            
+            In the models below, the **green arrows** represent the physical velocity vectors at different points along the line ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis—this is the exact cause of the illusion. By applying the PSE Modulation, we artificially keep the tip velocity vectors constant, neutralizing the visual distortion!
+            """)
+
+            # Fetch the actual Experimental PSE again for accuracy
+            e_pse = exp_pack[3].get('N/A', 1.5) if exp_pack else 1.5
+
+            # 4-Column Layout for the side-by-side comparison
+            mod_col1, mod_col2, mod_col3, mod_col4 = st.columns(4)
+
+            with mod_col1:
+                st.markdown("**1. Short Line**")
+                st.caption("Small constant vectors.")
+                render_vector_demo('short', speed=50)
+
+            with mod_col2:
+                st.markdown("**2. Long Line**")
+                st.caption("Large constant vectors.")
+                render_vector_demo('long', speed=50)
+
+            with mod_col3:
+                st.markdown("**3. Aperture (Unmodulated)**")
+                st.caption("Vectors shrink/grow wildly.")
+                # We use a pure ellipse aperture with 0 modulation
+                render_vector_demo('aperture', modulation=0.0, speed=50)
+
+            with mod_col4:
+                st.markdown(f"**4. Aperture (Nullified)**")
+                st.caption(f"PSE Applied (+{e_pse:.1f} Mod)")
+                # We apply the actual mathematical PSE derived from the participant data!
+                render_vector_demo('aperture', modulation=e_pse, speed=50)
+
 # --- PLACEHOLDERS FOR REMAINING TABS ---
-for i in range(1, 5):
+for i in range(2, 5):
     with tabs[i]:
         st.subheader(narratives[i]["header"])
         st.write(narratives[i]["blurb"])
