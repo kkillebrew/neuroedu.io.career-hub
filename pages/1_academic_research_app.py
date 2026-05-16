@@ -623,6 +623,11 @@ with tabs[1]:
 
             plot_col, demo_col = st.columns([4, 1])
 
+            # Define static plot dimensions to feed into our pixel-tracking math
+            plot_height = 400 
+            top_margin = 20
+            bottom_margin = 20
+
             with plot_col:
                 fig2 = go.Figure()
                 fig2.add_trace(go.Box(
@@ -638,20 +643,42 @@ with tabs[1]:
                 fig2.update_layout(
                     showlegend=False,
                     yaxis_title="Speed Modulation Factor",
-                    yaxis_range=[-0.5, 4.5],
+                    yaxis_range=[-3, 5], # NEW: Expanded scale
                     xaxis=dict(showticklabels=False), 
-                    height=250, 
-                    margin=dict(l=0, r=0, t=20, b=20)
+                    height=plot_height, 
+                    margin=dict(l=0, r=0, t=top_margin, b=bottom_margin)
                 )
                 st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
             with demo_col:
-                st.write("") 
+                # --- DYNAMIC Y-AXIS TRACKING MATH ---
+                # We calculate the exact pixel spacing needed to perfectly align the centers 
+                # of the 50px HTML canvases with the exact heights of the Plotly Y-Axis lines.
+                plot_area_height = plot_height - top_margin - bottom_margin
+                y_max, y_min = 5.0, -3.0
+                y_range = y_max - y_min
+                px_per_unit = plot_area_height / y_range
+                
+                # Calculate pixel distance from the very top of the Plotly figure to the center of each line
+                center_4 = top_margin + (y_max - 4.0) * px_per_unit
+                center_pse = top_margin + (y_max - e_pse) * px_per_unit
+                center_0 = top_margin + (y_max - 0.0) * px_per_unit
+                
+                # Subtract 25px (half the canvas size) to find the top edge of each canvas,
+                # then calculate the pure empty space needed between them.
+                gap_1 = max(0, center_4 - 25) 
+                gap_2 = max(0, (center_pse - 25) - (center_4 + 25)) 
+                gap_3 = max(0, (center_0 - 25) - (center_pse + 25)) 
+
+                # Render the dynamically spaced column using invisible HTML blocks
+                st.markdown(f"<div style='height: {gap_1}px'></div>", unsafe_allow_html=True)
                 render_mini_demo('aperture', modulation=4.0, size=50) 
-                st.write("") 
+                
+                st.markdown(f"<div style='height: {gap_2}px'></div>", unsafe_allow_html=True)
                 render_mini_demo('aperture', modulation=e_pse, size=50) 
-                st.write("") 
-                render_mini_demo('aperture', modulation=0.0, size=50) 
+                
+                st.markdown(f"<div style='height: {gap_3}px'></div>", unsafe_allow_html=True)
+                render_mini_demo('aperture', modulation=0.0, size=50)
 
             st.divider()
 
