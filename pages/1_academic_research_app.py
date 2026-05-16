@@ -538,10 +538,21 @@ with tabs[1]:
             
             import plotly.graph_objects as go
             
+            # Fetch the data
             control_pack, exp_pack = get_rotating_line_data()
-            c_pse_long = control_pack[3].get('Long', 60) if control_pack else 60
-            c_pse_short = control_pack[3].get('Short', 50) if control_pack else 50
-            e_pse = exp_pack[3].get('N/A', 1.5) if exp_pack else 1.5
+            
+            c_df, c_ind, c_avg, c_pse_dict = control_pack
+            e_df, e_ind, e_avg, e_pse_dict = exp_pack
+
+            # Group Averages (for the annotation lines)
+            c_pse_long = c_pse_dict.get('Long', 60)
+            c_pse_short = c_pse_dict.get('Short', 50)
+            e_pse = e_pse_dict.get('N/A', 1.5)
+
+            # Extract Individual PSE lists for the Beeswarm plots
+            ind_pse_long = c_ind[c_ind['Size'] == 'Long'][['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
+            ind_pse_short = c_ind[c_ind['Size'] == 'Short'][['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
+            ind_pse_exp = e_ind[['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
 
             st.divider()
 
@@ -552,11 +563,21 @@ with tabs[1]:
             st.write("Even without an aperture, human vision naturally perceives longer objects as moving slower than shorter objects rotating at the exact same physical speed.")
             
             fig1 = go.Figure()
-            fig1.add_trace(go.Bar(
-                x=['Long Line', 'Short Line'],
-                y=[c_pse_long, c_pse_short],
-                marker_color=['red', 'blue'],
-                width=0.4
+            
+            # Box 1: Long Line
+            fig1.add_trace(go.Box(
+                y=ind_pse_long, x=[0] * len(ind_pse_long),
+                name='Long Line', marker_color='red',
+                boxpoints='all', jitter=0.3, pointpos=0, # pointpos=0 centers the beeswarm over the box
+                fillcolor='rgba(255,0,0,0.2)', line=dict(width=2)
+            ))
+            
+            # Box 2: Short Line
+            fig1.add_trace(go.Box(
+                y=ind_pse_short, x=[1] * len(ind_pse_short),
+                name='Short Line', marker_color='blue',
+                boxpoints='all', jitter=0.3, pointpos=0,
+                fillcolor='rgba(0,0,255,0.2)', line=dict(width=2)
             ))
 
             # --- ANNOTATION: The Vertical Gap Line ---
@@ -564,13 +585,11 @@ with tabs[1]:
             higher_val = max(c_pse_long, c_pse_short)
             lower_val = min(c_pse_long, c_pse_short)
             
-            # Draw vertical dashed line exactly between the bars (Categorical x=0.5 is the exact midpoint)
+            # Draw vertical dashed line exactly between the boxes (x=0.5)
             fig1.add_shape(type="line", x0=0.5, y0=lower_val, x1=0.5, y1=higher_val, line=dict(color="black", width=2, dash="dash"))
-            # Draw horizontal tick caps for the gap
             fig1.add_shape(type="line", x0=0.45, y0=lower_val, x1=0.55, y1=lower_val, line=dict(color="black", width=2))
             fig1.add_shape(type="line", x0=0.45, y0=higher_val, x1=0.55, y1=higher_val, line=dict(color="black", width=2))
 
-            # Add concise text next to the gap line
             fig1.add_annotation(
                 x=0.52, y=(higher_val + lower_val)/2,
                 text=f"Gap: {delta:.1f} RPM",
@@ -578,13 +597,14 @@ with tabs[1]:
             )
 
             fig1.update_layout(
+                showlegend=False,
                 yaxis_title="Physical RPM Required for Equality",
-                xaxis=dict(showticklabels=False), # Hide text labels for living demos
-                height=350, margin=dict(l=20, r=20, t=20, b=0)
+                xaxis=dict(showticklabels=False, range=[-0.5, 1.5]), # Force perfect centering
+                height=350, margin=dict(l=0, r=0, t=20, b=0) # Removed side margins to align with Streamlit columns!
             )
             st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CONFIG)
 
-            # --- HTML DEMOS CENTERED UNDER BARS ---
+            # --- HTML DEMOS CENTERED UNDER BOXES ---
             col1, col2 = st.columns(2)
             with col1: 
                 render_mini_demo('long', speed=c_pse_long, size=50)
@@ -603,21 +623,28 @@ with tabs[1]:
 
             with plot_col:
                 fig2 = go.Figure()
-                fig2.add_trace(go.Bar(x=['Group PSE'], y=[e_pse], marker_color='green', width=0.3))
+                fig2.add_trace(go.Box(
+                    y=ind_pse_exp, name='Group PSE',
+                    marker_color='green', boxpoints='all', jitter=0.3, pointpos=0,
+                    fillcolor='rgba(0,128,0,0.2)', line=dict(width=2)
+                ))
+                
                 fig2.add_hline(y=4.0, line_dash="dot", line_color="red", annotation_text="Over-Modulated")
                 fig2.add_hline(y=e_pse, line_dash="dash", line_color="green", annotation_text="Subjective Equality (PSE)")
                 fig2.add_hline(y=0.0, line_dash="solid", line_color="blue", annotation_text="Unmodulated (Max Illusion)")
 
                 fig2.update_layout(
+                    showlegend=False,
                     yaxis_title="Speed Modulation Factor",
                     yaxis_range=[-0.5, 4.5],
-                    height=250, # Scaled down height to tightly fit the 3x 50px stacked demos
-                    margin=dict(l=20, r=20, t=20, b=20)
+                    xaxis=dict(showticklabels=False), 
+                    height=250, 
+                    margin=dict(l=0, r=0, t=20, b=20)
                 )
                 st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
             with demo_col:
-                st.write("") # Spacer to push down slightly
+                st.write("") 
                 render_mini_demo('aperture', modulation=4.0, size=50) 
                 st.write("") 
                 render_mini_demo('aperture', modulation=e_pse, size=50) 
@@ -633,7 +660,7 @@ with tabs[1]:
             st.markdown("""
             As detailed in **Porter et al. (2011)** regarding rotating ellipses, the human visual system relies heavily on **local orthogonal motion signals** (component vectors) to interpret global object motion. 
             
-            In the models below, the **green arrows** represent the true physical velocity vectors ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis. By applying the mathematical PSE Modulation, we dynamically alter $\omega$ to perfectly counteract the shrinking $r$, keeping the tip vectors constant and neutralizing the visual distortion!
+            In the models below, the **green lines** represent the true physical velocity vectors ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis. By applying the mathematical PSE Modulation, we dynamically alter $\omega$ to perfectly counteract the shrinking $r$, keeping the tip vectors constant and neutralizing the visual distortion!
             """)
 
             mod_col1, mod_col2, mod_col3, mod_col4 = st.columns(4)

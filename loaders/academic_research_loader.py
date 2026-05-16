@@ -575,6 +575,7 @@ def get_rotating_line_data():
                         subj_fit_df = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': y_smooth})
                         subj_fit_df['Subject_ID'] = subj
                         subj_fit_df['Size'] = size_cond
+                        subj_fit_df['PSE'] = subj_pse # <--- ADD THIS LINE HERE!
                         individual_fits.append(subj_fit_df)
                     except:
                         pass # Skip if math fails to converge for a noisy participant
