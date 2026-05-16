@@ -664,18 +664,22 @@ with tabs[1]:
             """)
 
             mod_col1, mod_col2, mod_col3, mod_col4 = st.columns(4)
+            
             with mod_col1:
-                st.markdown("**1. Short Line**")
                 render_vector_demo('short', speed=50)
+                st.markdown("<p style='text-align: center; margin-top: 5px;'><b>1. Short Line</b></p>", unsafe_allow_html=True)
+                
             with mod_col2:
-                st.markdown("**2. Long Line**")
                 render_vector_demo('long', speed=50)
+                st.markdown("<p style='text-align: center; margin-top: 5px;'><b>2. Long Line</b></p>", unsafe_allow_html=True)
+                
             with mod_col3:
-                st.markdown("**3. Aperture (0.0 Mod)**")
                 render_vector_demo('aperture', modulation=0.0, speed=50)
+                st.markdown("<p style='text-align: center; margin-top: 5px;'><b>3. Aperture (0.0 Mod)</b></p>", unsafe_allow_html=True)
+                
             with mod_col4:
-                st.markdown(f"**4. Aperture (Nullified)**")
                 render_vector_demo('aperture', modulation=e_pse, speed=50)
+                st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---
 for i in range(2, 5):

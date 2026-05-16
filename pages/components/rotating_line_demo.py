@@ -252,7 +252,7 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
     """
     Theoretical Component Motion Vectors.
     Calculates exact v = omega * r for orthogonal local motion signals.
-    Arrowheads removed for clarity.
+    Clean layout: No borders, no internal HTML labels.
     """
     if demo_type == 'long':
         shape_id = -1 
@@ -269,14 +269,13 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
     <html>
     <head>
         <style>
-            body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #808080; overflow: hidden; }}
-            canvas {{ background-color: #808080; border: 1px solid #555; border-radius: 4px; }}
-            .label {{ position: absolute; bottom: 5px; font-family: sans-serif; color: white; font-size: 12px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;}}
+            body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: transparent; overflow: hidden; }}
+            /* Removed the black border */
+            canvas {{ background-color: #808080; border-radius: 4px; border: none; }}
         </style>
     </head>
     <body>
         <canvas id="vectorCanvas" width="{size}" height="{size}"></canvas>
-        <div class="label">{demo_type.upper()}</div>
         <script>
             const canvas = document.getElementById('vectorCanvas');
             const ctx = canvas.getContext('2d');
@@ -320,7 +319,7 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
                 ctx.translate(cx, cy);
                 ctx.rotate(radAngle);
                 
-                // 1. Draw the Main Line
+                // Draw the Main Line
                 ctx.beginPath();
                 ctx.moveTo(-currentLength, 0);
                 ctx.lineTo(currentLength, 0);
@@ -328,26 +327,20 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
                 ctx.strokeStyle = '#FFFFFF'; 
                 ctx.stroke();
                 
-                // 2. TRUE COMPONENT VECTOR MATH (v = omega * r)
-                const numVectors = 4; // Vectors per side
-                // Convert degrees/sec to radians/sec for true angular velocity
+                // TRUE COMPONENT VECTOR MATH
+                const numVectors = 4; 
                 let omega = currentSpeed * (Math.PI / 180); 
-                
-                // FIX: Adjusted visual scale to keep lines perfectly sized without clipping
                 let visualScale = 0.5; 
                 
                 ctx.strokeStyle = '#00FF00';
-                ctx.lineWidth = 3; // Made the lines slightly thicker since they don't have arrowheads
+                ctx.lineWidth = 3; 
 
                 for(let i = -numVectors; i <= numVectors; i++) {{
                     if (i === 0) continue; 
                     
-                    // Exact distance (r) from the center of rotation
                     let r = (i / numVectors) * currentLength;
-                    // Exact component motion magnitude (v = r * omega)
                     let v = r * omega * visualScale; 
                     
-                    // Draw vector line (No arrowheads)
                     ctx.beginPath();
                     ctx.moveTo(r, 0);
                     ctx.lineTo(r, v);
