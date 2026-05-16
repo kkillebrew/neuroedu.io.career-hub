@@ -252,6 +252,7 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
     """
     Theoretical Component Motion Vectors.
     Calculates exact v = omega * r for orthogonal local motion signals.
+    Arrowheads removed for clarity.
     """
     if demo_type == 'long':
         shape_id = -1 
@@ -331,11 +332,12 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
                 const numVectors = 4; // Vectors per side
                 // Convert degrees/sec to radians/sec for true angular velocity
                 let omega = currentSpeed * (Math.PI / 180); 
-                let visualScale = 15; // Visual multiplier to make vectors legible
+                
+                // FIX: Adjusted visual scale to keep lines perfectly sized without clipping
+                let visualScale = 0.5; 
                 
                 ctx.strokeStyle = '#00FF00';
-                ctx.fillStyle = '#00FF00';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 3; // Made the lines slightly thicker since they don't have arrowheads
 
                 for(let i = -numVectors; i <= numVectors; i++) {{
                     if (i === 0) continue; 
@@ -345,19 +347,11 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
                     // Exact component motion magnitude (v = r * omega)
                     let v = r * omega * visualScale; 
                     
+                    // Draw vector line (No arrowheads)
                     ctx.beginPath();
                     ctx.moveTo(r, 0);
                     ctx.lineTo(r, v);
                     ctx.stroke();
-                    
-                    ctx.beginPath();
-                    let headSize = 6;
-                    let dir = v > 0 ? 1 : -1;
-                    ctx.moveTo(r, v);
-                    ctx.lineTo(r - headSize, v - dir * headSize);
-                    ctx.lineTo(r + headSize, v - dir * headSize);
-                    ctx.closePath();
-                    ctx.fill();
                 }}
 
                 ctx.restore();
