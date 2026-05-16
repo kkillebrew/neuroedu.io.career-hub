@@ -504,8 +504,7 @@ def get_response_counts_data(df):
 def get_rotating_line_data():
     """
     Fetches combined Parquet file from GitHub.
-    Applies Sigmoid fit to Control data, and Parabola fit to Experimental data
-    to accurately find the PSE vertex.
+    Applies Bounded curve fits to prevent mathematical outliers on noisy subjects.
     """
     try:
         github_token = os.environ.get("GITHUB_TOKEN")
@@ -532,11 +531,9 @@ def get_rotating_line_data():
         df = pd.read_parquet(BytesIO(response.content))
         
         # --- THE MATH ENGINES ---
-        # 1. Sigmoid for Control Task
         def sigmoid_curve(x, k, x0):
             return 1 / (1 + np.exp(-k * (x - x0).clip(-100, 100)))
             
-        # 2. Parabola for Experimental Task (Nulling)
         def parabola_curve(x, a, h, k):
             return a * (x - h)**2 + k
 
@@ -559,26 +556,27 @@ def get_rotating_line_data():
                     
                     try:
                         if task_name == 'Control':
-                            # Sigmoid needs Y from 0 to 1
                             y_data = subj_data['Percent_Faster'].values 
                             popt, _ = curve_fit(sigmoid_curve, x_data, y_data, p0=[1.0, np.median(x_data)], maxfev=2000)
                             y_smooth = sigmoid_curve(x_smooth, popt[0], popt[1]) * 100 
                             subj_pse = popt[1]
                         else:
-                            # Parabola fits better with Y from 0 to 100
                             y_data = subj_data['Percent_Faster'].values * 100
-                            # p0 guess: U-shape (positive 'a'), vertex 'h' at x=1.0, vertex 'k' at y=50
-                            popt, _ = curve_fit(parabola_curve, x_data, y_data, p0=[10.0, 1.0, 50.0], maxfev=2000)
+                            # FIXED: Added strict physical bounds for [a, h, k]
+                            # 'h' is the PSE, bounded strictly between -2.0 and 8.0 Mod Units
+                            bounds = ([-np.inf, -2.0, 0.0], [np.inf, 8.0, 100.0])
+                            popt, _ = curve_fit(parabola_curve, x_data, y_data, p0=[10.0, 1.0, 50.0], bounds=bounds, maxfev=2000)
                             y_smooth = parabola_curve(x_smooth, popt[0], popt[1], popt[2])
-                            subj_pse = popt[1] # 'h' is the vertex (PSE)
+                            subj_pse = popt[1] 
                             
                         subj_fit_df = pd.DataFrame({'X_Value': x_smooth, 'Fit_Percent': y_smooth})
                         subj_fit_df['Subject_ID'] = subj
                         subj_fit_df['Size'] = size_cond
-                        subj_fit_df['PSE'] = subj_pse # <--- ADD THIS LINE HERE!
+                        subj_fit_df['PSE'] = subj_pse
                         individual_fits.append(subj_fit_df)
                     except:
-                        pass # Skip if math fails to converge for a noisy participant
+                        # Silently skip noisy subjects who break the physical bounds
+                        pass 
 
                 # 2. Group Average Fits
                 avg_raw = size_df.groupby('X_Value')['Percent_Faster'].mean().reset_index()
@@ -588,7 +586,9 @@ def get_rotating_line_data():
                         avg_y_smooth = sigmoid_curve(x_smooth, popt_avg[0], popt_avg[1]) * 100
                         group_pse_dict[size_cond] = popt_avg[1]
                     else:
-                        popt_avg, _ = curve_fit(parabola_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'] * 100, p0=[10.0, 1.0, 50.0])
+                        # FIXED: Bounded Average calculation as well
+                        bounds = ([-np.inf, -2.0, 0.0], [np.inf, 8.0, 100.0])
+                        popt_avg, _ = curve_fit(parabola_curve, avg_raw['X_Value'], avg_raw['Percent_Faster'] * 100, p0=[10.0, 1.0, 50.0], bounds=bounds)
                         avg_y_smooth = parabola_curve(x_smooth, popt_avg[0], popt_avg[1], popt_avg[2])
                         group_pse_dict[size_cond] = popt_avg[1]
                         
@@ -603,7 +603,6 @@ def get_rotating_line_data():
                 
             return task_df, df_ind_fits, df_avg_fits, group_pse_dict
 
-        # Pass the task name so the process_block knows which math to use!
         control_data = process_block(df[df['Task'] == 'Control'], 'Control')
         experimental_data = process_block(df[df['Task'] == 'Experimental'], 'Experimental')
         
