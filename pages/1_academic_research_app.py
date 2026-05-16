@@ -538,7 +538,6 @@ with tabs[1]:
             
             import plotly.graph_objects as go
             
-            # Retrieve the PSE values calculated in the previous tab
             control_pack, exp_pack = get_rotating_line_data()
             c_pse_long = control_pack[3].get('Long', 60) if control_pack else 60
             c_pse_short = control_pack[3].get('Short', 50) if control_pack else 50
@@ -560,33 +559,37 @@ with tabs[1]:
                 width=0.4
             ))
 
-            # --- ANNOTATION: The Difference Line ---
-            # MATLAB Bridge: Equivalent to drawing a line() and text() between the bars
-            delta = c_pse_long - c_pse_short
-            fig1.add_shape(type="line",
-                x0='Long Line', y0=c_pse_short, x1='Short Line', y1=c_pse_short,
-                line=dict(color="black", width=2, dash="dashdot")
-            )
+            # --- ANNOTATION: The Vertical Gap Line ---
+            delta = abs(c_pse_long - c_pse_short)
+            higher_val = max(c_pse_long, c_pse_short)
+            lower_val = min(c_pse_long, c_pse_short)
+            
+            # Draw vertical dashed line exactly between the bars (Categorical x=0.5 is the exact midpoint)
+            fig1.add_shape(type="line", x0=0.5, y0=lower_val, x1=0.5, y1=higher_val, line=dict(color="black", width=2, dash="dash"))
+            # Draw horizontal tick caps for the gap
+            fig1.add_shape(type="line", x0=0.45, y0=lower_val, x1=0.55, y1=lower_val, line=dict(color="black", width=2))
+            fig1.add_shape(type="line", x0=0.45, y0=higher_val, x1=0.55, y1=higher_val, line=dict(color="black", width=2))
+
+            # Add concise text next to the gap line
             fig1.add_annotation(
-                x='Long Line', y=c_pse_long + 2,
-                text=f"Long lines must be sped up by ~{delta:.1f} RPM<br>to match the subjective speed of short lines!",
-                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2, arrowcolor="black",
-                font=dict(size=12, color="black"), align="center",
-                ax=0, ay=-40 # Offset the text above the arrow
+                x=0.52, y=(higher_val + lower_val)/2,
+                text=f"Gap: {delta:.1f} RPM",
+                showarrow=False, font=dict(size=13, color="black"), align="left", xanchor="left"
             )
 
             fig1.update_layout(
                 yaxis_title="Physical RPM Required for Equality",
-                xaxis=dict(showticklabels=False), # Hide text labels so we can use demos!
+                xaxis=dict(showticklabels=False), # Hide text labels for living demos
                 height=350, margin=dict(l=20, r=20, t=20, b=0)
             )
             st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CONFIG)
 
-            # --- HTML DEMOS AS X-AXIS LABELS ---
-            # Streamlit trick: Use columns to align the canvases under the bars
-            spacer1, col_long, spacer2, col_short, spacer3 = st.columns([1.5, 2, 0.5, 2, 1.5])
-            with col_long: render_mini_demo('long', speed=c_pse_long)
-            with col_short: render_mini_demo('short', speed=c_pse_short)
+            # --- HTML DEMOS CENTERED UNDER BARS ---
+            col1, col2 = st.columns(2)
+            with col1: 
+                render_mini_demo('long', speed=c_pse_long, size=50)
+            with col2: 
+                render_mini_demo('short', speed=c_pse_short, size=50)
 
             st.divider()
 
@@ -596,19 +599,11 @@ with tabs[1]:
             st.markdown("### 2. Nulling the Rotating Line Illusion")
             st.write("By mapping the speed modulation factor directly to the perceived deformation caused by the aperture, we can completely nullify the illusion.")
 
-            # Create a 3:1 layout split. Plotly on the left, Demos on the right.
-            plot_col, demo_col = st.columns([3, 1])
+            plot_col, demo_col = st.columns([4, 1])
 
             with plot_col:
                 fig2 = go.Figure()
-                fig2.add_trace(go.Bar(
-                    x=['Group PSE'],
-                    y=[e_pse],
-                    marker_color='green',
-                    width=0.3
-                ))
-                
-                # Add horizontal reference lines to map to the demos
+                fig2.add_trace(go.Bar(x=['Group PSE'], y=[e_pse], marker_color='green', width=0.3))
                 fig2.add_hline(y=4.0, line_dash="dot", line_color="red", annotation_text="Over-Modulated")
                 fig2.add_hline(y=e_pse, line_dash="dash", line_color="green", annotation_text="Subjective Equality (PSE)")
                 fig2.add_hline(y=0.0, line_dash="solid", line_color="blue", annotation_text="Unmodulated (Max Illusion)")
@@ -616,55 +611,43 @@ with tabs[1]:
                 fig2.update_layout(
                     yaxis_title="Speed Modulation Factor",
                     yaxis_range=[-0.5, 4.5],
-                    height=480, # 480px perfectly aligns with 3x 150px canvases!
+                    height=250, # Scaled down height to tightly fit the 3x 50px stacked demos
                     margin=dict(l=20, r=20, t=20, b=20)
                 )
                 st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
             with demo_col:
-                # Vertically stack 3 canvases that map to the Y-axis heights
-                render_mini_demo('aperture', modulation=4.0) # Top
-                render_mini_demo('aperture', modulation=e_pse) # Middle (PSE)
-                render_mini_demo('aperture', modulation=0.0) # Bottom (Baseline)
+                st.write("") # Spacer to push down slightly
+                render_mini_demo('aperture', modulation=4.0, size=50) 
+                st.write("") 
+                render_mini_demo('aperture', modulation=e_pse, size=50) 
+                st.write("") 
+                render_mini_demo('aperture', modulation=0.0, size=50) 
 
             st.divider()
 
             # =========================================================
-            # THEORETICAL MODELING: Component Motion Vectors
+            # THEORETICAL MODELING
             # =========================================================
             st.markdown("### 3. Theoretical Modeling: Local Motion Signals")
             st.markdown("""
             As detailed in **Porter et al. (2011)** regarding rotating ellipses, the human visual system relies heavily on **local orthogonal motion signals** (component vectors) to interpret global object motion. 
             
-            In the models below, the **green arrows** represent the physical velocity vectors at different points along the line ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis—this is the exact cause of the illusion. By applying the PSE Modulation, we artificially keep the tip velocity vectors constant, neutralizing the visual distortion!
+            In the models below, the **green arrows** represent the true physical velocity vectors ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis. By applying the mathematical PSE Modulation, we dynamically alter $\omega$ to perfectly counteract the shrinking $r$, keeping the tip vectors constant and neutralizing the visual distortion!
             """)
 
-            # Fetch the actual Experimental PSE again for accuracy
-            e_pse = exp_pack[3].get('N/A', 1.5) if exp_pack else 1.5
-
-            # 4-Column Layout for the side-by-side comparison
             mod_col1, mod_col2, mod_col3, mod_col4 = st.columns(4)
-
             with mod_col1:
                 st.markdown("**1. Short Line**")
-                st.caption("Small constant vectors.")
                 render_vector_demo('short', speed=50)
-
             with mod_col2:
                 st.markdown("**2. Long Line**")
-                st.caption("Large constant vectors.")
                 render_vector_demo('long', speed=50)
-
             with mod_col3:
-                st.markdown("**3. Aperture (Unmodulated)**")
-                st.caption("Vectors shrink/grow wildly.")
-                # We use a pure ellipse aperture with 0 modulation
+                st.markdown("**3. Aperture (0.0 Mod)**")
                 render_vector_demo('aperture', modulation=0.0, speed=50)
-
             with mod_col4:
                 st.markdown(f"**4. Aperture (Nullified)**")
-                st.caption(f"PSE Applied (+{e_pse:.1f} Mod)")
-                # We apply the actual mathematical PSE derived from the participant data!
                 render_vector_demo('aperture', modulation=e_pse, speed=50)
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---

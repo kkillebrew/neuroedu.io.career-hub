@@ -160,37 +160,32 @@ def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
 
 
 
-### - Create a miniature version of the demo for display purposes - ###
-def render_mini_demo(demo_type, modulation=0.0, speed=50, size=150):
+def render_mini_demo(demo_type, modulation=0.0, speed=50, size=50):
     """
-    Renders a miniature, static-configured HTML5 canvas for the Rotating Line.
-    demo_type options: 'long', 'short', 'aperture'
+    Renders a 50px miniature canvas. No labels, no tracking dots.
     """
-    # MATLAB Bridge: This sets our specific sizes for the Control condition lines
-    # vs the Experimental aperture dimensions.
     if demo_type == 'long':
-        shape_id = -1 # Special flag for raw line
-        ap_width, ap_height = 65, 65 # Line radius
+        shape_id = -1 
+        ap_width, ap_height = 65, 65 
     elif demo_type == 'short':
         shape_id = -1
-        ap_width, ap_height = 35, 35 # Line radius
+        ap_width, ap_height = 35, 35 
     else: # 'aperture'
         shape_id = 0
-        ap_width, ap_height = 65, 30 # Ellipse radii
+        ap_width, ap_height = 65, 30 
 
     html_code = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <style>
-            body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #808080; overflow: hidden; }}
-            canvas {{ background-color: #808080; }}
-            .label {{ position: absolute; bottom: 5px; font-family: sans-serif; color: white; font-size: 12px; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px;}}
+            /* justify-content: center ensures perfect alignment under the Plotly bars */
+            body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: transparent; overflow: hidden; }}
+            canvas {{ background-color: #808080; border-radius: 4px; }}
         </style>
     </head>
     <body>
         <canvas id="stimCanvas" width="{size}" height="{size}"></canvas>
-        <div class="label">{demo_type.upper()}</div>
         <script>
             const canvas = document.getElementById('stimCanvas');
             const ctx = canvas.getContext('2d');
@@ -198,8 +193,8 @@ def render_mini_demo(demo_type, modulation=0.0, speed=50, size=150):
             const cy = canvas.height / 2;
             
             const shapeId = {shape_id};
-            const apWidth = {ap_width};
-            const apHeight = {ap_height};
+            const apWidth = {ap_width} * ({size}/150); // Scale geometry to new mini size
+            const apHeight = {ap_height} * ({size}/150);
             const modulation = {modulation};
             const baseSpeed = {speed};
             
@@ -214,18 +209,17 @@ def render_mini_demo(demo_type, modulation=0.0, speed=50, size=150):
                 let radAngle = angle * (Math.PI / 180);
                 let currentLength = 0;
                 
-                if (shapeId === -1) {{ // No aperture, pure line
+                if (shapeId === -1) {{ 
                     currentLength = apWidth; 
-                }} else {{ // Ellipse
+                }} else {{ 
                     currentLength = (apWidth * apHeight) / Math.sqrt(
                         Math.pow(apHeight * Math.cos(radAngle), 2) + 
                         Math.pow(apWidth * Math.sin(radAngle), 2)
                     );
                 }}
 
-                // Calculate Speed Modulation
                 let lengthFactor = (apWidth - currentLength) / (apWidth - apHeight);
-                if (shapeId === -1) lengthFactor = 0; // No length change, no mod
+                if (shapeId === -1) lengthFactor = 0; 
                 
                 let currentSpeed = baseSpeed * (1 + (modulation * lengthFactor));
                 angle += currentSpeed * dt;
@@ -238,16 +232,9 @@ def render_mini_demo(demo_type, modulation=0.0, speed=50, size=150):
                 ctx.beginPath();
                 ctx.moveTo(-currentLength, 0);
                 ctx.lineTo(currentLength, 0);
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 2; // Thinner line for mini demo
                 ctx.strokeStyle = '#FFFFFF'; 
                 ctx.stroke();
-                
-                // Red tracking dots
-                ctx.beginPath();
-                ctx.arc(-currentLength, 0, 5, 0, Math.PI * 2);
-                ctx.arc(currentLength, 0, 5, 0, Math.PI * 2);
-                ctx.fillStyle = '#FF0000'; 
-                ctx.fill();
 
                 ctx.restore();
                 requestAnimationFrame(drawLoop);
@@ -258,14 +245,13 @@ def render_mini_demo(demo_type, modulation=0.0, speed=50, size=150):
     </html>
     """
     import streamlit.components.v1 as components
-    # Render with no scrolling allowed
     components.html(html_code, height=size, scrolling=False)
 
-### - Render the rotating line with component motion vectors displayed in real time. - ###
+
 def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
     """
-    Renders a theoretical model of the rotating line, overlaying dynamic
-    component motion vectors along the line's length to visualize velocity.
+    Theoretical Component Motion Vectors.
+    Calculates exact v = omega * r for orthogonal local motion signals.
     """
     if demo_type == 'long':
         shape_id = -1 
@@ -273,7 +259,7 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
     elif demo_type == 'short':
         shape_id = -1
         ap_width, ap_height = 40, 40 
-    else: # 'aperture'
+    else:
         shape_id = 0
         ap_width, ap_height = 80, 40 
 
@@ -341,33 +327,33 @@ def render_vector_demo(demo_type, modulation=0.0, speed=50, size=200):
                 ctx.strokeStyle = '#FFFFFF'; 
                 ctx.stroke();
                 
-                // 2. Draw the Component Motion Vectors (Arrows)
-                // The velocity v = r * omega. We scale it visually to fit the box.
-                const numVectors = 3; // Number of vectors per side
-                const visualScale = 0.5; // Tweak to make arrows look proportional
+                // 2. TRUE COMPONENT VECTOR MATH (v = omega * r)
+                const numVectors = 4; // Vectors per side
+                // Convert degrees/sec to radians/sec for true angular velocity
+                let omega = currentSpeed * (Math.PI / 180); 
+                let visualScale = 15; // Visual multiplier to make vectors legible
                 
-                ctx.strokeStyle = '#00FF00'; // Green vectors
+                ctx.strokeStyle = '#00FF00';
                 ctx.fillStyle = '#00FF00';
                 ctx.lineWidth = 2;
 
                 for(let i = -numVectors; i <= numVectors; i++) {{
-                    if (i === 0) continue; // Skip center pivot point
+                    if (i === 0) continue; 
                     
+                    // Exact distance (r) from the center of rotation
                     let r = (i / numVectors) * currentLength;
-                    // Vector magnitude is proportional to distance from center (r) and current rotational speed
-                    let v = r * (currentSpeed / 100) * visualScale; 
+                    // Exact component motion magnitude (v = r * omega)
+                    let v = r * omega * visualScale; 
                     
-                    // Draw vector shaft
                     ctx.beginPath();
                     ctx.moveTo(r, 0);
                     ctx.lineTo(r, v);
                     ctx.stroke();
                     
-                    // Draw arrowhead
                     ctx.beginPath();
-                    ctx.moveTo(r, v);
-                    let headSize = 5;
+                    let headSize = 6;
                     let dir = v > 0 ? 1 : -1;
+                    ctx.moveTo(r, v);
                     ctx.lineTo(r - headSize, v - dir * headSize);
                     ctx.lineTo(r + headSize, v - dir * headSize);
                     ctx.closePath();
