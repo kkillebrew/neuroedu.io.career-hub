@@ -605,7 +605,9 @@ with tabs[1]:
             st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CONFIG)
 
             # --- HTML DEMOS CENTERED UNDER BOXES ---
-            col1, col2 = st.columns(2)
+            # We add a 15% spacer on the left to perfectly absorb the width of the Plotly Y-Axis!
+            spacer_left, col1, col2, spacer_right = st.columns([0.15, 1, 1, 0.05])
+            
             with col1: 
                 render_mini_demo('long', speed=c_pse_long, size=50)
             with col2: 
