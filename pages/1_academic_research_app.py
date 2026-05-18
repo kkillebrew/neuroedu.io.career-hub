@@ -747,8 +747,7 @@ with tabs[2]:
             fig_beh = px.box(acc_df, x='Condition', y='Correct', color='Condition', points='all',
                              title="Recall Accuracy by Gestalt Grouping Condition",
                              labels={'Correct': 'Proportion Correct'})
-            fig_beh.update_layout(**PLOTLY_CONFIG)
-            st.plotly_chart(fig_beh, use_container_width=True)
+            st.plotly_chart(fig_beh, use_container_width=True, config=PLOTLY_CONFIG)
         else:
             st.info("Loading Behavioral Data from GitHub...")
 
@@ -770,8 +769,7 @@ with tabs[2]:
             fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', 
                                title=f"Grand Average VEP ({sample_cond})",
                                labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)'})
-            fig_time.update_layout(**PLOTLY_CONFIG)
-            st.plotly_chart(fig_time, use_container_width=True)
+            st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
             
             # Note: We will add the detailed FFT Power spectrum charts in the next step!
 
