@@ -611,3 +611,49 @@ def get_rotating_line_data():
     except Exception as e:
         st.error(f"Error executing get_rotating_line_data: {e}")
         return None, None
+
+# =====================================================================
+# VISUAL WORKING MEMORY (VWM) DATA LOADERS
+# =====================================================================
+
+def _fetch_github_parquet(base_name):
+    """
+    Dynamically fetches and stitches partitioned Parquet files from GitHub.
+    """
+    headers = {'Authorization': f"token {st.secrets['GITHUB_TOKEN']}"}
+    base_url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}"
+    
+    # 1. Try fetching an unpartitioned file first (e.g., vwm_behavioral)
+    res_single = requests.get(f"{base_url}.parquet", headers=headers)
+    if res_single.status_code == 200:
+        return pd.read_parquet(BytesIO(res_single.content))
+        
+    # 2. If it is chunked, stitch the parts dynamically
+    dfs = []
+    chunk_idx = 1
+    while True:
+        url = f"{base_url}_part_{chunk_idx}.parquet"
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            dfs.append(pd.read_parquet(BytesIO(res.content)))
+            chunk_idx += 1
+        else:
+            break
+            
+    if dfs:
+        return pd.concat(dfs, ignore_index=True)
+    else:
+        st.error(f"Failed to load {base_name} data from GitHub.")
+        return pd.DataFrame()
+
+@st.cache_data
+def get_vwm_behavioral_data():
+    """Fetches behavioral accuracy data."""
+    return _fetch_github_parquet('vwm_behavioral')
+
+@st.cache_data
+def get_vwm_eeg_data():
+    """Fetches VEP and Trial-Level FFT Power DataFrames."""
+    df_time = _fetch_github_parquet('vwm_eeg_time')
+    df_power = _fetch_github_parquet('vwm_eeg_trial_power')
+    return df_time, df_power

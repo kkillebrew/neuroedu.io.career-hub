@@ -32,10 +32,13 @@ from loaders.academic_research_loader import (
     get_accuracy_data,          # <-- NEW
     get_test_retest_data,       # <-- NEW
     get_rotating_line_data,     # Start of rotating line stuff
+    get_vwm_behavioral_data,    # <-- NEW
+    get_vwm_eeg_data,           # <-- NEW
     PLOTLY_CONFIG
 )
 
 from pages.components.rotating_line_demo import render_rotating_line_demo, render_mini_demo, render_vector_demo
+from pages.components.vwm_encoding_demo import render_vwm_demo
 from career_hub_loader import get_references_metadata
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -710,8 +713,73 @@ with tabs[1]:
                 render_vector_demo('aperture', modulation=e_pse, speed=50)
                 st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
 
+# =====================================================================
+# TAB 3: VISUAL WORKING MEMORY (Index 2)
+# =====================================================================
+with tabs[2]:
+    st.subheader(narratives[2]["header"])
+    st.write(narratives[2]["blurb"])
+    
+    st.markdown("### Interactive VWM Frequency Tagging Paradigm")
+    st.write("Click below to experience the encoding phase. Maintain fixation on the center cross while the visual stimuli flicker at precise frequencies (3Hz and 5Hz).")
+    
+    if st.button("Run Mini-Experiment", key="run_vwm"):
+        render_vwm_demo()
+        st.caption("Rendering via HTML5 Canvas. Left stimulus: 3Hz, Right stimulus: 5Hz.")
+        
+    st.divider()
+    
+    # --- SUB-TABS FOR DATA ANALYSIS ---
+    vwm_tabs = st.tabs([
+        "1. Behavioral Findings", 
+        "2. EEG & FFT Results", 
+        "3. Control Data & Analysis", 
+        "4. Additional Projects"
+    ])
+    
+    with vwm_tabs[0]:
+        st.markdown("#### Behavioral Accuracy: Grouping vs. Unstructured")
+        df_beh = get_vwm_behavioral_data()
+        
+        if not df_beh.empty:
+            # Map MATLAB condition IDs to strings
+            df_beh['Condition'] = df_beh['Group_Condition'].map({1: 'Grouped', 2: 'Weak Group', 3: 'No Group'})
+            acc_df = df_beh.groupby(['Subject_ID', 'Condition'])['Correct'].mean().reset_index()
+            
+            # Visualization Best Practice: Box plot with points to show both distribution and individual variance
+            fig_beh = px.box(acc_df, x='Condition', y='Correct', color='Condition', points='all',
+                             title="Recall Accuracy by Gestalt Grouping Condition",
+                             labels={'Correct': 'Proportion Correct'})
+            fig_beh.update_layout(**PLOTLY_CONFIG)
+            st.plotly_chart(fig_beh, use_container_width=True)
+        else:
+            st.info("Loading Behavioral Data from GitHub...")
+
+    with vwm_tabs[1]:
+        st.markdown("#### EEG Analysis: Steady-State Visual Evoked Potentials (SSVEP)")
+        st.write("Data fetching in progress. The pipeline is stitching the chunked Parquet files...")
+        
+        df_time, df_power = get_vwm_eeg_data()
+        
+        if df_time is not None and not df_time.empty:
+            st.success("Successfully loaded massive EEG arrays!")
+            
+            # Plot the Grand Average VEP for a single condition as an example
+            sample_cond = 'grpNoPrb3'
+            df_plot = df_time[df_time['Condition'] == sample_cond]
+            # Average across all subjects for the grand waveform
+            grand_waveform = df_plot.groupby('Time_s')['Amplitude_uV'].mean().reset_index()
+            
+            fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', 
+                               title=f"Grand Average VEP ({sample_cond})",
+                               labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)'})
+            fig_time.update_layout(**PLOTLY_CONFIG)
+            st.plotly_chart(fig_time, use_container_width=True)
+            
+            # Note: We will add the detailed FFT Power spectrum charts in the next step!
+
 # --- PLACEHOLDERS FOR REMAINING TABS ---
-for i in range(2, 5):
+for i in range(3, 5):
     with tabs[i]:
         st.subheader(narratives[i]["header"])
         st.write(narratives[i]["blurb"])
