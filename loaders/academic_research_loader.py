@@ -618,48 +618,30 @@ def get_rotating_line_data():
 
 def _fetch_github_parquet(base_name):
     """
-    Dynamically fetches and stitches partitioned Parquet files from GitHub.
-    Retrieves the token from DigitalOcean container environment variables.
+    Fetches a single pre-aggregated Parquet file from GitHub.
     """
-    # Grab the token injected by DigitalOcean (returns None if not found)
     github_token = os.getenv('GITHUB_TOKEN')
-    
-    # Only attach the Authorization header if the token actually exists
     headers = {'Authorization': f"token {github_token}"} if github_token else {}
     
-    base_url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}"
+    # We now point directly to the tiny summary files
+    url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
     
-    # 1. Try fetching an unpartitioned file first
-    res_single = requests.get(f"{base_url}.parquet", headers=headers)
-    if res_single.status_code == 200:
-        return pd.read_parquet(BytesIO(res_single.content))
-        
-    # 2. If it is chunked, stitch the parts dynamically
-    dfs = []
-    chunk_idx = 1
-    while True:
-        url = f"{base_url}_part_{chunk_idx}.parquet"
+    try:
         res = requests.get(url, headers=headers)
-        if res.status_code == 200:
-            dfs.append(pd.read_parquet(BytesIO(res.content)))
-            chunk_idx += 1
-        else:
-            break
-            
-    if dfs:
-        return pd.concat(dfs, ignore_index=True)
-    else:
-        st.error(f"Failed to load {base_name} data from GitHub.")
+        res.raise_for_status() # Throws an error if the file is missing (404)
+        return pd.read_parquet(BytesIO(res.content))
+    except Exception as e:
+        st.error(f"Failed to load {base_name}: {e}")
         return pd.DataFrame()
 
 @st.cache_data
 def get_vwm_behavioral_data():
-    """Fetches behavioral accuracy data."""
     return _fetch_github_parquet('vwm_behavioral')
 
 @st.cache_data
 def get_vwm_eeg_data():
-    """Fetches VEP and Trial-Level FFT Power DataFrames."""
-    df_time = _fetch_github_parquet('vwm_eeg_time')
-    df_power = _fetch_github_parquet('vwm_eeg_trial_power')
+    # Fetch the newly aggregated summary files
+    df_time = _fetch_github_parquet('vwm_eeg_time_summary')
+    df_power = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     return df_time, df_power
+    
