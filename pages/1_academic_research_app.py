@@ -80,9 +80,9 @@ st.write("A visual summary of methodologies utilized to uncover neural biomarker
 tabs = st.tabs([
     "🧩 1. Biomarkers of Psychosis (SFM)", 
     "🔄 2. The Rotating Line Illusion",  # <-- Renamed this tab
-    "🧠 3. Neural Modeling", 
-    "📊 4. Visual Biases", 
-    "🎯 5. Ensemble Encoding"
+    "🧠 3. Encoding Visual Objects Into Memory", 
+    "📊 4. Ensemble Encoding", 
+    "🎯 5. Intraparietal Regions Involvment In Working Memory Encoding"
 ])
 
 # --- TAB 1: STRUCTURE FROM MOTION (SFM) ---
