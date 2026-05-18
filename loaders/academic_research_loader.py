@@ -619,11 +619,17 @@ def get_rotating_line_data():
 def _fetch_github_parquet(base_name):
     """
     Dynamically fetches and stitches partitioned Parquet files from GitHub.
+    Retrieves the token from DigitalOcean container environment variables.
     """
-    headers = {'Authorization': f"token {st.secrets['GITHUB_TOKEN']}"}
+    # Grab the token injected by DigitalOcean (returns None if not found)
+    github_token = os.getenv('GITHUB_TOKEN')
+    
+    # Only attach the Authorization header if the token actually exists
+    headers = {'Authorization': f"token {github_token}"} if github_token else {}
+    
     base_url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}"
     
-    # 1. Try fetching an unpartitioned file first (e.g., vwm_behavioral)
+    # 1. Try fetching an unpartitioned file first
     res_single = requests.get(f"{base_url}.parquet", headers=headers)
     if res_single.status_code == 200:
         return pd.read_parquet(BytesIO(res_single.content))

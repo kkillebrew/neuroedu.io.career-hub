@@ -716,10 +716,7 @@ with tabs[1]:
 # =====================================================================
 # TAB 3: VISUAL WORKING MEMORY (Index 2)
 # =====================================================================
-with tabs[2]:
-    st.subheader(narratives[2]["header"])
-    st.write(narratives[2]["blurb"])
-    
+with tabs[2]:    
     st.markdown("### Interactive VWM Frequency Tagging Paradigm")
     st.write("Click below to experience the encoding phase. Maintain fixation on the center cross while the visual stimuli flicker at precise frequencies (3Hz and 5Hz).")
     
