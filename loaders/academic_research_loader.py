@@ -726,60 +726,67 @@ def get_processed_fft_grid():
     return df_avg
 
 @st.cache_data
-def get_processed_fft_index():
+def get_processed_index_spectra():
+    """Calculates the 1-100Hz Index Spectrum for all 12 Condition Pairs."""
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
-    if df.empty: return df
-    
-    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+    if df.empty: return pd.DataFrame(), pd.DataFrame()
+
+    # Generate all 12 combinations dynamically
+    base_freqs = ['3', '5', '12', '20']
+    target_pairs = [f"{t}_{g}" for t in base_freqs for g in base_freqs if t != g]
+
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
-    
+
     df_filt = df[df['Condition'].isin(conds)].copy()
     df_filt['Pair'] = df_filt['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_filt['Grouping'] = np.where(df_filt['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
-    
+
+    # Pivot to align Grouped/NotGrouped side-by-side per Subject/Freq
     pivoted = df_filt.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], columns='Grouping', values='Power').reset_index()
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
-    pivoted['Index_Value'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
-    
+
+    # Calculate Index: (Grp - noGrp) / (Grp + noGrp)
+    idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    pivoted['Index_Value'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+    # Average across subjects for the 12 line plots
+    df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
+
+    # We return the raw pivoted data too, so the Role summary plot can use it without recalculating!
+    return pivoted, df_spectra
+
+@st.cache_data
+def get_vwm_role_index():
+    """Extracts the specific Index value based on whether the frequency was the Target or the Grouped item."""
+    pivoted, _ = get_processed_index_spectra()
+    if pivoted.empty: return pd.DataFrame()
+
     records = []
     unique_freqs = pivoted['Frequency_Hz'].unique()
-    
-    for pair in target_pairs:
-        ft, fg = map(int, pair.split('_'))
-        freq_map = {
-            'f_t': ft, '2f_t': 2*ft, '3f_t': 3*ft,
-            'f_g': fg, '2f_g': 2*fg, '3f_g': 3*fg,
-            'f_t+f_g': ft+fg, '|f_t-f_g|': abs(ft-fg),
-            '2f_t+f_g': 2*ft+fg, '|2f_t-f_g|': abs(2*ft-fg),
-            'f_t+2f_g': ft+2*fg, '|f_t-2f_g|': abs(ft-2*fg)
-        }
+
+    for pair in pivoted['Pair'].unique():
+        t_str, g_str = pair.split('_')
+        t_hz, g_hz = float(t_str), float(g_str)
+
         pair_df = pivoted[pivoted['Pair'] == pair]
-        
-        for tag, hz in freq_map.items():
-            closest_hz = unique_freqs[np.abs(unique_freqs - float(hz)).argmin()]
-            tag_df = pair_df[pair_df['Frequency_Hz'] == closest_hz].copy()
-            tag_df['Tag'] = tag
-            records.append(tag_df)
-            
-    df_idx = pd.concat(records, ignore_index=True)
-    
-    stats_records = []
-    for tag in df_idx['Tag'].unique():
-        tag_data = df_idx[df_idx['Tag'] == tag]['Index_Value'].dropna()
-        if len(tag_data) > 0:
-            t_stat, p_val = ttest_1samp(tag_data, 0.0)
-            mean_val = tag_data.mean()
-            star = ""
-            if pd.notna(p_val):
-                if p_val < 0.001: star = "***"
-                elif p_val < 0.01: star = "**"
-                elif p_val < 0.05: star = "*"
-            stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
-            
-    cat_order = ['f_t', '2f_t', '3f_t', 'f_g', '2f_g', '3f_g', '|f_t-f_g|', 'f_t+f_g', '|2f_t-f_g|', '2f_t+f_g', '|f_t-2f_g|', 'f_t+2f_g']
-    df_stats = pd.DataFrame(stats_records)
-    df_stats['Tag'] = pd.Categorical(df_stats['Tag'], categories=cat_order, ordered=True)
-    return df_stats.sort_values('Tag')
+
+        # Find closest frequency bins
+        closest_t = unique_freqs[np.abs(unique_freqs - t_hz).argmin()]
+        closest_g = unique_freqs[np.abs(unique_freqs - g_hz).argmin()]
+
+        # Extract the index when this Hz was the TARGET
+        df_t = pair_df[pair_df['Frequency_Hz'] == closest_t].copy()
+        df_t['Base_Hz'] = t_str + 'Hz'
+        df_t['Role'] = 'Target Object'
+
+        # Extract the index when this Hz was the GROUPED object
+        df_g = pair_df[pair_df['Frequency_Hz'] == closest_g].copy()
+        df_g['Base_Hz'] = g_str + 'Hz'
+        df_g['Role'] = 'Grouped Object'
+
+        records.extend([df_t, df_g])
+
+    return pd.concat(records, ignore_index=True)
 
 def calculate_vwm_stats(df_stats, metric_col):
     """Calculates paired t-tests for the VWM Grouping conditions."""

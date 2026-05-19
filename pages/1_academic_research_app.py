@@ -40,7 +40,8 @@ from loaders.academic_research_loader import (
     get_processed_vwm_vep,      # <--- NEW
     get_processed_vwm_snr,      # <--- NEW
     get_processed_fft_grid,     # <--- NEW
-    get_processed_fft_index,    # <--- NEW
+    get_processed_index_spectra, # <--- NEW
+    get_vwm_role_index,          # <--- NEW
     calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
@@ -910,22 +911,54 @@ with tabs[2]:
                         st.info("Loading Full Spectrum FFT Data...")
 
         with grouping_tabs[2]:
-            st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
-            st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
+                st.markdown("#### EEG Frequency Tagging: Neural Index of Grouping")
+                st.write("We isolate grouping mechanisms using an Index: `(Grouped - Not Grouped) / (Grouped + Not Grouped)`. This removes baseline noise, perfectly isolating the frequency-specific variance driven by visual binding.")
 
-            global_snr = get_processed_vwm_snr()
-            if global_snr is not None and not global_snr.empty:
-                fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
-                                 title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
-                                 labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
-                                 color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
-                
-                fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
-                
-                st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
-                st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
-            else:
-                st.info("Loading EEG Frequency Data...")
+                pivoted_idx, df_spectra = get_processed_index_spectra()
+
+                if not df_spectra.empty:
+                    # ----------------------------------------------------
+                    # PLOT 1: The 12-Grid Index Spectrum
+                    # ----------------------------------------------------
+                    st.markdown("##### 1-100Hz Index Spectrum (All 12 Pairs)")
+                    st.write("Participant-averaged Index values across the full frequency spectrum for each target/grouped combination.")
+                    
+                    fig_idx_grid = px.line(df_spectra, x='Frequency_Hz', y='Index_Value',
+                                           facet_col='Pair', facet_col_wrap=4,
+                                           title="Frequency Tagging Index by Condition Pair",
+                                           labels={'Index_Value': 'Grouping Index', 'Frequency_Hz': 'Frequency (Hz)'})
+                    
+                    fig_idx_grid.for_each_annotation(lambda a: a.update(text="Condition: " + a.text.split("=")[-1].replace('_', 'Hz & ') + "Hz"))
+                    fig_idx_grid.update_xaxes(range=[1, 40]) # Zoomed to 1-40Hz to see the peaks clearly
+                    fig_idx_grid.add_hline(y=0, line_dash="dash", line_color="black", line_width=1)
+                    fig_idx_grid.update_layout(height=800)
+                    
+                    st.plotly_chart(fig_idx_grid, use_container_width=True, config=PLOTLY_CONFIG)
+
+                    st.divider()
+
+                    # ----------------------------------------------------
+                    # PLOT 2: Average Index by Object Role (Target vs Grouped)
+                    # ----------------------------------------------------
+                    st.markdown("##### Average Index by Object Role")
+                    st.write("Extracting the exact index values at the Target vs. Grouped frequencies, collapsed across combinations, to see how the visual cortex prioritizes the items.")
+                    
+                    df_role = get_vwm_role_index()
+                    
+                    # Ensure frequencies display in chronological order
+                    df_role['Base_Hz'] = pd.Categorical(df_role['Base_Hz'], categories=['3Hz', '5Hz', '12Hz', '20Hz'], ordered=True)
+                    
+                    fig_role = px.box(df_role, x='Base_Hz', y='Index_Value', color='Role', points='all',
+                                      title="Grouping Index: Target Frequencies vs. Grouped Frequencies",
+                                      labels={'Index_Value': 'Index (Grp > NoGrp)', 'Base_Hz': 'Frequency Tag'},
+                                      color_discrete_map={'Target Object': '#3b82f6', 'Grouped Object': '#10b981'})
+                    
+                    fig_role.add_hline(y=0.0, line_dash="dash", line_color="red", annotation_text="Chance (0)")
+                    
+                    st.plotly_chart(fig_role, use_container_width=True, config=PLOTLY_CONFIG)
+
+                else:
+                    st.info("Loading FFT Index Data...")
 
     # ---------------------------------------------------------------------
     # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)
