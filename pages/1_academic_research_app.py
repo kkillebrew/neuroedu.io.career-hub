@@ -820,25 +820,27 @@ with tabs[2]:
 
                 if df_power is not None and not df_power.empty:
                     
-                    # --- PERFORMANCE OPTIMIZATION: Cached Vectorized Data Processing ---
-                    # Prevents the app from recalculating 1,000,000 rows on every UI click
+                    # --- PERFORMANCE OPTIMIZATION: Shrink before Reshaping ---
                     @st.cache_data
                     def process_global_snr(df):
                         snr_cols = [c for c in df.columns if 'SNR' in c]
 
-                        # 1. Melt the dataframe
-                        melted = df.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
-                                         value_vars=snr_cols, 
-                                         var_name='Frequency_Type', value_name='SNR')
+                        # 1. PRE-AGGREGATE: Average across all 256 channels FIRST.
+                        # This shrinks the dataframe from 163,840 rows down to just 640 rows!
+                        df_mean_channels = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
-                        # 2. VECTORIZED String Searching (100x faster than .apply lambda)
+                        # 2. Melt the tiny 640-row dataframe
+                        melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
+                                                       value_vars=snr_cols, 
+                                                       var_name='Frequency_Type', value_name='SNR')
+
+                        # 3. Fast Vectorized Categorization
                         melted['Signal_Type'] = np.where(
                             melted['Frequency_Type'].str.contains('IM'), 
                             'Intermodulation (Sum/Diff)', 
                             'Fundamental (Base Hz)'
                         )
 
-                        # 3. VECTORIZED Grouping Status
                         cond_lower = melted['Condition'].str.lower()
                         melted['Grouping_Status'] = np.where(
                             cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
@@ -846,11 +848,11 @@ with tabs[2]:
                             'Non-Grouped'
                         )
 
-                        # 4. Average to create the final small mapping (returns ~80 rows)
+                        # 4. Final grouping for the boxplot
                         return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
 
-                    # Execute the optimized cached function
-                    with st.spinner("Processing 256-channel frequency array..."):
+                    # Execute the lightning-fast function
+                    with st.spinner("Processing frequency arrays..."):
                         global_snr = process_global_snr(df_power)
 
                     # --- PLOT: THE NON-LINEAR INTERACTION ---
