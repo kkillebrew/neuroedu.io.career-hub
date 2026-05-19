@@ -731,20 +731,28 @@ def get_processed_fft_grid():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return df
     
+    # ADD THIS FILTER
+    df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
+    
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
     
     df_filt = df[df['Condition'].isin(conds)].copy()
-    df_avg = df_filt.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    # Group by Subject to ensure the ROI average is clean
+    df_avg = df_filt.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    df_avg = df_avg.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    
     df_avg['Grouping'] = np.where(df_avg['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
     df_avg['Pair'] = df_avg['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     return df_avg
 
 @st.cache_data
 def get_processed_index_spectra():
-    """Calculates the 1-100Hz Index Spectrum for all 12 Condition Pairs."""
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return pd.DataFrame(), pd.DataFrame()
+    
+    # ADD THIS FILTER
+    df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
 
     # Generate all 12 combinations dynamically
     base_freqs = ['3', '5', '12', '20']
