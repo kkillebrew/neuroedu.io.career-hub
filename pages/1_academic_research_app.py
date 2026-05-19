@@ -33,7 +33,8 @@ from loaders.academic_research_loader import (
     get_test_retest_data,       # <-- NEW
     get_rotating_line_data,     # Start of rotating line stuff
     get_vwm_behavioral_data,    # <-- NEW
-    get_vwm_eeg_data,           # <-- NEW
+    get_vwm_eeg_time_data,      # <--- NEW SPLIT LOADER 1
+    get_vwm_eeg_power_data,     # <--- NEW SPLIT LOADER 2
     PLOTLY_CONFIG
 )
 
