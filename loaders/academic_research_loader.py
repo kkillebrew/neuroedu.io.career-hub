@@ -158,7 +158,7 @@ def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     
     # --- 1. FETCH BEHAVIORAL DATA (.parquet) ---
     try:
-        p_res = requests.get(PARQUET_RAW_URL, headers=headers)
+        p_res = requests.get(PARQUET_RAW_URL, headers=headers, timeout=15)
         if p_res.status_code == 200:
             df = pd.read_parquet(BytesIO(p_res.content))
         else:
@@ -194,7 +194,7 @@ def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     # --- 2. FETCH DEMOGRAPHICS (.csv) ---
     dx_col = None
     try:
-        c_res = requests.get(DEMOG_RAW_URL, headers=headers)
+        c_res = requests.get(DEMOG_RAW_URL, headers=headers, timeout=15)
         if c_res.status_code == 200:
             df_demog = pd.read_csv(StringIO(c_res.text))
             id_col = next((c for c in df_demog.columns if 'id' in c.lower() or 'record' in c.lower()), None)
@@ -509,7 +509,7 @@ def get_rotating_line_data():
     Fetches combined Parquet file from GitHub.
     Applies Bounded curve fits to prevent mathematical outliers on noisy subjects.
     """
-    
+
     try:
         github_token = os.environ.get("GITHUB_TOKEN")
         if not github_token:
@@ -528,7 +528,7 @@ def get_rotating_line_data():
         raw_url = f"https://raw.githubusercontent.com/{username}/{repo}/main/{file_path}?t={cache_buster}"
         
         headers = {'Authorization': f'token {github_token}'}
-        response = requests.get(raw_url, headers=headers)
+        response = requests.get(raw_url, headers=headers, timeout=15)
         if response.status_code != 200:
             return None, None
             
@@ -627,12 +627,12 @@ def _fetch_github_parquet(base_name):
     github_token = os.getenv('GITHUB_TOKEN')
     headers = {'Authorization': f"token {github_token}"} if github_token else {}
     
-    # Point directly to the tiny summary files
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
     
     try:
-        res = requests.get(url, headers=headers)
-        res.raise_for_status() # Throws an error if the file is missing
+        # CRITICAL FIX: Timeout prevents infinite Streamlit loading spinners!
+        res = requests.get(url, headers=headers, timeout=15)
+        res.raise_for_status() 
         return pd.read_parquet(BytesIO(res.content))
     except Exception as e:
         st.error(f"Failed to load {base_name}: {e}")
@@ -643,12 +643,11 @@ def get_vwm_behavioral_data():
     """Fetches Behavioral Accuracy Data for the Grouping paradigm."""
     return _fetch_github_parquet('vwm_behavioral')
 
+# CRITICAL FIX: Split the time and power data into separate caches to save RAM!
 @st.cache_data
-def get_vwm_eeg_data():
-    """
-    Fetches the Aggregated EEG Data.
-    Returns: df_time (VEP Grand Averages), df_power (SSVEP SNR)
-    """
-    df_time = _fetch_github_parquet('vwm_eeg_time_summary')
-    df_power = _fetch_github_parquet('vwm_eeg_trial_power_summary')
-    return df_time, df_power
+def get_vwm_eeg_time_data():
+    return _fetch_github_parquet('vwm_eeg_time_summary')
+
+@st.cache_data
+def get_vwm_eeg_power_data():
+    return _fetch_github_parquet('vwm_eeg_trial_power_summary')

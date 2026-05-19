@@ -52,20 +52,20 @@ narratives = get_project_narratives()
 
 # --- HIGH-SPEED CACHED DATA PROCESSORS ---
 @st.cache_data
-def process_vwm_vep(_df_time):  # <--- UNDERSCORE ADDED HERE
-    df_working = _df_time.copy()
-    cond_lower = df_working['Condition'].str.lower()
-    df_working['Grouping_Condition'] = np.where(
+def process_vwm_vep(_df_time):
+    cond_lower = _df_time['Condition'].str.lower()
+    groups = np.where(
         cond_lower.str.contains('nogrp'), 'Not Grouped',
         np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
     )
+    # Using .assign() creates a shallow map instead of a deep memory copy!
+    df_working = _df_time.assign(Grouping_Condition=groups)
     return df_working.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
 
 @st.cache_data
-def process_vwm_snr(_df_power):  # <--- UNDERSCORE ADDED HERE
-    df_working = _df_power.copy()
-    snr_cols = [c for c in df_working.columns if 'SNR' in c]
-    df_mean = df_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+def process_vwm_snr(_df_power):
+    snr_cols = [c for c in _df_power.columns if 'SNR' in c]
+    df_mean = _df_power.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
                           var_name='Frequency_Type', value_name='SNR')
     melted['Signal_Type'] = np.where(
@@ -822,9 +822,8 @@ with tabs[2]:
                 st.markdown("#### EEG Data Initial Preprocessing and Visualization")
                 st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
                 
-                df_time, _ = get_vwm_eeg_data()
+                df_time = get_vwm_eeg_time_data() # <--- Split Loader
                 if df_time is not None and not df_time.empty:
-                    # Run the lightning-fast cached processor
                     grand_waveform = process_vwm_vep(df_time)
                     
                     fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
@@ -845,9 +844,8 @@ with tabs[2]:
             st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
             st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
 
-            _, df_power = get_vwm_eeg_data()
+            df_power = get_vwm_eeg_power_data() # <--- Split Loader
             if df_power is not None and not df_power.empty:
-                # Run the lightning-fast cached processor
                 global_snr = process_vwm_snr(df_power)
 
                 fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
