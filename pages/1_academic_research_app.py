@@ -818,49 +818,49 @@ with tabs[2]:
             else:
                 st.info("Loading Grouping Behavioral Data...")
 
-        with grouping_tabs[1]:
-                st.markdown("#### EEG Data Initial Preprocessing and Visualization")
-                st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
+    with grouping_tabs[1]:
+            st.markdown("#### EEG Data Initial Preprocessing and Visualization")
+            st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
+            
+            df_time, _ = get_vwm_eeg_data()
+            if df_time is not None and not df_time.empty:
+                # Run the lightning-fast cached processor
+                grand_waveform = process_vwm_vep(df_time)
                 
-                df_time, _ = get_vwm_eeg_data()
-                if df_time is not None and not df_time.empty:
-                    # Run the lightning-fast cached processor
-                    grand_waveform = process_vwm_vep(df_time)
-                    
-                    fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
-                                       title="Grand Average VEP by Grouping Condition",
-                                       labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
-                                       color_discrete_map={"Grouped Probed": "#3b82f6", "Grouped Non-Probed": "#10b981", "Not Grouped": "#ef4444"})
-                    
-                    fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
-                                       annotation_text="FFT Analysis Window", annotation_position="top left")
-                    fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
-                    fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
-                    
-                    st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
-                else:
-                    st.info("Loading EEG Time-Series Data...")
+                fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
+                                   title="Grand Average VEP by Grouping Condition",
+                                   labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
+                                   color_discrete_map={"Grouped Probed": "#3b82f6", "Grouped Non-Probed": "#10b981", "Not Grouped": "#ef4444"})
+                
+                fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
+                                   annotation_text="FFT Analysis Window", annotation_position="top left")
+                fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
+                fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
+                
+                st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
+            else:
+                st.info("Loading EEG Time-Series Data...")
 
-            with grouping_tabs[2]:
-                st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
-                st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
+        with grouping_tabs[2]:
+            st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
+            st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
 
-                _, df_power = get_vwm_eeg_data()
-                if df_power is not None and not df_power.empty:
-                    # Run the lightning-fast cached processor
-                    global_snr = process_vwm_snr(df_power)
+            _, df_power = get_vwm_eeg_data()
+            if df_power is not None and not df_power.empty:
+                # Run the lightning-fast cached processor
+                global_snr = process_vwm_snr(df_power)
 
-                    fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
-                                     title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
-                                     labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
-                                     color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
-                    
-                    fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
-                    
-                    st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
-                    st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
-                else:
-                    st.info("Loading EEG Frequency Data...")
+                fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
+                                 title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
+                                 labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
+                                 color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
+                
+                fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
+                
+                st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
+                st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
+            else:
+                st.info("Loading EEG Frequency Data...")
 
     # ---------------------------------------------------------------------
     # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)
