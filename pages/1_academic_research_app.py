@@ -824,56 +824,56 @@ with tabs[2]:
                 else:
                     st.info("Loading EEG Time-Series Data...")
 
-            with grouping_tabs[2]:
-                st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
-                st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
+        with grouping_tabs[2]:
+            st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
+            st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
 
-                _, df_power = get_vwm_eeg_data()
+            _, df_power = get_vwm_eeg_data()
 
-                if df_power is not None and not df_power.empty:
-                    
-                    # 1. Create a safe working copy
-                    df_power_working = df_power.copy()
-                    snr_cols = [c for c in df_power_working.columns if 'SNR' in c]
+            if df_power is not None and not df_power.empty:
+                
+                # 1. Create a safe working copy
+                df_power_working = df_power.copy()
+                snr_cols = [c for c in df_power_working.columns if 'SNR' in c]
 
-                    # 2. PRE-AGGREGATE: Average across all 256 channels FIRST to shrink the matrix
-                    df_mean_channels = df_power_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+                # 2. PRE-AGGREGATE: Average across all 256 channels FIRST to shrink the matrix
+                df_mean_channels = df_power_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
-                    # 3. Melt the shrunken dataframe
-                    melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
-                                                   value_vars=snr_cols, 
-                                                   var_name='Frequency_Type', value_name='SNR')
+                # 3. Melt the shrunken dataframe
+                melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
+                                               value_vars=snr_cols, 
+                                               var_name='Frequency_Type', value_name='SNR')
 
-                    # 4. Fast Vectorized Categorization
-                    melted['Signal_Type'] = np.where(
-                        melted['Frequency_Type'].str.contains('IM'), 
-                        'Intermodulation (Sum/Diff)', 
-                        'Fundamental (Base Hz)'
-                    )
+                # 4. Fast Vectorized Categorization
+                melted['Signal_Type'] = np.where(
+                    melted['Frequency_Type'].str.contains('IM'), 
+                    'Intermodulation (Sum/Diff)', 
+                    'Fundamental (Base Hz)'
+                )
 
-                    cond_lower = melted['Condition'].str.lower()
-                    melted['Grouping_Status'] = np.where(
-                        cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
-                        'Grouped', 
-                        'Non-Grouped'
-                    )
+                cond_lower = melted['Condition'].str.lower()
+                melted['Grouping_Status'] = np.where(
+                    cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
+                    'Grouped', 
+                    'Non-Grouped'
+                )
 
-                    # 5. Final grouping for the boxplot
-                    global_snr = melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+                # 5. Final grouping for the boxplot
+                global_snr = melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
 
-                    # --- PLOT: THE NON-LINEAR INTERACTION ---
-                    fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
-                                     title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
-                                     labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
-                                     color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
-                    
-                    fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
-                    
-                    st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
-                    st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
+                # --- PLOT: THE NON-LINEAR INTERACTION ---
+                fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
+                                 title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
+                                 labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
+                                 color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
+                
+                fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
+                
+                st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
+                st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
 
-                else:
-                    st.info("Loading EEG Frequency Data...")
+            else:
+                st.info("Loading EEG Frequency Data...")
 
     # ---------------------------------------------------------------------
     # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)
