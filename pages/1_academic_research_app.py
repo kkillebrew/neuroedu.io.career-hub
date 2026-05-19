@@ -925,6 +925,43 @@ with tabs[2]:
                     
                     st.plotly_chart(fig_role, use_container_width=True, config=PLOTLY_CONFIG)
 
+                    st.divider()
+
+                    # ----------------------------------------------------
+                    # PLOT 3: The Harmonic Index Stem Plot (Moved here)
+                    # ----------------------------------------------------
+                    st.markdown("#### Harmonic Index Analysis")
+                    st.write("We use this index to isolate neural variance driven by grouping (target vs. non-probed).")
+                    
+                    # We reuse the df_spectra we already processed for the 12-grid
+                    # but we need to derive the index stats for this specific stem plot format
+                    df_idx_stats = get_processed_fft_index()
+                    
+                    fig_index = go.Figure()
+                    
+                    # Stems
+                    fig_index.add_trace(go.Bar(
+                        x=df_idx_stats['Tag'], y=df_idx_stats['Mean_Index'], 
+                        width=0.05, marker_color='black', showlegend=False
+                    ))
+                    
+                    # Caps
+                    fig_index.add_trace(go.Scatter(
+                        x=df_idx_stats['Tag'], y=df_idx_stats['Mean_Index'],
+                        mode='markers+text', marker=dict(size=12, color='#10b981', line=dict(width=2, color='white')),
+                        text=df_idx_stats['Star'], textposition='top center',
+                        textfont=dict(size=16, color='black'), showlegend=False
+                    ))
+                    
+                    fig_index.add_hline(y=0.0, line_color='red', line_width=1)
+                    fig_index.update_layout(
+                        title="Harmonic Index Values Across All Pair Combinations",
+                        yaxis_title="Index Value (Grouped > Not Grouped)",
+                        xaxis_title="Harmonic Identifier",
+                        height=450
+                    )
+                    st.plotly_chart(fig_index, use_container_width=True, config=PLOTLY_CONFIG)
+
                 else:
                     st.info("Loading FFT Index Data...")
 
