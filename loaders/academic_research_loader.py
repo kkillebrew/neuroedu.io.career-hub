@@ -724,7 +724,8 @@ def get_processed_vwm_snr():
     melted['Valid'] = melted.apply(is_valid_frequency, axis=1)
     melted_clean = melted[melted['Valid']]
 
-    return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+    # Change the final return line in get_processed_vwm_snr to:
+    return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].median().reset_index()
 
 @st.cache_data
 def get_processed_fft_grid():
