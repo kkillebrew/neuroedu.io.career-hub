@@ -50,6 +50,35 @@ pubs_df = get_publications_data()
 expertise = get_research_expertise()
 narratives = get_project_narratives()
 
+# --- HIGH-SPEED CACHED DATA PROCESSORS ---
+@st.cache_data
+def process_vwm_vep(df_time):
+    df_working = df_time.copy()
+    cond_lower = df_working['Condition'].str.lower()
+    df_working['Grouping_Condition'] = np.where(
+        cond_lower.str.contains('nogrp'), 'Not Grouped',
+        np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
+    )
+    return df_working.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
+
+@st.cache_data
+def process_vwm_snr(df_power):
+    df_working = df_power.copy()
+    snr_cols = [c for c in df_working.columns if 'SNR' in c]
+    df_mean = df_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
+                          var_name='Frequency_Type', value_name='SNR')
+    melted['Signal_Type'] = np.where(
+        melted['Frequency_Type'].str.contains('IM'), 
+        'Intermodulation (Sum/Diff)', 'Fundamental (Base Hz)'
+    )
+    cond_lower = melted['Condition'].str.lower()
+    melted['Grouping_Status'] = np.where(
+        cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
+        'Grouped', 'Non-Grouped'
+    )
+    return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+
 # ==========================================
 # TOP SECTION: CV & PUBLICATIONS
 # ==========================================
@@ -795,21 +824,9 @@ with tabs[2]:
                 
                 df_time, _ = get_vwm_eeg_data()
                 if df_time is not None and not df_time.empty:
+                    # Run the lightning-fast cached processor
+                    grand_waveform = process_vwm_vep(df_time)
                     
-                    # 1. Create a safe working copy to avoid mutating the Streamlit cache!
-                    df_time_working = df_time.copy()
-                    
-                    # 2. Map the 32 conditions to the 3 Behavioral Conditions
-                    cond_lower = df_time_working['Condition'].str.lower()
-                    df_time_working['Grouping_Condition'] = np.where(
-                        cond_lower.str.contains('nogrp'), 'Not Grouped',
-                        np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
-                    )
-                    
-                    # 3. Average across Subjects and Frequencies
-                    grand_waveform = df_time_working.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
-                    
-                    # 4. Plot all 3 conditions on the same graph
                     fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
                                        title="Grand Average VEP by Grouping Condition",
                                        labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
@@ -824,56 +841,26 @@ with tabs[2]:
                 else:
                     st.info("Loading EEG Time-Series Data...")
 
-        with grouping_tabs[2]:
-            st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
-            st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
+            with grouping_tabs[2]:
+                st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
+                st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
 
-            _, df_power = get_vwm_eeg_data()
+                _, df_power = get_vwm_eeg_data()
+                if df_power is not None and not df_power.empty:
+                    # Run the lightning-fast cached processor
+                    global_snr = process_vwm_snr(df_power)
 
-            if df_power is not None and not df_power.empty:
-                
-                # 1. Create a safe working copy
-                df_power_working = df_power.copy()
-                snr_cols = [c for c in df_power_working.columns if 'SNR' in c]
-
-                # 2. PRE-AGGREGATE: Average across all 256 channels FIRST to shrink the matrix
-                df_mean_channels = df_power_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
-
-                # 3. Melt the shrunken dataframe
-                melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
-                                               value_vars=snr_cols, 
-                                               var_name='Frequency_Type', value_name='SNR')
-
-                # 4. Fast Vectorized Categorization
-                melted['Signal_Type'] = np.where(
-                    melted['Frequency_Type'].str.contains('IM'), 
-                    'Intermodulation (Sum/Diff)', 
-                    'Fundamental (Base Hz)'
-                )
-
-                cond_lower = melted['Condition'].str.lower()
-                melted['Grouping_Status'] = np.where(
-                    cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
-                    'Grouped', 
-                    'Non-Grouped'
-                )
-
-                # 5. Final grouping for the boxplot
-                global_snr = melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
-
-                # --- PLOT: THE NON-LINEAR INTERACTION ---
-                fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
-                                 title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
-                                 labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
-                                 color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
-                
-                fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
-                
-                st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
-                st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
-
-            else:
-                st.info("Loading EEG Frequency Data...")
+                    fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
+                                     title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
+                                     labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
+                                     color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
+                    
+                    fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
+                    
+                    st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
+                    st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
+                else:
+                    st.info("Loading EEG Frequency Data...")
 
     # ---------------------------------------------------------------------
     # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)

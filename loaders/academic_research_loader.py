@@ -132,6 +132,8 @@ def get_category_colors():
         'Unknown': '#cbd5e1'
     }
 
+
+@st.cache_data
 def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     """
     Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
@@ -501,7 +503,12 @@ def get_response_counts_data(df):
 #########################################################
 #---    Load In the Rotating Line Behavioral Data    ---#
 #########################################################
+@st.cache_data
 def get_rotating_line_data():
+    """
+    Fetches combined Parquet file from GitHub.
+    Applies Bounded curve fits to prevent mathematical outliers on noisy subjects.
+    ...
     """
     Fetches combined Parquet file from GitHub.
     Applies Bounded curve fits to prevent mathematical outliers on noisy subjects.
