@@ -747,7 +747,17 @@ with tabs[1]:
 # TAB 3: VISUAL WORKING MEMORY
 # =====================================================================
 with tabs[2]:
+    # --- RESTORED MASTHEAD & DEMO ---
+    vwm_text = narratives[2]
+    st.subheader(vwm_text["header"])
+    st.write(vwm_text["blurb"])
+    
+    # Render the interactive HTML/JS demo
+    render_vwm_demo()
+    
     st.divider()
+    
+    # --- OUTER PROJECT TABS ---
     project_tabs = st.tabs([
         "🧠 Project 1: Grouping by Color", 
         "⏱️ Project 2: Task Type (Simultaneous vs. Sequential)"
