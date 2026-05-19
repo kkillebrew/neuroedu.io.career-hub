@@ -52,8 +52,8 @@ narratives = get_project_narratives()
 
 # --- HIGH-SPEED CACHED DATA PROCESSORS ---
 @st.cache_data
-def process_vwm_vep(df_time):
-    df_working = df_time.copy()
+def process_vwm_vep(_df_time):  # <--- UNDERSCORE ADDED HERE
+    df_working = _df_time.copy()
     cond_lower = df_working['Condition'].str.lower()
     df_working['Grouping_Condition'] = np.where(
         cond_lower.str.contains('nogrp'), 'Not Grouped',
@@ -62,8 +62,8 @@ def process_vwm_vep(df_time):
     return df_working.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
 
 @st.cache_data
-def process_vwm_snr(df_power):
-    df_working = df_power.copy()
+def process_vwm_snr(_df_power):  # <--- UNDERSCORE ADDED HERE
+    df_working = _df_power.copy()
     snr_cols = [c for c in df_working.columns if 'SNR' in c]
     df_mean = df_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
