@@ -35,6 +35,7 @@ from loaders.academic_research_loader import (
     get_vwm_behavioral_data,    # <-- NEW
     get_vwm_eeg_time_data,      # <--- NEW SPLIT LOADER 1
     get_vwm_eeg_power_data,     # <--- NEW SPLIT LOADER 2
+    calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
 
@@ -787,18 +788,26 @@ with tabs[2]:
                     if row['Grouped_Status'] == 2: return "Not Grouped"
                     return "Unknown"
                 df_valid['Grouping_Condition'] = df_valid.apply(get_cond_label, axis=1)
-                
+
                 # --- PLOT 1: ACCURACY ---
                 st.write("Participants were tested on whether a probed item was Old or New across three grouping conditions.")
                 acc_df = df_valid.groupby(['Subject_ID', 'Grouping_Condition'])['Correct'].mean().reset_index()
                 acc_df['Correct'] *= 100 
                 
-                fig_acc = px.box(acc_df, x='Grouping_Condition', y='Correct', color='Grouping_Condition', points='all',
-                                 title="Accuracy (% Correct) by Grouping Condition",
-                                 labels={'Correct': 'Accuracy (%)', 'Grouping_Condition': 'Condition'},
-                                 category_orders={"Grouping_Condition": ["Grouped Probed", "Grouped Non-Probed", "Not Grouped"]})
-                fig_acc.update_yaxes(range=[40, 100])
-                st.plotly_chart(fig_acc, use_container_width=True, config=PLOTLY_CONFIG)
+                acc_col1, acc_col2 = st.columns([2.5, 1])
+                
+                with acc_col1:
+                    fig_acc = px.box(acc_df, x='Grouping_Condition', y='Correct', color='Grouping_Condition', points='all',
+                                     title="Accuracy (% Correct) by Grouping Condition",
+                                     labels={'Correct': 'Accuracy (%)', 'Grouping_Condition': 'Condition'},
+                                     category_orders={"Grouping_Condition": ["Grouped Probed", "Grouped Non-Probed", "Not Grouped"]})
+                    fig_acc.update_yaxes(range=[40, 100])
+                    fig_acc.update_layout(showlegend=False)
+                    st.plotly_chart(fig_acc, use_container_width=True, config=PLOTLY_CONFIG)
+                    
+                with acc_col2:
+                    st.markdown("##### Accuracy Stats")
+                    st.info(calculate_vwm_stats(acc_df, 'Correct')) # <--- CLEAN LOADER CALL
                 
                 st.divider()
                 
@@ -819,12 +828,20 @@ with tabs[2]:
 
                 k_df = df_valid.groupby(['Subject_ID', 'Grouping_Condition']).apply(calc_cowans_k).reset_index(name='K_Score')
                 
-                fig_k = px.box(k_df, x='Grouping_Condition', y='K_Score', color='Grouping_Condition', points='all',
-                                 title="Cowan's K by Grouping Condition",
-                                 labels={'K_Score': 'Number of Items (K)', 'Grouping_Condition': 'Condition'},
-                                 category_orders={"Grouping_Condition": ["Grouped Probed", "Grouped Non-Probed", "Not Grouped"]})
-                fig_k.update_yaxes(range=[0, 4])
-                st.plotly_chart(fig_k, use_container_width=True, config=PLOTLY_CONFIG)
+                k_col1, k_col2 = st.columns([2.5, 1])
+                
+                with k_col1:
+                    fig_k = px.box(k_df, x='Grouping_Condition', y='K_Score', color='Grouping_Condition', points='all',
+                                     title="Cowan's K by Grouping Condition",
+                                     labels={'K_Score': 'Number of Items (K)', 'Grouping_Condition': 'Condition'},
+                                     category_orders={"Grouping_Condition": ["Grouped Probed", "Grouped Non-Probed", "Not Grouped"]})
+                    fig_k.update_yaxes(range=[0, 4])
+                    fig_k.update_layout(showlegend=False)
+                    st.plotly_chart(fig_k, use_container_width=True, config=PLOTLY_CONFIG)
+
+                with k_col2:
+                    st.markdown("##### Cowan's K Stats")
+                    st.success(calculate_vwm_stats(k_df, 'K_Score')) # <--- CLEAN LOADER CALL
 
             else:
                 st.info("Loading Grouping Behavioral Data...")

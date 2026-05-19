@@ -651,3 +651,43 @@ def get_vwm_eeg_time_data():
 @st.cache_data
 def get_vwm_eeg_power_data():
     return _fetch_github_parquet('vwm_eeg_trial_power_summary')
+
+def calculate_vwm_stats(df_stats, metric_col):
+    """
+    Calculates paired t-tests for the VWM Grouping conditions.
+    MATLAB Equivalent: [h,p,ci,stats] = ttest(data1, data2) & sigstar()
+    """
+    from scipy.stats import ttest_rel
+    
+    def get_sig_stars(p):
+        if pd.isna(p): return ""
+        if p <= 0.001: return "***"
+        elif p <= 0.01: return "**"
+        elif p <= 0.05: return "*"
+        else: return "ns"
+
+    # Pivot to ensure arrays align perfectly by Subject
+    pivot_df = df_stats.pivot(index='Subject_ID', columns='Grouping_Condition', values=metric_col).dropna()
+    
+    # Defensive check
+    if not all(col in pivot_df.columns for col in ['Grouped Probed', 'Grouped Non-Probed', 'Not Grouped']):
+        return "Insufficient paired data for statistical analysis."
+        
+    g_probed = pivot_df['Grouped Probed']
+    g_non_probed = pivot_df['Grouped Non-Probed']
+    not_grouped = pivot_df['Not Grouped']
+    
+    # 1&2, 1&3, 2&3 Comparisons
+    t1, p1 = ttest_rel(g_probed, g_non_probed)
+    t2, p2 = ttest_rel(g_probed, not_grouped)
+    t3, p3 = ttest_rel(g_non_probed, not_grouped)
+    
+    return f"""
+        **Grouped Probed vs. Non-Probed:** $t = {t1:.2f}$, $p = {p1:.4f}$ **{get_sig_stars(p1)}**
+
+        **Grouped Probed vs. Not Grouped:** $t = {t2:.2f}$, $p = {p2:.4f}$ **{get_sig_stars(p2)}**
+
+        **Grouped Non-Probed vs. Not Grouped:** $t = {t3:.2f}$, $p = {p3:.4f}$ **{get_sig_stars(p3)}**
+
+        *(Significance: *p<.05, **p<.01, ***p<.001)*
+        """
