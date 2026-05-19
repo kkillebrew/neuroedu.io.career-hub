@@ -88,35 +88,41 @@ def process_vwm_snr(_df_power):
 
 @st.cache_data
 def process_full_fft_grid(_df_fft):
-    """Isolates the 8 specific conditions and averages across subjects for the 2x4 Grid."""
+    """Isolates the 8 specific conditions in milliseconds."""
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
-    res = []
-    for pair in target_pairs:
-        grp_cond = f'grpPrb{pair}'
-        nogrp_cond = f'noGrp{pair}'
-        df_pair = _df_fft[_df_fft['Condition'].isin([grp_cond, nogrp_cond])]
-        
-        # Average across subjects
-        df_avg = df_pair.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
-        df_avg['Pair'] = pair
-        df_avg['Grouping'] = np.where(df_avg['Condition'] == grp_cond, 'Grouped', 'Not Grouped')
-        res.append(df_avg)
-    return pd.concat(res, ignore_index=True)
+    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
+    
+    # 1. Filter and Average
+    df_filt = _df_fft[_df_fft['Condition'].isin(conds)].copy()
+    df_avg = df_filt.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    
+    # 2. Assign Pair and Grouping instantly
+    df_avg['Grouping'] = np.where(df_avg['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
+    df_avg['Pair'] = df_avg['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
+    return df_avg
 
 @st.cache_data
 def process_fft_index(_df_fft):
-    """Calculates the (Grp - noGrp)/(Grp + noGrp) Index aligned by Harmonic Tags using Vectorized Math."""
+    """Calculates the Harmonic Index instantly using a single DataFrame Pivot."""
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
+    
+    df_filt = _df_fft[_df_fft['Condition'].isin(conds)].copy()
+    df_filt['Pair'] = df_filt['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
+    df_filt['Grouping'] = np.where(df_filt['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
+    
+    # ONE PIVOT to align all Grouped and NotGrouped power side-by-side
+    pivoted = df_filt.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], columns='Grouping', values='Power').reset_index()
+    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
+    
+    # Calculate Index for ALL subjects and conditions instantly
+    pivoted['Index_Value'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    
     records = []
-
-    # Get the unique frequency array ONCE (it's identical for all subjects)
-    unique_freqs = _df_fft['Frequency_Hz'].unique()
-
+    unique_freqs = pivoted['Frequency_Hz'].unique()
+    
     for pair in target_pairs:
-        ft_str, fg_str = pair.split('_')
-        ft, fg = int(ft_str), int(fg_str)
-
-        # Dynamic Harmonic & IM Mapping
+        ft, fg = map(int, pair.split('_'))
         freq_map = {
             'f_t': ft, '2f_t': 2*ft, '3f_t': 3*ft,
             'f_g': fg, '2f_g': 2*fg, '3f_g': 3*fg,
@@ -124,53 +130,29 @@ def process_fft_index(_df_fft):
             '2f_t+f_g': 2*ft+fg, '|2f_t-f_g|': abs(2*ft-fg),
             'f_t+2f_g': ft+2*fg, '|f_t-2f_g|': abs(ft-2*fg)
         }
-
-        grp_cond = f'grpPrb{pair}'
-        nogrp_cond = f'noGrp{pair}'
-
-        # Filter the dataset to just these two conditions for speed
-        df_pair = _df_fft[_df_fft['Condition'].isin([grp_cond, nogrp_cond])]
-
+        pair_df = pivoted[pivoted['Pair'] == pair]
+        
         for tag, hz in freq_map.items():
-            # Find the closest frequency bin globally (Only doing this ONCE per tag!)
             closest_hz = unique_freqs[np.abs(unique_freqs - float(hz)).argmin()]
+            tag_df = pair_df[pair_df['Frequency_Hz'] == closest_hz].copy()
+            tag_df['Tag'] = tag
+            records.append(tag_df)
             
-            # Isolate just that specific frequency row for all subjects
-            df_hz = df_pair[df_pair['Frequency_Hz'] == closest_hz]
-            
-            # VECTORIZATION: Pivot to get Grouped and NotGrouped in columns side-by-side
-            pivoted = df_hz.pivot(index='Subject_ID', columns='Condition', values='Power').dropna()
-            
-            if grp_cond in pivoted.columns and nogrp_cond in pivoted.columns:
-                p_g = pivoted[grp_cond]
-                p_ng = pivoted[nogrp_cond]
-                
-                # Calculate the Index for ALL 20 subjects instantly!
-                idx_vals = (p_g - p_ng) / (p_g + p_ng)
-                
-                # Extract the results
-                for subj, val in idx_vals.items():
-                    records.append({'Subject_ID': subj, 'Pair': pair, 'Tag': tag, 'Index_Value': val})
-
-    df_idx = pd.DataFrame(records)
+    df_idx = pd.concat(records, ignore_index=True)
     
-    # Calculate Mean Index and 1-Sample T-Test vs 0 (Chance)
     stats_records = []
     for tag in df_idx['Tag'].unique():
-        tag_data = df_idx[df_idx['Tag'] == tag]['Index_Value']
-        t_stat, p_val = ttest_1samp(tag_data, 0.0)
-        mean_val = tag_data.mean()
-        
-        # Assign Significance Stars
-        star = ""
-        if pd.notna(p_val):
-            if p_val < 0.001: star = "***"
-            elif p_val < 0.01: star = "**"
-            elif p_val < 0.05: star = "*"
-            
-        stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
-        
-    # Standardize the order of categories for the plot
+        tag_data = df_idx[df_idx['Tag'] == tag]['Index_Value'].dropna()
+        if len(tag_data) > 0:
+            t_stat, p_val = ttest_1samp(tag_data, 0.0)
+            mean_val = tag_data.mean()
+            star = ""
+            if pd.notna(p_val):
+                if p_val < 0.001: star = "***"
+                elif p_val < 0.01: star = "**"
+                elif p_val < 0.05: star = "*"
+            stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
+    
     cat_order = ['f_t', '2f_t', '3f_t', 'f_g', '2f_g', '3f_g', '|f_t-f_g|', 'f_t+f_g', '|2f_t-f_g|', '2f_t+f_g', '|f_t-2f_g|', 'f_t+2f_g']
     df_stats = pd.DataFrame(stats_records)
     df_stats['Tag'] = pd.Categorical(df_stats['Tag'], categories=cat_order, ordered=True)
