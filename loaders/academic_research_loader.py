@@ -619,46 +619,131 @@ def get_rotating_line_data():
 # =====================================================================
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
+from scipy.stats import ttest_rel, ttest_1samp
+
 def _fetch_github_parquet(base_name):
-    """
-    Fetches a single pre-aggregated Parquet file from GitHub.
-    Retrieves the token from DigitalOcean container environment variables.
-    """
-    github_token = os.getenv('GITHUB_TOKEN')
+    """Fetches a single pre-aggregated Parquet file from GitHub."""
+    github_token = os.getenv('GITHUB_TOKEN', st.secrets.get("GITHUB_TOKEN"))
     headers = {'Authorization': f"token {github_token}"} if github_token else {}
-    
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
     
     try:
-        # CRITICAL FIX: Timeout prevents infinite Streamlit loading spinners!
         res = requests.get(url, headers=headers, timeout=15)
         res.raise_for_status() 
         return pd.read_parquet(BytesIO(res.content))
     except Exception as e:
-        st.error(f"Failed to load {base_name}: {e}")
+        print(f"Failed to load {base_name}: {e}")
         return pd.DataFrame()
 
 @st.cache_data
 def get_vwm_behavioral_data():
-    """Fetches Behavioral Accuracy Data for the Grouping paradigm."""
     return _fetch_github_parquet('vwm_behavioral')
 
-# CRITICAL FIX: Split the time and power data into separate caches to save RAM!
+# --- MEMORY OPTIMIZED PROCESSORS (DOWNLOAD & VAPORIZE) ---
 @st.cache_data
-def get_vwm_eeg_time_data():
-    return _fetch_github_parquet('vwm_eeg_time_summary')
+def get_processed_vwm_vep():
+    df = _fetch_github_parquet('vwm_eeg_time_summary')
+    if df.empty: return df
+    
+    cond_lower = df['Condition'].str.lower()
+    df['Grouping_Condition'] = np.where(
+        cond_lower.str.contains('nogrp'), 'Not Grouped',
+        np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
+    )
+    return df.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
 
 @st.cache_data
-def get_vwm_eeg_power_data():
-    return _fetch_github_parquet('vwm_eeg_trial_power_summary')
+def get_processed_vwm_snr():
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    if df.empty: return df
+    
+    snr_cols = [c for c in df.columns if 'SNR' in c]
+    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
+                          var_name='Frequency_Type', value_name='SNR')
+    melted['Signal_Type'] = np.where(
+        melted['Frequency_Type'].str.contains('IM'), 
+        'Intermodulation (Sum/Diff)', 'Fundamental (Base Hz)'
+    )
+    cond_lower = melted['Condition'].str.lower()
+    melted['Grouping_Status'] = np.where(
+        cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
+        'Grouped', 'Non-Grouped'
+    )
+    return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+
+@st.cache_data
+def get_processed_fft_grid():
+    df = _fetch_github_parquet('vwm_eeg_full_spectrum')
+    if df.empty: return df
+    
+    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
+    
+    df_filt = df[df['Condition'].isin(conds)].copy()
+    df_avg = df_filt.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    df_avg['Grouping'] = np.where(df_avg['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
+    df_avg['Pair'] = df_avg['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
+    return df_avg
+
+@st.cache_data
+def get_processed_fft_index():
+    df = _fetch_github_parquet('vwm_eeg_full_spectrum')
+    if df.empty: return df
+    
+    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
+    
+    df_filt = df[df['Condition'].isin(conds)].copy()
+    df_filt['Pair'] = df_filt['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
+    df_filt['Grouping'] = np.where(df_filt['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
+    
+    pivoted = df_filt.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], columns='Grouping', values='Power').reset_index()
+    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
+    pivoted['Index_Value'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    
+    records = []
+    unique_freqs = pivoted['Frequency_Hz'].unique()
+    
+    for pair in target_pairs:
+        ft, fg = map(int, pair.split('_'))
+        freq_map = {
+            'f_t': ft, '2f_t': 2*ft, '3f_t': 3*ft,
+            'f_g': fg, '2f_g': 2*fg, '3f_g': 3*fg,
+            'f_t+f_g': ft+fg, '|f_t-f_g|': abs(ft-fg),
+            '2f_t+f_g': 2*ft+fg, '|2f_t-f_g|': abs(2*ft-fg),
+            'f_t+2f_g': ft+2*fg, '|f_t-2f_g|': abs(ft-2*fg)
+        }
+        pair_df = pivoted[pivoted['Pair'] == pair]
+        
+        for tag, hz in freq_map.items():
+            closest_hz = unique_freqs[np.abs(unique_freqs - float(hz)).argmin()]
+            tag_df = pair_df[pair_df['Frequency_Hz'] == closest_hz].copy()
+            tag_df['Tag'] = tag
+            records.append(tag_df)
+            
+    df_idx = pd.concat(records, ignore_index=True)
+    
+    stats_records = []
+    for tag in df_idx['Tag'].unique():
+        tag_data = df_idx[df_idx['Tag'] == tag]['Index_Value'].dropna()
+        if len(tag_data) > 0:
+            t_stat, p_val = ttest_1samp(tag_data, 0.0)
+            mean_val = tag_data.mean()
+            star = ""
+            if pd.notna(p_val):
+                if p_val < 0.001: star = "***"
+                elif p_val < 0.01: star = "**"
+                elif p_val < 0.05: star = "*"
+            stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
+            
+    cat_order = ['f_t', '2f_t', '3f_t', 'f_g', '2f_g', '3f_g', '|f_t-f_g|', 'f_t+f_g', '|2f_t-f_g|', '2f_t+f_g', '|f_t-2f_g|', 'f_t+2f_g']
+    df_stats = pd.DataFrame(stats_records)
+    df_stats['Tag'] = pd.Categorical(df_stats['Tag'], categories=cat_order, ordered=True)
+    return df_stats.sort_values('Tag')
 
 def calculate_vwm_stats(df_stats, metric_col):
-    """
-    Calculates paired t-tests for the VWM Grouping conditions.
-    MATLAB Equivalent: [h,p,ci,stats] = ttest(data1, data2) & sigstar()
-    """
-    from scipy.stats import ttest_rel
-    
+    """Calculates paired t-tests for the VWM Grouping conditions."""
     def get_sig_stars(p):
         if pd.isna(p): return ""
         if p <= 0.001: return "***"
@@ -666,33 +751,12 @@ def calculate_vwm_stats(df_stats, metric_col):
         elif p <= 0.05: return "*"
         else: return "ns"
 
-    # Pivot to ensure arrays align perfectly by Subject
     pivot_df = df_stats.pivot(index='Subject_ID', columns='Grouping_Condition', values=metric_col).dropna()
-    
-    # Defensive check
     if not all(col in pivot_df.columns for col in ['Grouped Probed', 'Grouped Non-Probed', 'Not Grouped']):
-        return "Insufficient paired data for statistical analysis."
+        return "Insufficient data."
         
-    g_probed = pivot_df['Grouped Probed']
-    g_non_probed = pivot_df['Grouped Non-Probed']
-    not_grouped = pivot_df['Not Grouped']
+    t1, p1 = ttest_rel(pivot_df['Grouped Probed'], pivot_df['Grouped Non-Probed'])
+    t2, p2 = ttest_rel(pivot_df['Grouped Probed'], pivot_df['Not Grouped'])
+    t3, p3 = ttest_rel(pivot_df['Grouped Non-Probed'], pivot_df['Not Grouped'])
     
-    # 1&2, 1&3, 2&3 Comparisons
-    t1, p1 = ttest_rel(g_probed, g_non_probed)
-    t2, p2 = ttest_rel(g_probed, not_grouped)
-    t3, p3 = ttest_rel(g_non_probed, not_grouped)
-    
-    return f"""
-        **Grouped Probed vs. Non-Probed:** $t = {t1:.2f}$, $p = {p1:.4f}$ **{get_sig_stars(p1)}**
-
-        **Grouped Probed vs. Not Grouped:** $t = {t2:.2f}$, $p = {p2:.4f}$ **{get_sig_stars(p2)}**
-
-        **Grouped Non-Probed vs. Not Grouped:** $t = {t3:.2f}$, $p = {p3:.4f}$ **{get_sig_stars(p3)}**
-
-        *(Significance: *p<.05, **p<.01, ***p<.001)*
-        """
-
-@st.cache_data
-def get_vwm_eeg_full_spectrum_data():
-    """Fetches the 1-100Hz Full Spectrum FFT Data."""
-    return _fetch_github_parquet('vwm_eeg_full_spectrum')
+    return f"**Grouped Probed vs. Non-Probed:** $t = {t1:.2f}$, $p = {p1:.4f}$ **{get_sig_stars(p1)}** \n\n**Grouped Probed vs. Not Grouped:** $t = {t2:.2f}$, $p = {p2:.4f}$ **{get_sig_stars(p2)}** \n\n**Grouped Non-Probed vs. Not Grouped:** $t = {t3:.2f}$, $p = {p3:.4f}$ **{get_sig_stars(p3)}** \n\n*(Significance: *p<.05, **p<.01, ***p<.001)*"
