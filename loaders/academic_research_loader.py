@@ -667,19 +667,33 @@ def get_processed_vwm_snr():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return df
     
+    # 1. Identify all SNR columns
     snr_cols = [c for c in df.columns if 'SNR' in c]
+    
+    # 2. Average across channels FIRST
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+    
+    # 3. Melt
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
                           var_name='Frequency_Type', value_name='SNR')
+    
+    # 4. ROBUST CLASSIFICATION: Explicitly look for our known targets
+    # Instead of just checking for 'IM', we check if it's a known fundamental Hz.
+    # Adjust this list if your fundamental tags are different!
+    fundamentals = ['3Hz', '5Hz', '12Hz', '20Hz']
+    
     melted['Signal_Type'] = np.where(
-        melted['Frequency_Type'].str.contains('IM'), 
-        'Intermodulation (Sum/Diff)', 'Fundamental (Base Hz)'
+        melted['Frequency_Type'].apply(lambda x: any(f in x for f in fundamentals)),
+        'Fundamental (Base Hz)',
+        'Intermodulation (Sum/Diff)'
     )
+    
     cond_lower = melted['Condition'].str.lower()
     melted['Grouping_Status'] = np.where(
         cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
         'Grouped', 'Non-Grouped'
     )
+    
     return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
 
 @st.cache_data
