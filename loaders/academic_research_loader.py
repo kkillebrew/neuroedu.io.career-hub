@@ -691,3 +691,8 @@ def calculate_vwm_stats(df_stats, metric_col):
 
         *(Significance: *p<.05, **p<.01, ***p<.001)*
         """
+
+@st.cache_data
+def get_vwm_eeg_full_spectrum_data():
+    """Fetches the 1-100Hz Full Spectrum FFT Data."""
+    return _fetch_github_parquet('vwm_eeg_full_spectrum')
