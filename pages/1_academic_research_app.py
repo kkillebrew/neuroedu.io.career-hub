@@ -714,160 +714,172 @@ with tabs[1]:
                 st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
 
 # =====================================================================
-# TAB 3: VISUAL WORKING MEMORY (Index 2)
-# =====================================================================
-with tabs[2]:    
-    st.markdown("### Interactive VWM Frequency Tagging Paradigm")
-    st.write("Click below to experience the encoding phase. Maintain fixation on the center cross while the visual stimuli flicker at precise frequencies (3Hz and 5Hz).")
-    
-    if st.button("Run Mini-Experiment", key="run_vwm"):
-        render_vwm_demo()
-        st.caption("Rendering via HTML5 Canvas. Left stimulus: 3Hz, Right stimulus: 5Hz.")
-        
+    # OUTER PROJECT TABS
+    # =====================================================================
     st.divider()
-    
-    # --- SUB-TABS FOR DATA ANALYSIS ---
-    vwm_tabs = st.tabs([
-        "1. Behavioral Findings", 
-        "2. EEG & FFT Results", 
-        "3. Control Data & Analysis", 
-        "4. Additional Projects"
+    project_tabs = st.tabs([
+        "🧠 Project 1: Grouping by Color", 
+        "⏱️ Project 2: Task Type (Simultaneous vs. Sequential)"
     ])
     
-    # --- SUB-TABS FOR DATA ANALYSIS ---
-    vwm_tabs = st.tabs([
-        "1. Behavioral Findings", 
-        "2. EEG Data Initial Preprocessing and Visualization", 
-        "3. EEG Frequency Tagging Analysis", 
-        "4. Additional Projects"
-    ])
-    
-    with vwm_tabs[0]:
-        st.markdown("#### Behavioral Accuracy: Simultaneous vs. Sequential Full-Report")
-        df_beh = get_vwm_behavioral_data()
+    # ---------------------------------------------------------------------
+    # PROJECT 1: GROUPING BY COLOR
+    # ---------------------------------------------------------------------
+    with project_tabs[0]:
+        st.markdown("### Neural Correlates of Gestalt Grouping in VWM")
+        grouping_tabs = st.tabs([
+            "1. Behavioral Findings", 
+            "2. EEG Data Initial Preprocessing and Visualization", 
+            "3. EEG Frequency Tagging Analysis"
+        ])
         
-        if not df_beh.empty:
-            # Create a percentage column for easier plotting
-            df_beh['Correct_Pct'] = df_beh['Correct'] * 100
+        with grouping_tabs[0]:
+            st.markdown("#### Behavioral Findings: Accuracy and Capacity (Cowan's K)")
+            df_beh = get_vwm_behavioral_data()
             
-            # ---------------------------------------------------------
-            # FIGURE 2A: Overall Accuracy by Task
-            # ---------------------------------------------------------
-            st.markdown("##### Overall Accuracy by Recall Type")
-            st.write("Participants performed significantly better in the simultaneous recall condition compared to the sequential condition.")
-            
-            acc_overall = df_beh.groupby('Task')['Correct_Pct'].mean().reset_index()
-            # Calculate standard error for error bars if desired (omitted for clean Plotly defaults, but mean is exact)
-            
-            fig_2a = px.bar(acc_overall, x='Task', y='Correct_Pct', color='Task',
-                            title="Figure 2A: Overall Accuracy",
-                            labels={'Correct_Pct': 'Accuracy (% Correct)', 'Task': 'Recall Type'},
-                            range_y=[0, 100])
-            
-            # Add the 10% estimated chance line
-            fig_2a.add_hline(y=10, line_dash="dash", line_color="black", annotation_text="Chance")
-            st.plotly_chart(fig_2a, use_container_width=True, config=PLOTLY_CONFIG)
-            
-            st.divider()
-            
-            # ---------------------------------------------------------
-            # FIGURE 2B: Accuracy by Response Order
-            # ---------------------------------------------------------
-            st.markdown("##### Accuracy by Response Order")
-            st.write("Performance was better for early responses, and the slope of performance was steeper in the simultaneous task.")
-            
-            # Group by Task and Trial_Order
-            acc_order = df_beh.groupby(['Task', 'Trial_Order'])['Correct_Pct'].mean().reset_index()
-            
-            # Ensure Trial_Order is treated as a categorical string for the X-axis
-            acc_order['Response Order'] = acc_order['Trial_Order'].apply(lambda x: f"{int(x)} Item")
-            
-            fig_2b = px.bar(acc_order, x='Response Order', y='Correct_Pct', color='Task', barmode='group',
-                            title="Figure 2B: Accuracy by Response Order",
-                            labels={'Correct_Pct': 'Accuracy (% Correct)'},
-                            range_y=[0, 100])
-            st.plotly_chart(fig_2b, use_container_width=True, config=PLOTLY_CONFIG)
-            
-            st.divider()
-            
-            # ---------------------------------------------------------
-            # FIGURE 2C: Percentage of Trials by Number of Items Remembered
-            # ---------------------------------------------------------
-            st.markdown("##### Distribution of Items Remembered")
-            st.write("Consistent with a 'subset-of-items' model, the majority of trials resulted in two items being correctly recalled.")
-            
-            # To calculate items recalled PER TRIAL, we need to group the 4 rows that make up a single trial.
-            # We create a synthetic 'Trial_ID' by assuming every 4 rows per subject/task is one trial.
-            df_beh['Trial_ID'] = df_beh.groupby(['Subject_ID', 'Task']).cumcount() // 4
-            
-            # Sum the 'Correct' column (0 or 1) across the 4 items in each trial
-            trials_summary = df_beh.groupby(['Subject_ID', 'Task', 'Trial_ID'])['Correct'].sum().reset_index()
-            trials_summary.rename(columns={'Correct': 'Items_Remembered'}, inplace=True)
-            
-            # Calculate the percentage of trials for each bin (0, 1, 2, 3, 4 items) per task
-            task_counts = trials_summary.groupby('Task').size()
-            dist_df = trials_summary.groupby(['Task', 'Items_Remembered']).size().reset_index(name='Count')
-            
-            # Normalize to percentages
-            dist_df['Percentage of Trials'] = dist_df.apply(
-                lambda row: (row['Count'] / task_counts[row['Task']]) * 100, axis=1
-            )
-            
-            fig_2c = px.bar(dist_df, x='Items_Remembered', y='Percentage of Trials', color='Task', barmode='group',
-                            title="Figure 2C: Percentage of Trials by Number of Items Remembered",
-                            labels={'Items_Remembered': 'Number of Items Remembered'},
-                            range_y=[0, 100])
-            
-            # Ensure the X-axis shows all numbers 0-4 discretely
-            fig_2c.update_xaxes(tickmode='linear', tick0=0, dtick=1)
-            st.plotly_chart(fig_2c, use_container_width=True, config=PLOTLY_CONFIG)
-            
-        else:
-            st.info("Loading Behavioral Data from GitHub...")
+            if not df_beh.empty:
+                # 1. MATLAB Bridge: Filter out non-responses (rawdata(:,8)==1)
+                df_valid = df_beh[df_beh['Responded'] == 1].copy()
+                
+                # 2. Assign the 3 MATLAB Conditions
+                def get_cond_label(row):
+                    if row['Grouped_Status'] == 1 and row['Probe_Status'] == 1: return "Grouped Probed"
+                    if row['Grouped_Status'] == 1 and row['Probe_Status'] == 2: return "Grouped Non-Probed"
+                    if row['Grouped_Status'] == 2: return "Not Grouped"
+                    return "Unknown"
+                df_valid['Grouping_Condition'] = df_valid.apply(get_cond_label, axis=1)
+                
+                # --- PLOT 1: ACCURACY ---
+                st.write("Participants were tested on whether a probed item was Old or New across three grouping conditions.")
+                acc_df = df_valid.groupby(['Subject_ID', 'Grouping_Condition'])['Correct'].mean().reset_index()
+                acc_df['Correct'] *= 100 # Convert to percentage
+                
+                fig_acc = px.box(acc_df, x='Grouping_Condition', y='Correct', color='Grouping_Condition', points='all',
+                                 title="Accuracy (% Correct) by Grouping Condition",
+                                 labels={'Correct': 'Accuracy (%)', 'Grouping_Condition': 'Condition'},
+                                 category_orders={"Grouping_Condition": ["Grouped Probed", "Grouped Non-Probed", "Not Grouped"]})
+                fig_acc.update_yaxes(range=[40, 100])
+                st.plotly_chart(fig_acc, use_container_width=True, config=PLOTLY_CONFIG)
+                
+                st.divider()
+                
+                # --- PLOT 2: COWAN'S K ---
+                st.markdown("##### Working Memory Capacity (Cowan's K)")
+                st.write("Capacity was estimated using Cowan's K formula: K = Set Size * (Hit Rate - False Alarm Rate).")
+                
+                def calc_cowans_k(group):
+                    # Hit Rate (HR): It was old (1) and they said old (1)
+                    hits = len(group[(group['Old_New'] == 1) & (group['Response'] == 1)])
+                    actual_old = len(group[group['Old_New'] == 1])
+                    hr = hits / actual_old if actual_old > 0 else 0
+                    
+                    # False Alarm Rate (FAR): It was new (2) and they said old (1)
+                    fas = len(group[(group['Old_New'] == 2) & (group['Response'] == 1)])
+                    actual_new = len(group[group['Old_New'] == 2])
+                    far = fas / actual_new if actual_new > 0 else 0
+                    
+                    # K = 4 items * (HR - FAR)
+                    return 4 * (hr - far)
 
-    with vwm_tabs[1]:
-        st.markdown("#### EEG Analysis: VEPs and SSVEP Signal-to-Noise Ratio (SNR)")
+                k_df = df_valid.groupby(['Subject_ID', 'Grouping_Condition']).apply(calc_cowans_k).reset_index(name='K_Score')
+                
+                fig_k = px.box(k_df, x='Grouping_Condition', y='K_Score', color='Grouping_Condition', points='all',
+                                 title="Cowan's K by Grouping Condition",
+                                 labels={'K_Score': 'Number of Items (K)', 'Grouping_Condition': 'Condition'},
+                                 category_orders={"Grouping_Condition": ["Grouped Probed", "Grouped Non-Probed", "Not Grouped"]})
+                fig_k.update_yaxes(range=[0, 4])
+                st.plotly_chart(fig_k, use_container_width=True, config=PLOTLY_CONFIG)
+
+            else:
+                st.info("Loading Grouping Behavioral Data...")
+
+        with grouping_tabs[1]:
+            st.markdown("#### EEG Data Initial Preprocessing and Visualization")
+            st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset.")
+            
+            df_time, _ = get_vwm_eeg_data()
+            if df_time is not None and not df_time.empty:
+                # Group condition mapping for VEPs
+                selected_cond = st.selectbox("Select Condition to View VEP:", df_time['Condition'].unique())
+                df_plot_time = df_time[df_time['Condition'] == selected_cond]
+                grand_waveform = df_plot_time.groupby(['Time_s'])['Amplitude_uV'].mean().reset_index()
+                
+                fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', 
+                                   title=f"Grand Average VEP ({selected_cond})",
+                                   labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)'})
+                
+                fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
+                                   annotation_text="FFT Analysis Window", annotation_position="top left")
+                fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
+                fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
+                
+                st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
+            else:
+                st.info("Loading EEG Time-Series Data...")
+
+        with grouping_tabs[2]:
+            st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
+            st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
+
+            _, df_power = get_vwm_eeg_data()
+
+            if df_power is not None and not df_power.empty:
+                # 1. Isolate the SNR columns
+                snr_cols = [c for c in df_power.columns if 'SNR' in c]
+
+                # 2. Melt the dataframe so we can categorize the frequencies
+                df_power_melted = df_power.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
+                                                value_vars=snr_cols, 
+                                                var_name='Frequency_Type', value_name='SNR')
+
+                # 3. Classify as Fundamental or Intermodulation (Harmonic) based on the column name
+                df_power_melted['Signal_Type'] = df_power_melted['Frequency_Type'].apply(
+                    lambda x: 'Intermodulation (Sum/Diff)' if 'IM' in x else 'Fundamental (Base Hz)'
+                )
+
+                # 4. Create a clean "Grouped" vs "Non-Grouped" label
+                df_power_melted['Grouping_Status'] = df_power_melted['Condition'].apply(
+                    lambda c: 'Grouped' if 'grp' in c.lower() and 'nogrp' not in c.lower() else 'Non-Grouped'
+                )
+
+                # 5. Average across all 256 channels first to get a Global SNR per subject, per condition
+                global_snr = df_power_melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+
+                # --- PLOT: THE NON-LINEAR INTERACTION ---
+                fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
+                                 title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
+                                 labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
+                                 color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
+                
+                # Add a baseline annotation at SNR = 1.0 (Noise level)
+                fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
+                
+                st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
+                
+                st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
+
+            else:
+                st.info("Loading EEG Frequency Data...")
+
+    # ---------------------------------------------------------------------
+    # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)
+    # ---------------------------------------------------------------------
+    with project_tabs[1]:
+        st.markdown("### The Impact of Recall Task on VWM Encoding")
+        st.write("This project isolates the neural correlates of encoding processes during Simultaneous vs. Sequential full-report tasks.")
         
-        df_time, df_power = get_vwm_eeg_data()
+        task_tabs = st.tabs([
+            "1. Behavioral Findings", 
+            "2. EEG Data Initial Preprocessing and Visualization", 
+            "3. EEG Frequency Tagging Analysis"
+        ])
         
-        if df_time is not None and not df_time.empty:
-            # 1. VISUAL EVOKED POTENTIAL (VEP)
-            st.markdown("##### Occipital ROI Grand Average (Time-Series)")
-            st.write("This waveform represents the neural activity averaged across the posterior occipital-parietal cluster.")
-            
-            # Let the user pick a task to view
-            selected_task = st.radio("Select Task to View VEP:", df_time['Task'].unique(), horizontal=True)
-            
-            df_plot_time = df_time[df_time['Task'] == selected_task]
-            grand_waveform = df_plot_time.groupby(['Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
-            
-            fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Condition',
-                               title=f"Grand Average VEP ({selected_task} Task)",
-                               labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)'})
-            st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
-            
-        if df_power is not None and not df_power.empty:
-            st.divider()
-            # 2. SSVEP SIGNAL-TO-NOISE RATIO
-            st.markdown("##### SSVEP Frequency Tagging (SNR)")
-            st.write("Replicating Figure 3: Analyzing the Signal-to-Noise ratio of the visual flicker frequencies.")
-            
-            # For a basic overview, let's average the SNR across all channels for now
-            # (We will build the 256-channel Topographic Maps in the next step!)
-            snr_cols = [col for col in df_power.columns if 'SNR' in col]
-            
-            # Melt the dataframe so we can plot all frequencies side-by-side
-            df_power_melted = df_power.melt(id_vars=['Subject_ID', 'Task', 'Condition', 'Channel'], 
-                                            value_vars=snr_cols, 
-                                            var_name='Frequency', value_name='SNR')
-            
-            # Average across channels and subjects to get the Grand Mean SNR per frequency
-            grand_snr = df_power_melted.groupby(['Task', 'Frequency'])['SNR'].mean().reset_index()
-            
-            fig_snr = px.bar(grand_snr, x='Frequency', y='SNR', color='Task', barmode='group',
-                             title="Grand Average SNR by Frequency Tag",
-                             labels={'SNR': 'Signal-to-Noise Ratio'})
-            st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
+        with task_tabs[0]:
+            st.info("Data pending upload. Visualizations for Simultaneous vs. Sequential accuracy slopes will populate here.")
+        with task_tabs[1]:
+            st.info("Data pending upload. Grand Average VEPs for Task Types will populate here.")
+        with task_tabs[2]:
+            st.info("Data pending upload. Figure 3 Topographic Heat Maps will populate here.")
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---
 for i in range(3, 5):

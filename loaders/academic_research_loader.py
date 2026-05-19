@@ -636,7 +636,7 @@ def _fetch_github_parquet(base_name):
 
 @st.cache_data
 def get_vwm_behavioral_data():
-    """Fetches Behavioral Accuracy Data (Simultaneous vs Sequential)."""
+    """Fetches Behavioral Accuracy Data for the Grouping paradigm."""
     return _fetch_github_parquet('vwm_behavioral')
 
 @st.cache_data
