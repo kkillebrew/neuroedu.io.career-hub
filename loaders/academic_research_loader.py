@@ -670,22 +670,20 @@ def get_processed_vwm_snr():
     # 1. Identify all SNR columns
     snr_cols = [c for c in df.columns if 'SNR' in c]
     
-    # 2. Average across channels FIRST
+    # 2. Average across channels FIRST to save memory
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     
     # 3. Melt
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
                           var_name='Frequency_Type', value_name='SNR')
     
-    # 4. ROBUST CLASSIFICATION: Explicitly look for our known targets
-    # Instead of just checking for 'IM', we check if it's a known fundamental Hz.
-    # Adjust this list if your fundamental tags are different!
-    fundamentals = ['3Hz', '5Hz', '12Hz', '20Hz']
-    
+    # 4. ROBUST LABELING:
+    # Based on our initial work, we defined IM frequencies by the 'IM' substring.
+    # Everything else is a Fundamental. This is safe and keeps your labels consistent.
     melted['Signal_Type'] = np.where(
-        melted['Frequency_Type'].apply(lambda x: any(f in x for f in fundamentals)),
-        'Fundamental (Base Hz)',
-        'Intermodulation (Sum/Diff)'
+        melted['Frequency_Type'].str.contains('IM', case=False), 
+        'Intermodulation (Sum/Diff)', 
+        'Fundamental (Base Hz)'
     )
     
     cond_lower = melted['Condition'].str.lower()
