@@ -713,9 +713,10 @@ with tabs[1]:
                 render_vector_demo('aperture', modulation=e_pse, speed=50)
                 st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
 
-    # =====================================================================
-    # OUTER PROJECT TABS
-    # =====================================================================
+# =====================================================================
+# TAB 3: VISUAL WORKING MEMORY
+# =====================================================================
+with tabs[2]:
     st.divider()
     project_tabs = st.tabs([
         "🧠 Project 1: Grouping by Color", 
@@ -738,10 +739,8 @@ with tabs[1]:
             df_beh = get_vwm_behavioral_data()
             
             if not df_beh.empty:
-                # 1. MATLAB Bridge: Filter out non-responses (rawdata(:,8)==1)
                 df_valid = df_beh[df_beh['Responded'] == 1].copy()
                 
-                # 2. Assign the 3 MATLAB Conditions
                 def get_cond_label(row):
                     if row['Grouped_Status'] == 1 and row['Probe_Status'] == 1: return "Grouped Probed"
                     if row['Grouped_Status'] == 1 and row['Probe_Status'] == 2: return "Grouped Non-Probed"
@@ -752,7 +751,7 @@ with tabs[1]:
                 # --- PLOT 1: ACCURACY ---
                 st.write("Participants were tested on whether a probed item was Old or New across three grouping conditions.")
                 acc_df = df_valid.groupby(['Subject_ID', 'Grouping_Condition'])['Correct'].mean().reset_index()
-                acc_df['Correct'] *= 100 # Convert to percentage
+                acc_df['Correct'] *= 100 
                 
                 fig_acc = px.box(acc_df, x='Grouping_Condition', y='Correct', color='Grouping_Condition', points='all',
                                  title="Accuracy (% Correct) by Grouping Condition",
@@ -768,17 +767,14 @@ with tabs[1]:
                 st.write("Capacity was estimated using Cowan's K formula: K = Set Size * (Hit Rate - False Alarm Rate).")
                 
                 def calc_cowans_k(group):
-                    # Hit Rate (HR): It was old (1) and they said old (1)
                     hits = len(group[(group['Old_New'] == 1) & (group['Response'] == 1)])
                     actual_old = len(group[group['Old_New'] == 1])
                     hr = hits / actual_old if actual_old > 0 else 0
                     
-                    # False Alarm Rate (FAR): It was new (2) and they said old (1)
                     fas = len(group[(group['Old_New'] == 2) & (group['Response'] == 1)])
                     actual_new = len(group[group['Old_New'] == 2])
                     far = fas / actual_new if actual_new > 0 else 0
                     
-                    # K = 4 items * (HR - FAR)
                     return 4 * (hr - far)
 
                 k_df = df_valid.groupby(['Subject_ID', 'Grouping_Condition']).apply(calc_cowans_k).reset_index(name='K_Score')
@@ -799,7 +795,6 @@ with tabs[1]:
             
             df_time, _ = get_vwm_eeg_data()
             if df_time is not None and not df_time.empty:
-                # Group condition mapping for VEPs
                 selected_cond = st.selectbox("Select Condition to View VEP:", df_time['Condition'].unique())
                 df_plot_time = df_time[df_time['Condition'] == selected_cond]
                 grand_waveform = df_plot_time.groupby(['Time_s'])['Amplitude_uV'].mean().reset_index()
@@ -832,7 +827,7 @@ with tabs[1]:
                                                 value_vars=snr_cols, 
                                                 var_name='Frequency_Type', value_name='SNR')
 
-                # 3. Classify as Fundamental or Intermodulation (Harmonic) based on the column name
+                # 3. Classify as Fundamental or Intermodulation (Harmonic)
                 df_power_melted['Signal_Type'] = df_power_melted['Frequency_Type'].apply(
                     lambda x: 'Intermodulation (Sum/Diff)' if 'IM' in x else 'Fundamental (Base Hz)'
                 )
@@ -851,11 +846,9 @@ with tabs[1]:
                                  labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
                                  color_discrete_map={'Grouped': '#3b82f6', 'Non-Grouped': '#ef4444'})
                 
-                # Add a baseline annotation at SNR = 1.0 (Noise level)
                 fig_snr.add_hline(y=1.0, line_dash="dash", line_color="black", annotation_text="Noise Floor (SNR = 1.0)")
                 
                 st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
-                
                 st.info("Next Step: 256-Channel Topographic Maps to pinpoint spatial origin!")
 
             else:
