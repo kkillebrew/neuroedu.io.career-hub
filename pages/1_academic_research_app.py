@@ -735,43 +735,77 @@ with tabs[2]:
     ])
     
     with vwm_tabs[0]:
-        st.markdown("#### Behavioral Accuracy: Grouping vs. Unstructured")
+        st.markdown("#### Behavioral Accuracy: Task Type & Response Order")
         df_beh = get_vwm_behavioral_data()
         
         if not df_beh.empty:
-            # Map MATLAB condition IDs to strings
-            df_beh['Condition'] = df_beh['Group_Condition'].map({1: 'Grouped', 2: 'Weak Group', 3: 'No Group'})
-            acc_df = df_beh.groupby(['Subject_ID', 'Condition'])['Correct'].mean().reset_index()
+            # CABN PAPER REPLICATION: Accuracy by Task (Simultaneous vs Sequential)
+            st.write("Replicating Figure 2: Performance slopes between Simultaneous and Sequential full-report tasks.")
             
-            # Visualization Best Practice: Box plot with points to show both distribution and individual variance
-            fig_beh = px.box(acc_df, x='Condition', y='Correct', color='Condition', points='all',
-                             title="Recall Accuracy by Gestalt Grouping Condition",
-                             labels={'Correct': 'Proportion Correct'})
-            st.plotly_chart(fig_beh, use_container_width=True, config=PLOTLY_CONFIG)
+            # Group by Subject, Task, and Trial Order
+            # Note: Assuming 'Trial_Order' or 'Response' tracks the 1st, 2nd, 3rd, 4th item recalled
+            # If your column is named differently, adjust 'Trial_Order' below
+            if 'Trial_Order' in df_beh.columns:
+                acc_slope = df_beh.groupby(['Subject_ID', 'Task', 'Trial_Order'])['Correct'].mean().reset_index()
+                
+                fig_beh_slope = px.line(acc_slope, x='Trial_Order', y='Correct', color='Task', 
+                                        markers=True, title="Recall Accuracy by Response Order",
+                                        labels={'Correct': 'Proportion Correct', 'Trial_Order': 'Response Order'})
+                st.plotly_chart(fig_beh_slope, use_container_width=True, config=PLOTLY_CONFIG)
+            
+            # Boxplot for overall Task Performance
+            acc_overall = df_beh.groupby(['Subject_ID', 'Task'])['Correct'].mean().reset_index()
+            fig_beh_box = px.box(acc_overall, x='Task', y='Correct', color='Task', points='all',
+                                 title="Overall Accuracy: Simultaneous vs. Sequential",
+                                 labels={'Correct': 'Proportion Correct'})
+            st.plotly_chart(fig_beh_box, use_container_width=True, config=PLOTLY_CONFIG)
+            
         else:
             st.info("Loading Behavioral Data from GitHub...")
 
     with vwm_tabs[1]:
-        st.markdown("#### EEG Analysis: Steady-State Visual Evoked Potentials (SSVEP)")
-        st.write("Data fetching in progress. The pipeline is stitching the chunked Parquet files...")
+        st.markdown("#### EEG Analysis: VEPs and SSVEP Signal-to-Noise Ratio (SNR)")
         
         df_time, df_power = get_vwm_eeg_data()
         
         if df_time is not None and not df_time.empty:
-            st.success("Successfully loaded massive EEG arrays!")
+            # 1. VISUAL EVOKED POTENTIAL (VEP)
+            st.markdown("##### Occipital ROI Grand Average (Time-Series)")
+            st.write("This waveform represents the neural activity averaged across the posterior occipital-parietal cluster.")
             
-            # Plot the Grand Average VEP for a single condition as an example
-            sample_cond = 'grpNoPrb3'
-            df_plot = df_time[df_time['Condition'] == sample_cond]
-            # Average across all subjects for the grand waveform
-            grand_waveform = df_plot.groupby('Time_s')['Amplitude_uV'].mean().reset_index()
+            # Let the user pick a task to view
+            selected_task = st.radio("Select Task to View VEP:", df_time['Task'].unique(), horizontal=True)
             
-            fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', 
-                               title=f"Grand Average VEP ({sample_cond})",
+            df_plot_time = df_time[df_time['Task'] == selected_task]
+            grand_waveform = df_plot_time.groupby(['Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
+            
+            fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Condition',
+                               title=f"Grand Average VEP ({selected_task} Task)",
                                labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)'})
             st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
             
-            # Note: We will add the detailed FFT Power spectrum charts in the next step!
+        if df_power is not None and not df_power.empty:
+            st.divider()
+            # 2. SSVEP SIGNAL-TO-NOISE RATIO
+            st.markdown("##### SSVEP Frequency Tagging (SNR)")
+            st.write("Replicating Figure 3: Analyzing the Signal-to-Noise ratio of the visual flicker frequencies.")
+            
+            # For a basic overview, let's average the SNR across all channels for now
+            # (We will build the 256-channel Topographic Maps in the next step!)
+            snr_cols = [col for col in df_power.columns if 'SNR' in col]
+            
+            # Melt the dataframe so we can plot all frequencies side-by-side
+            df_power_melted = df_power.melt(id_vars=['Subject_ID', 'Task', 'Condition', 'Channel'], 
+                                            value_vars=snr_cols, 
+                                            var_name='Frequency', value_name='SNR')
+            
+            # Average across channels and subjects to get the Grand Mean SNR per frequency
+            grand_snr = df_power_melted.groupby(['Task', 'Frequency'])['SNR'].mean().reset_index()
+            
+            fig_snr = px.bar(grand_snr, x='Frequency', y='SNR', color='Task', barmode='group',
+                             title="Grand Average SNR by Frequency Tag",
+                             labels={'SNR': 'Signal-to-Noise Ratio'})
+            st.plotly_chart(fig_snr, use_container_width=True, config=PLOTLY_CONFIG)
 
 # --- PLACEHOLDERS FOR REMAINING TABS ---
 for i in range(3, 5):

@@ -615,20 +615,20 @@ def get_rotating_line_data():
 # =====================================================================
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
-
 def _fetch_github_parquet(base_name):
     """
     Fetches a single pre-aggregated Parquet file from GitHub.
+    Retrieves the token from DigitalOcean container environment variables.
     """
     github_token = os.getenv('GITHUB_TOKEN')
     headers = {'Authorization': f"token {github_token}"} if github_token else {}
     
-    # We now point directly to the tiny summary files
+    # Point directly to the tiny summary files
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
     
     try:
         res = requests.get(url, headers=headers)
-        res.raise_for_status() # Throws an error if the file is missing (404)
+        res.raise_for_status() # Throws an error if the file is missing
         return pd.read_parquet(BytesIO(res.content))
     except Exception as e:
         st.error(f"Failed to load {base_name}: {e}")
@@ -636,12 +636,15 @@ def _fetch_github_parquet(base_name):
 
 @st.cache_data
 def get_vwm_behavioral_data():
+    """Fetches Behavioral Accuracy Data (Simultaneous vs Sequential)."""
     return _fetch_github_parquet('vwm_behavioral')
 
 @st.cache_data
 def get_vwm_eeg_data():
-    # Fetch the newly aggregated summary files
+    """
+    Fetches the Aggregated EEG Data.
+    Returns: df_time (VEP Grand Averages), df_power (SSVEP SNR)
+    """
     df_time = _fetch_github_parquet('vwm_eeg_time_summary')
     df_power = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     return df_time, df_power
-    
