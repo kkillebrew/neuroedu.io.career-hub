@@ -796,25 +796,20 @@ with tabs[2]:
                 df_time, _ = get_vwm_eeg_data()
                 if df_time is not None and not df_time.empty:
                     
-                    # --- PERFORMANCE OPTIMIZATION: Cached Vectorized Averaging ---
-                    @st.cache_data
-                    def process_vep_data(df):
-                        # 1. Map the 32 conditions to the 3 Behavioral Conditions
-                        cond_lower = df['Condition'].str.lower()
-                        df['Grouping_Condition'] = np.where(
-                            cond_lower.str.contains('nogrp'), 'Not Grouped',
-                            np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
-                        )
-                        
-                        # 2. Average across Subjects and Frequencies
-                        # This instantly shrinks 640,000 rows down to just ~3,000 rows!
-                        return df.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
-
-                    # Execute the lightning-fast function
-                    with st.spinner("Aggregating 640,000 VEP timepoints..."):
-                        grand_waveform = process_vep_data(df_time)
+                    # 1. Create a safe working copy to avoid mutating the Streamlit cache!
+                    df_time_working = df_time.copy()
                     
-                    # Plot all 3 conditions on the same graph for direct comparison
+                    # 2. Map the 32 conditions to the 3 Behavioral Conditions
+                    cond_lower = df_time_working['Condition'].str.lower()
+                    df_time_working['Grouping_Condition'] = np.where(
+                        cond_lower.str.contains('nogrp'), 'Not Grouped',
+                        np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
+                    )
+                    
+                    # 3. Average across Subjects and Frequencies
+                    grand_waveform = df_time_working.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
+                    
+                    # 4. Plot all 3 conditions on the same graph
                     fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
                                        title="Grand Average VEP by Grouping Condition",
                                        labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
@@ -829,7 +824,7 @@ with tabs[2]:
                 else:
                     st.info("Loading EEG Time-Series Data...")
 
-        with grouping_tabs[2]:
+            with grouping_tabs[2]:
                 st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
                 st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
 
@@ -837,40 +832,34 @@ with tabs[2]:
 
                 if df_power is not None and not df_power.empty:
                     
-                    # --- PERFORMANCE OPTIMIZATION: Shrink before Reshaping ---
-                    @st.cache_data
-                    def process_global_snr(df):
-                        snr_cols = [c for c in df.columns if 'SNR' in c]
+                    # 1. Create a safe working copy
+                    df_power_working = df_power.copy()
+                    snr_cols = [c for c in df_power_working.columns if 'SNR' in c]
 
-                        # 1. PRE-AGGREGATE: Average across all 256 channels FIRST.
-                        # This shrinks the dataframe from 163,840 rows down to just 640 rows!
-                        df_mean_channels = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+                    # 2. PRE-AGGREGATE: Average across all 256 channels FIRST to shrink the matrix
+                    df_mean_channels = df_power_working.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
-                        # 2. Melt the tiny 640-row dataframe
-                        melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
-                                                       value_vars=snr_cols, 
-                                                       var_name='Frequency_Type', value_name='SNR')
+                    # 3. Melt the shrunken dataframe
+                    melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
+                                                   value_vars=snr_cols, 
+                                                   var_name='Frequency_Type', value_name='SNR')
 
-                        # 3. Fast Vectorized Categorization
-                        melted['Signal_Type'] = np.where(
-                            melted['Frequency_Type'].str.contains('IM'), 
-                            'Intermodulation (Sum/Diff)', 
-                            'Fundamental (Base Hz)'
-                        )
+                    # 4. Fast Vectorized Categorization
+                    melted['Signal_Type'] = np.where(
+                        melted['Frequency_Type'].str.contains('IM'), 
+                        'Intermodulation (Sum/Diff)', 
+                        'Fundamental (Base Hz)'
+                    )
 
-                        cond_lower = melted['Condition'].str.lower()
-                        melted['Grouping_Status'] = np.where(
-                            cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
-                            'Grouped', 
-                            'Non-Grouped'
-                        )
+                    cond_lower = melted['Condition'].str.lower()
+                    melted['Grouping_Status'] = np.where(
+                        cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
+                        'Grouped', 
+                        'Non-Grouped'
+                    )
 
-                        # 4. Final grouping for the boxplot
-                        return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
-
-                    # Execute the lightning-fast function
-                    with st.spinner("Processing frequency arrays..."):
-                        global_snr = process_global_snr(df_power)
+                    # 5. Final grouping for the boxplot
+                    global_snr = melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
 
                     # --- PLOT: THE NON-LINEAR INTERACTION ---
                     fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
