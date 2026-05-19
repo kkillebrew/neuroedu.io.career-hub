@@ -508,11 +508,8 @@ def get_rotating_line_data():
     """
     Fetches combined Parquet file from GitHub.
     Applies Bounded curve fits to prevent mathematical outliers on noisy subjects.
-    ...
     """
-    Fetches combined Parquet file from GitHub.
-    Applies Bounded curve fits to prevent mathematical outliers on noisy subjects.
-    """
+    
     try:
         github_token = os.environ.get("GITHUB_TOKEN")
         if not github_token:
