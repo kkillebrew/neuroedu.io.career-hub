@@ -734,31 +734,93 @@ with tabs[2]:
         "4. Additional Projects"
     ])
     
+    # --- SUB-TABS FOR DATA ANALYSIS ---
+    vwm_tabs = st.tabs([
+        "1. Behavioral Findings", 
+        "2. EEG Data Initial Preprocessing and Visualization", 
+        "3. EEG Frequency Tagging Analysis", 
+        "4. Additional Projects"
+    ])
+    
     with vwm_tabs[0]:
-        st.markdown("#### Behavioral Accuracy: Task Type & Response Order")
+        st.markdown("#### Behavioral Accuracy: Simultaneous vs. Sequential Full-Report")
         df_beh = get_vwm_behavioral_data()
         
         if not df_beh.empty:
-            # CABN PAPER REPLICATION: Accuracy by Task (Simultaneous vs Sequential)
-            st.write("Replicating Figure 2: Performance slopes between Simultaneous and Sequential full-report tasks.")
+            # Create a percentage column for easier plotting
+            df_beh['Correct_Pct'] = df_beh['Correct'] * 100
             
-            # Group by Subject, Task, and Trial Order
-            # Note: Assuming 'Trial_Order' or 'Response' tracks the 1st, 2nd, 3rd, 4th item recalled
-            # If your column is named differently, adjust 'Trial_Order' below
-            if 'Trial_Order' in df_beh.columns:
-                acc_slope = df_beh.groupby(['Subject_ID', 'Task', 'Trial_Order'])['Correct'].mean().reset_index()
-                
-                fig_beh_slope = px.line(acc_slope, x='Trial_Order', y='Correct', color='Task', 
-                                        markers=True, title="Recall Accuracy by Response Order",
-                                        labels={'Correct': 'Proportion Correct', 'Trial_Order': 'Response Order'})
-                st.plotly_chart(fig_beh_slope, use_container_width=True, config=PLOTLY_CONFIG)
+            # ---------------------------------------------------------
+            # FIGURE 2A: Overall Accuracy by Task
+            # ---------------------------------------------------------
+            st.markdown("##### Overall Accuracy by Recall Type")
+            st.write("Participants performed significantly better in the simultaneous recall condition compared to the sequential condition.")
             
-            # Boxplot for overall Task Performance
-            acc_overall = df_beh.groupby(['Subject_ID', 'Task'])['Correct'].mean().reset_index()
-            fig_beh_box = px.box(acc_overall, x='Task', y='Correct', color='Task', points='all',
-                                 title="Overall Accuracy: Simultaneous vs. Sequential",
-                                 labels={'Correct': 'Proportion Correct'})
-            st.plotly_chart(fig_beh_box, use_container_width=True, config=PLOTLY_CONFIG)
+            acc_overall = df_beh.groupby('Task')['Correct_Pct'].mean().reset_index()
+            # Calculate standard error for error bars if desired (omitted for clean Plotly defaults, but mean is exact)
+            
+            fig_2a = px.bar(acc_overall, x='Task', y='Correct_Pct', color='Task',
+                            title="Figure 2A: Overall Accuracy",
+                            labels={'Correct_Pct': 'Accuracy (% Correct)', 'Task': 'Recall Type'},
+                            range_y=[0, 100])
+            
+            # Add the 10% estimated chance line
+            fig_2a.add_hline(y=10, line_dash="dash", line_color="black", annotation_text="Chance")
+            st.plotly_chart(fig_2a, use_container_width=True, config=PLOTLY_CONFIG)
+            
+            st.divider()
+            
+            # ---------------------------------------------------------
+            # FIGURE 2B: Accuracy by Response Order
+            # ---------------------------------------------------------
+            st.markdown("##### Accuracy by Response Order")
+            st.write("Performance was better for early responses, and the slope of performance was steeper in the simultaneous task.")
+            
+            # Group by Task and Trial_Order
+            acc_order = df_beh.groupby(['Task', 'Trial_Order'])['Correct_Pct'].mean().reset_index()
+            
+            # Ensure Trial_Order is treated as a categorical string for the X-axis
+            acc_order['Response Order'] = acc_order['Trial_Order'].apply(lambda x: f"{int(x)} Item")
+            
+            fig_2b = px.bar(acc_order, x='Response Order', y='Correct_Pct', color='Task', barmode='group',
+                            title="Figure 2B: Accuracy by Response Order",
+                            labels={'Correct_Pct': 'Accuracy (% Correct)'},
+                            range_y=[0, 100])
+            st.plotly_chart(fig_2b, use_container_width=True, config=PLOTLY_CONFIG)
+            
+            st.divider()
+            
+            # ---------------------------------------------------------
+            # FIGURE 2C: Percentage of Trials by Number of Items Remembered
+            # ---------------------------------------------------------
+            st.markdown("##### Distribution of Items Remembered")
+            st.write("Consistent with a 'subset-of-items' model, the majority of trials resulted in two items being correctly recalled.")
+            
+            # To calculate items recalled PER TRIAL, we need to group the 4 rows that make up a single trial.
+            # We create a synthetic 'Trial_ID' by assuming every 4 rows per subject/task is one trial.
+            df_beh['Trial_ID'] = df_beh.groupby(['Subject_ID', 'Task']).cumcount() // 4
+            
+            # Sum the 'Correct' column (0 or 1) across the 4 items in each trial
+            trials_summary = df_beh.groupby(['Subject_ID', 'Task', 'Trial_ID'])['Correct'].sum().reset_index()
+            trials_summary.rename(columns={'Correct': 'Items_Remembered'}, inplace=True)
+            
+            # Calculate the percentage of trials for each bin (0, 1, 2, 3, 4 items) per task
+            task_counts = trials_summary.groupby('Task').size()
+            dist_df = trials_summary.groupby(['Task', 'Items_Remembered']).size().reset_index(name='Count')
+            
+            # Normalize to percentages
+            dist_df['Percentage of Trials'] = dist_df.apply(
+                lambda row: (row['Count'] / task_counts[row['Task']]) * 100, axis=1
+            )
+            
+            fig_2c = px.bar(dist_df, x='Items_Remembered', y='Percentage of Trials', color='Task', barmode='group',
+                            title="Figure 2C: Percentage of Trials by Number of Items Remembered",
+                            labels={'Items_Remembered': 'Number of Items Remembered'},
+                            range_y=[0, 100])
+            
+            # Ensure the X-axis shows all numbers 0-4 discretely
+            fig_2c.update_xaxes(tickmode='linear', tick0=0, dtick=1)
+            st.plotly_chart(fig_2c, use_container_width=True, config=PLOTLY_CONFIG)
             
         else:
             st.info("Loading Behavioral Data from GitHub...")
