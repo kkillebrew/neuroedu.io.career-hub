@@ -790,27 +790,44 @@ with tabs[2]:
                 st.info("Loading Grouping Behavioral Data...")
 
         with grouping_tabs[1]:
-            st.markdown("#### EEG Data Initial Preprocessing and Visualization")
-            st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset.")
-            
-            df_time, _ = get_vwm_eeg_data()
-            if df_time is not None and not df_time.empty:
-                selected_cond = st.selectbox("Select Condition to View VEP:", df_time['Condition'].unique())
-                df_plot_time = df_time[df_time['Condition'] == selected_cond]
-                grand_waveform = df_plot_time.groupby(['Time_s'])['Amplitude_uV'].mean().reset_index()
+                st.markdown("#### EEG Data Initial Preprocessing and Visualization")
+                st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
                 
-                fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', 
-                                   title=f"Grand Average VEP ({selected_cond})",
-                                   labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)'})
-                
-                fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
-                                   annotation_text="FFT Analysis Window", annotation_position="top left")
-                fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
-                fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
-                
-                st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
-            else:
-                st.info("Loading EEG Time-Series Data...")
+                df_time, _ = get_vwm_eeg_data()
+                if df_time is not None and not df_time.empty:
+                    
+                    # --- PERFORMANCE OPTIMIZATION: Cached Vectorized Averaging ---
+                    @st.cache_data
+                    def process_vep_data(df):
+                        # 1. Map the 32 conditions to the 3 Behavioral Conditions
+                        cond_lower = df['Condition'].str.lower()
+                        df['Grouping_Condition'] = np.where(
+                            cond_lower.str.contains('nogrp'), 'Not Grouped',
+                            np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
+                        )
+                        
+                        # 2. Average across Subjects and Frequencies
+                        # This instantly shrinks 640,000 rows down to just ~3,000 rows!
+                        return df.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
+
+                    # Execute the lightning-fast function
+                    with st.spinner("Aggregating 640,000 VEP timepoints..."):
+                        grand_waveform = process_vep_data(df_time)
+                    
+                    # Plot all 3 conditions on the same graph for direct comparison
+                    fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
+                                       title="Grand Average VEP by Grouping Condition",
+                                       labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
+                                       color_discrete_map={"Grouped Probed": "#3b82f6", "Grouped Non-Probed": "#10b981", "Not Grouped": "#ef4444"})
+                    
+                    fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
+                                       annotation_text="FFT Analysis Window", annotation_position="top left")
+                    fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
+                    fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
+                    
+                    st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
+                else:
+                    st.info("Loading EEG Time-Series Data...")
 
         with grouping_tabs[2]:
                 st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
