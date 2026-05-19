@@ -713,7 +713,7 @@ with tabs[1]:
                 render_vector_demo('aperture', modulation=e_pse, speed=50)
                 st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
 
-# =====================================================================
+    # =====================================================================
     # OUTER PROJECT TABS
     # =====================================================================
     st.divider()
