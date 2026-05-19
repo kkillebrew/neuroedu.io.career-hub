@@ -25,6 +25,18 @@ import streamlit as st
 import json
 import time
 
+# ROI Channel Map (1-based indices as per your specification)
+ROI_MAP = {
+    'O1': [116, 125, 124, 123, 136, 135],
+    'O2': [138, 150, 149, 148, 158, 157],
+    'P1': [89, 89, 100, 110, 99, 87],
+    'P2': [128, 129, 130, 142, 141, 153],
+    'C1': [45, 53, 60, 52, 44, 43],
+    'C2': [132, 144, 155, 185, 184, 197]
+}
+# Flatten for quick filtering
+ALL_ROI_CHANNELS = [ch for sublist in ROI_MAP.values() for ch in sublist]
+
 # --- PLOTLY CONFIGURATION ---
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
 
@@ -667,9 +679,12 @@ def get_processed_vwm_snr():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return df
     
+    # 1. Filter by ROI channels before anything else
+    # Assuming your DataFrame has a 'Channel' column (1-256)
+    df = df[df['Channel'].isin(ALL_ROI_CHANNELS)] 
+    
     snr_cols = [c for c in df.columns if 'SNR' in c]
-
-    # Average channels FIRST to shrink row count and save memory
+    # Now group by Subject, Condition, AND Channel to maintain ROI integrity
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
