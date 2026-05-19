@@ -105,9 +105,12 @@ def process_full_fft_grid(_df_fft):
 
 @st.cache_data
 def process_fft_index(_df_fft):
-    """Calculates the (Grp - noGrp)/(Grp + noGrp) Index aligned by Harmonic Tags."""
+    """Calculates the (Grp - noGrp)/(Grp + noGrp) Index aligned by Harmonic Tags using Vectorized Math."""
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
     records = []
+
+    # Get the unique frequency array ONCE (it's identical for all subjects)
+    unique_freqs = _df_fft['Frequency_Hz'].unique()
 
     for pair in target_pairs:
         ft_str, fg_str = pair.split('_')
@@ -125,25 +128,29 @@ def process_fft_index(_df_fft):
         grp_cond = f'grpPrb{pair}'
         nogrp_cond = f'noGrp{pair}'
 
-        # Calculate index per subject to allow for statistical testing later
-        for subj in _df_fft['Subject_ID'].unique():
-            df_grp = _df_fft[(_df_fft['Condition'] == grp_cond) & (_df_fft['Subject_ID'] == subj)]
-            df_nogrp = _df_fft[(_df_fft['Condition'] == nogrp_cond) & (_df_fft['Subject_ID'] == subj)]
+        # Filter the dataset to just these two conditions for speed
+        df_pair = _df_fft[_df_fft['Condition'].isin([grp_cond, nogrp_cond])]
 
-            if df_grp.empty or df_nogrp.empty: continue
-
-            for tag, hz in freq_map.items():
-                hz_float = float(hz)
-                # Find the closest frequency bin
-                grp_match = df_grp.iloc[(df_grp['Frequency_Hz'] - hz_float).abs().argsort()[:1]]
-                nogrp_match = df_nogrp.iloc[(df_nogrp['Frequency_Hz'] - hz_float).abs().argsort()[:1]]
-
-                if not grp_match.empty and not nogrp_match.empty:
-                    p_g = grp_match['Power'].values[0]
-                    p_ng = nogrp_match['Power'].values[0]
-                    idx_val = (p_g - p_ng) / (p_g + p_ng) if (p_g + p_ng) != 0 else 0
-
-                    records.append({'Subject_ID': subj, 'Pair': pair, 'Tag': tag, 'Index_Value': idx_val})
+        for tag, hz in freq_map.items():
+            # Find the closest frequency bin globally (Only doing this ONCE per tag!)
+            closest_hz = unique_freqs[np.abs(unique_freqs - float(hz)).argmin()]
+            
+            # Isolate just that specific frequency row for all subjects
+            df_hz = df_pair[df_pair['Frequency_Hz'] == closest_hz]
+            
+            # VECTORIZATION: Pivot to get Grouped and NotGrouped in columns side-by-side
+            pivoted = df_hz.pivot(index='Subject_ID', columns='Condition', values='Power').dropna()
+            
+            if grp_cond in pivoted.columns and nogrp_cond in pivoted.columns:
+                p_g = pivoted[grp_cond]
+                p_ng = pivoted[nogrp_cond]
+                
+                # Calculate the Index for ALL 20 subjects instantly!
+                idx_vals = (p_g - p_ng) / (p_g + p_ng)
+                
+                # Extract the results
+                for subj, val in idx_vals.items():
+                    records.append({'Subject_ID': subj, 'Pair': pair, 'Tag': tag, 'Index_Value': val})
 
     df_idx = pd.DataFrame(records)
     
@@ -156,10 +163,11 @@ def process_fft_index(_df_fft):
         
         # Assign Significance Stars
         star = ""
-        if p_val < 0.001: star = "***"
-        elif p_val < 0.01: star = "**"
-        elif p_val < 0.05: star = "*"
-        
+        if pd.notna(p_val):
+            if p_val < 0.001: star = "***"
+            elif p_val < 0.01: star = "**"
+            elif p_val < 0.05: star = "*"
+            
         stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
         
     # Standardize the order of categories for the plot
