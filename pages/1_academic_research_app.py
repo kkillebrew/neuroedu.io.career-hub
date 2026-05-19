@@ -875,38 +875,6 @@ with tabs[2]:
                         fig_grid.update_layout(height=600, title_text="1-100Hz FFT Power Spectrum (Trial Averaged)")
                         fig_grid.update_xaxes(range=[1, 40])
                         st.plotly_chart(fig_grid, use_container_width=True, config=PLOTLY_CONFIG)
-
-                        st.divider()
-
-                        # ========================================================
-                        # PLOT: THE HARMONIC INDEX STEM PLOT
-                        # ========================================================
-                        st.markdown("#### Harmonic Index Analysis")
-                        st.write("To isolate the exact neural variance responsible for grouping, we calculate an Index: `(Grouped - Not Grouped) / (Grouped + Not Grouped)`. This collapses the data by harmonic relationship ($f_t$, $f_g$, and Intermodulations). Stars indicate significance from a 1-sample t-test against 0 (chance).")
-                        
-                        df_index = get_processed_fft_index()
-                        fig_index = go.Figure()
-                        
-                        fig_index.add_trace(go.Bar(
-                            x=df_index['Tag'], y=df_index['Mean_Index'], 
-                            width=0.05, marker_color='black', showlegend=False
-                        ))
-                        
-                        fig_index.add_trace(go.Scatter(
-                            x=df_index['Tag'], y=df_index['Mean_Index'],
-                            mode='markers+text', marker=dict(size=12, color='#10b981', line=dict(width=2, color='white')),
-                            text=df_index['Star'], textposition='top center',
-                            textfont=dict(size=16, color='black'), showlegend=False
-                        ))
-                        
-                        fig_index.add_hline(y=0.0, line_color='red', line_width=1)
-                        fig_index.update_layout(
-                            title="Harmonic Index Values Across All Pair Combinations",
-                            yaxis_title="Index Value (Grouped > Not Grouped)",
-                            xaxis_title="Harmonic Identifier",
-                            height=450
-                        )
-                        st.plotly_chart(fig_index, use_container_width=True, config=PLOTLY_CONFIG)
                     else:
                         st.info("Loading Full Spectrum FFT Data...")
 
