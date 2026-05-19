@@ -818,28 +818,28 @@ with tabs[2]:
             else:
                 st.info("Loading Grouping Behavioral Data...")
 
-    with grouping_tabs[1]:
-            st.markdown("#### EEG Data Initial Preprocessing and Visualization")
-            st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
-            
-            df_time, _ = get_vwm_eeg_data()
-            if df_time is not None and not df_time.empty:
-                # Run the lightning-fast cached processor
-                grand_waveform = process_vwm_vep(df_time)
+        with grouping_tabs[1]:
+                st.markdown("#### EEG Data Initial Preprocessing and Visualization")
+                st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
                 
-                fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
-                                   title="Grand Average VEP by Grouping Condition",
-                                   labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
-                                   color_discrete_map={"Grouped Probed": "#3b82f6", "Grouped Non-Probed": "#10b981", "Not Grouped": "#ef4444"})
-                
-                fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
-                                   annotation_text="FFT Analysis Window", annotation_position="top left")
-                fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
-                fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
-                
-                st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
-            else:
-                st.info("Loading EEG Time-Series Data...")
+                df_time, _ = get_vwm_eeg_data()
+                if df_time is not None and not df_time.empty:
+                    # Run the lightning-fast cached processor
+                    grand_waveform = process_vwm_vep(df_time)
+                    
+                    fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
+                                       title="Grand Average VEP by Grouping Condition",
+                                       labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
+                                       color_discrete_map={"Grouped Probed": "#3b82f6", "Grouped Non-Probed": "#10b981", "Not Grouped": "#ef4444"})
+                    
+                    fig_time.add_vrect(x0=0.5, x1=2.0, fillcolor="green", opacity=0.1, line_width=0, 
+                                       annotation_text="FFT Analysis Window", annotation_position="top left")
+                    fig_time.add_vline(x=0.5, line_dash="dash", line_color="green")
+                    fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
+                    
+                    st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
+                else:
+                    st.info("Loading EEG Time-Series Data...")
 
         with grouping_tabs[2]:
             st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
