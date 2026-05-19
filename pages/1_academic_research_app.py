@@ -968,17 +968,16 @@ with tabs[2]:
                             
                             show_leg = True if i == 0 else False
                             
-                            # Using Bar traces with a tiny width makes perfect "Stem Plots" in Plotly
-                            fig_grid.add_trace(go.Bar(x=grp_data['Frequency_Hz'], y=grp_data['Power'], name='Grouped', marker_color='#3b82f6', showlegend=show_leg, width=0.4), row=row, col=col)
-                            fig_grid.add_trace(go.Bar(x=nogrp_data['Frequency_Hz'], y=nogrp_data['Power'], name='Not Grouped', marker_color='#ef4444', showlegend=show_leg, width=0.4, opacity=0.7), row=row, col=col)
+                            # CRITICAL BROWSER FIX: go.Scatter is WebGL optimized and won't crash the DOM
+                            fig_grid.add_trace(go.Scatter(x=grp_data['Frequency_Hz'], y=grp_data['Power'], name='Grouped', fill='tozeroy', mode='lines', line=dict(width=1, color='#3b82f6'), showlegend=show_leg), row=row, col=col)
+                            fig_grid.add_trace(go.Scatter(x=nogrp_data['Frequency_Hz'], y=nogrp_data['Power'], name='Not Grouped', fill='tozeroy', mode='lines', line=dict(width=1, color='#ef4444'), showlegend=show_leg, opacity=0.7), row=row, col=col)
                             
                             col += 1
                             if col > 4:
                                 col = 1
                                 row += 1
                                 
-                        fig_grid.update_layout(height=600, barmode='overlay', title_text="1-100Hz FFT Power Spectrum (Trial Averaged)")
-                        # Zoom the X-axis to 1-40Hz to see the peaks better, but data is there up to 100Hz
+                        fig_grid.update_layout(height=600, title_text="1-100Hz FFT Power Spectrum (Trial Averaged)")
                         fig_grid.update_xaxes(range=[1, 40])
                         st.plotly_chart(fig_grid, use_container_width=True, config=PLOTLY_CONFIG)
     
