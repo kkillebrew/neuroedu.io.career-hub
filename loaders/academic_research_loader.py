@@ -664,38 +664,36 @@ def get_processed_vwm_vep():
 
 @st.cache_data
 def get_processed_vwm_snr():
-    # Fetch exactly the file we used for the SNR plots initially
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return df
     
-    # 1. Isolate SNR columns
+    # 1. Get all columns that look like SNR
     snr_cols = [c for c in df.columns if 'SNR' in c]
 
-    # 2. Average across channels first (Memory Optimization)
-    df_mean_channels = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+    # 2. Average across subjects and conditions (collapse channels)
+    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
-    # 3. Melt to long format
-    melted = df_mean_channels.melt(id_vars=['Subject_ID', 'Condition'], 
-                                   value_vars=snr_cols, 
-                                   var_name='Frequency_Type', value_name='SNR')
+    # 3. Melt
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
+                          value_vars=snr_cols, 
+                          var_name='Frequency_Type', value_name='SNR')
 
-    # 4. The Original Logic: If it contains 'IM', it's Intermodulation. Else, it's Fundamental.
-    # We use .str.contains, which is case-insensitive if we want, but keeping it simple:
+    # 4. EXPLICIT LOGIC: 
+    # If the column name does NOT contain 'IM', it MUST be a Fundamental.
+    # This matches exactly how we built the dictionary in Colab.
     melted['Signal_Type'] = np.where(
-        melted['Frequency_Type'].str.contains('IM'), 
+        melted['Frequency_Type'].str.contains('IM', case=False), 
         'Intermodulation (Sum/Diff)', 
         'Fundamental (Base Hz)'
     )
 
-    # 5. Define Grouping Status
+    # 5. Define grouping
     cond_lower = melted['Condition'].str.lower()
     melted['Grouping_Status'] = np.where(
         cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
-        'Grouped', 
-        'Non-Grouped'
+        'Grouped', 'Non-Grouped'
     )
 
-    # 6. Return the aggregated result
     return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
 
 @st.cache_data
