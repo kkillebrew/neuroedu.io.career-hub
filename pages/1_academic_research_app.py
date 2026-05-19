@@ -37,9 +37,10 @@ from loaders.academic_research_loader import (
     get_test_retest_data,       # <-- NEW
     get_rotating_line_data,     # Start of rotating line stuff
     get_vwm_behavioral_data,    # <-- NEW
-    get_vwm_eeg_time_data,      # <--- NEW SPLIT LOADER 1
-    get_vwm_eeg_power_data,     # <--- NEW SPLIT LOADER 2
-    get_vwm_eeg_full_spectrum_data, # <--- NEW
+    get_processed_vwm_vep,      # <--- NEW
+    get_processed_vwm_snr,      # <--- NEW
+    get_processed_fft_grid,     # <--- NEW
+    get_processed_fft_index,    # <--- NEW
     calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
@@ -56,107 +57,6 @@ render_sidebar()
 pubs_df = get_publications_data()
 expertise = get_research_expertise()
 narratives = get_project_narratives()
-
-# --- HIGH-SPEED CACHED DATA PROCESSORS ---
-@st.cache_data
-def process_vwm_vep(_df_time):
-    cond_lower = _df_time['Condition'].str.lower()
-    groups = np.where(
-        cond_lower.str.contains('nogrp'), 'Not Grouped',
-        np.where(cond_lower.str.contains('grpnoprb'), 'Grouped Non-Probed', 'Grouped Probed')
-    )
-    # Using .assign() creates a shallow map instead of a deep memory copy!
-    df_working = _df_time.assign(Grouping_Condition=groups)
-    return df_working.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
-
-@st.cache_data
-def process_vwm_snr(_df_power):
-    snr_cols = [c for c in _df_power.columns if 'SNR' in c]
-    df_mean = _df_power.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
-    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, 
-                          var_name='Frequency_Type', value_name='SNR')
-    melted['Signal_Type'] = np.where(
-        melted['Frequency_Type'].str.contains('IM'), 
-        'Intermodulation (Sum/Diff)', 'Fundamental (Base Hz)'
-    )
-    cond_lower = melted['Condition'].str.lower()
-    melted['Grouping_Status'] = np.where(
-        cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
-        'Grouped', 'Non-Grouped'
-    )
-    return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
-
-@st.cache_data
-def process_full_fft_grid(_df_fft):
-    """Isolates the 8 specific conditions in milliseconds."""
-    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
-    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
-    
-    # 1. Filter and Average
-    df_filt = _df_fft[_df_fft['Condition'].isin(conds)].copy()
-    df_avg = df_filt.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
-    
-    # 2. Assign Pair and Grouping instantly
-    df_avg['Grouping'] = np.where(df_avg['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
-    df_avg['Pair'] = df_avg['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
-    return df_avg
-
-@st.cache_data
-def process_fft_index(_df_fft):
-    """Calculates the Harmonic Index instantly using a single DataFrame Pivot."""
-    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
-    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
-    
-    df_filt = _df_fft[_df_fft['Condition'].isin(conds)].copy()
-    df_filt['Pair'] = df_filt['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
-    df_filt['Grouping'] = np.where(df_filt['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
-    
-    # ONE PIVOT to align all Grouped and NotGrouped power side-by-side
-    pivoted = df_filt.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], columns='Grouping', values='Power').reset_index()
-    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
-    
-    # Calculate Index for ALL subjects and conditions instantly
-    pivoted['Index_Value'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
-    
-    records = []
-    unique_freqs = pivoted['Frequency_Hz'].unique()
-    
-    for pair in target_pairs:
-        ft, fg = map(int, pair.split('_'))
-        freq_map = {
-            'f_t': ft, '2f_t': 2*ft, '3f_t': 3*ft,
-            'f_g': fg, '2f_g': 2*fg, '3f_g': 3*fg,
-            'f_t+f_g': ft+fg, '|f_t-f_g|': abs(ft-fg),
-            '2f_t+f_g': 2*ft+fg, '|2f_t-f_g|': abs(2*ft-fg),
-            'f_t+2f_g': ft+2*fg, '|f_t-2f_g|': abs(ft-2*fg)
-        }
-        pair_df = pivoted[pivoted['Pair'] == pair]
-        
-        for tag, hz in freq_map.items():
-            closest_hz = unique_freqs[np.abs(unique_freqs - float(hz)).argmin()]
-            tag_df = pair_df[pair_df['Frequency_Hz'] == closest_hz].copy()
-            tag_df['Tag'] = tag
-            records.append(tag_df)
-            
-    df_idx = pd.concat(records, ignore_index=True)
-    
-    stats_records = []
-    for tag in df_idx['Tag'].unique():
-        tag_data = df_idx[df_idx['Tag'] == tag]['Index_Value'].dropna()
-        if len(tag_data) > 0:
-            t_stat, p_val = ttest_1samp(tag_data, 0.0)
-            mean_val = tag_data.mean()
-            star = ""
-            if pd.notna(p_val):
-                if p_val < 0.001: star = "***"
-                elif p_val < 0.01: star = "**"
-                elif p_val < 0.05: star = "*"
-            stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
-    
-    cat_order = ['f_t', '2f_t', '3f_t', 'f_g', '2f_g', '3f_g', '|f_t-f_g|', 'f_t+f_g', '|2f_t-f_g|', '2f_t+f_g', '|f_t-2f_g|', 'f_t+2f_g']
-    df_stats = pd.DataFrame(stats_records)
-    df_stats['Tag'] = pd.Categorical(df_stats['Tag'], categories=cat_order, ordered=True)
-    return df_stats.sort_values('Tag')
 
 # ==========================================
 # TOP SECTION: CV & PUBLICATIONS
@@ -927,10 +827,8 @@ with tabs[2]:
                 st.markdown("#### EEG Data Initial Preprocessing and Visualization")
                 st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
                 
-                df_time = get_vwm_eeg_time_data() # <--- Split Loader
-                if df_time is not None and not df_time.empty:
-                    grand_waveform = process_vwm_vep(df_time)
-                    
+                grand_waveform = get_processed_vwm_vep()
+                if grand_waveform is not None and not grand_waveform.empty:
                     fig_time = px.line(grand_waveform, x='Time_s', y='Amplitude_uV', color='Grouping_Condition',
                                        title="Grand Average VEP by Grouping Condition",
                                        labels={'Time_s': 'Time (s)', 'Amplitude_uV': 'Amplitude (µV)', 'Grouping_Condition': 'Condition'},
@@ -951,12 +849,8 @@ with tabs[2]:
                     st.markdown("#### Frequency Tagging: 1-100Hz Spectra")
                     st.write("Full-spectrum FFTs comparing Grouped vs. Not Grouped conditions across specific frequency pairs.")
                     
-                    df_full_fft = get_vwm_eeg_full_spectrum_data()
-                    
-                    if df_full_fft is not None and not df_full_fft.empty:
-                        with st.spinner("Processing 1-100Hz Subplots..."):
-                            df_grid = process_full_fft_grid(df_full_fft)
-                            
+                    df_grid = get_processed_fft_grid()
+                    if df_grid is not None and not df_grid.empty:
                         target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
                         fig_grid = make_subplots(rows=2, cols=4, subplot_titles=[f"Condition {p.replace('_', 'Hz & ')}Hz" for p in target_pairs])
                         
@@ -968,7 +862,7 @@ with tabs[2]:
                             
                             show_leg = True if i == 0 else False
                             
-                            # CRITICAL BROWSER FIX: go.Scatter is WebGL optimized and won't crash the DOM
+                            # CRITICAL BROWSER FIX: WebGL Scatter Shapes
                             fig_grid.add_trace(go.Scatter(x=grp_data['Frequency_Hz'], y=grp_data['Power'], name='Grouped', fill='tozeroy', mode='lines', line=dict(width=1, color='#3b82f6'), showlegend=show_leg), row=row, col=col)
                             fig_grid.add_trace(go.Scatter(x=nogrp_data['Frequency_Hz'], y=nogrp_data['Power'], name='Not Grouped', fill='tozeroy', mode='lines', line=dict(width=1, color='#ef4444'), showlegend=show_leg, opacity=0.7), row=row, col=col)
                             
@@ -980,28 +874,23 @@ with tabs[2]:
                         fig_grid.update_layout(height=600, title_text="1-100Hz FFT Power Spectrum (Trial Averaged)")
                         fig_grid.update_xaxes(range=[1, 40])
                         st.plotly_chart(fig_grid, use_container_width=True, config=PLOTLY_CONFIG)
-    
+
                         st.divider()
-    
+
                         # ========================================================
                         # PLOT: THE HARMONIC INDEX STEM PLOT
                         # ========================================================
                         st.markdown("#### Harmonic Index Analysis")
                         st.write("To isolate the exact neural variance responsible for grouping, we calculate an Index: `(Grouped - Not Grouped) / (Grouped + Not Grouped)`. This collapses the data by harmonic relationship ($f_t$, $f_g$, and Intermodulations). Stars indicate significance from a 1-sample t-test against 0 (chance).")
                         
-                        with st.spinner("Aligning Harmonic Indices..."):
-                            df_index = process_fft_index(df_full_fft)
-                            
-                        # Build a Stem Plot (Bar + Scatter)
+                        df_index = get_processed_fft_index()
                         fig_index = go.Figure()
                         
-                        # The "Stems" (Thin Bars)
                         fig_index.add_trace(go.Bar(
                             x=df_index['Tag'], y=df_index['Mean_Index'], 
                             width=0.05, marker_color='black', showlegend=False
                         ))
                         
-                        # The "Caps" (Markers)
                         fig_index.add_trace(go.Scatter(
                             x=df_index['Tag'], y=df_index['Mean_Index'],
                             mode='markers+text', marker=dict(size=12, color='#10b981', line=dict(width=2, color='white')),
@@ -1017,21 +906,15 @@ with tabs[2]:
                             height=450
                         )
                         st.plotly_chart(fig_index, use_container_width=True, config=PLOTLY_CONFIG)
-                        
                     else:
                         st.info("Loading Full Spectrum FFT Data...")
-            
-                else:
-                    st.info("Loading EEG Time-Series Data...")
 
         with grouping_tabs[2]:
             st.markdown("#### EEG Frequency Tagging: Non-Linear Neural Interaction")
             st.write("As described in the study, if the visual cortex binds two flickering objects into a single 'grouped' object, we expect to see non-linear intermodulation (IM) frequencies (e.g., the sum and difference of the fundamental frequencies).")
 
-            df_power = get_vwm_eeg_power_data() # <--- Split Loader
-            if df_power is not None and not df_power.empty:
-                global_snr = process_vwm_snr(df_power)
-
+            global_snr = get_processed_vwm_snr()
+            if global_snr is not None and not global_snr.empty:
                 fig_snr = px.box(global_snr, x='Signal_Type', y='SNR', color='Grouping_Status', points='all',
                                  title="Visual Cortex Binding: Fundamental vs. Intermodulation SNR",
                                  labels={'SNR': 'Global SNR (Channel Average)', 'Signal_Type': 'Frequency Type', 'Grouping_Status': 'Condition'},
