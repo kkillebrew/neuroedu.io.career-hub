@@ -667,34 +667,49 @@ def get_processed_vwm_snr():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return df
     
-    # 1. Get all columns that look like SNR
     snr_cols = [c for c in df.columns if 'SNR' in c]
 
-    # 2. Average across subjects and conditions (collapse channels)
+    # Average channels FIRST to shrink row count and save memory
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
-    # 3. Melt
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
                           value_vars=snr_cols, 
                           var_name='Frequency_Type', value_name='SNR')
 
-    # 4. EXPLICIT LOGIC: 
-    # If the column name does NOT contain 'IM', it MUST be a Fundamental.
-    # This matches exactly how we built the dictionary in Colab.
+    # The Original Labeling Logic
     melted['Signal_Type'] = np.where(
         melted['Frequency_Type'].str.contains('IM', case=False), 
         'Intermodulation (Sum/Diff)', 
         'Fundamental (Base Hz)'
     )
 
-    # 5. Define grouping
     cond_lower = melted['Condition'].str.lower()
     melted['Grouping_Status'] = np.where(
         cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 
         'Grouped', 'Non-Grouped'
     )
 
-    return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+    # --- CRITICAL DATA RESTORATION (REGEX FILTER) ---
+    import re
+    # Extract the exact integer from the column name (e.g., 'SNR_3Hz' -> '3')
+    melted['Freq_Hz_Str'] = melted['Frequency_Type'].str.extract(r'(\d+)')
+    
+    def is_valid_frequency(row):
+        # Keep all Intermodulation frequencies
+        if row['Signal_Type'] == 'Intermodulation (Sum/Diff)':
+            return True
+        
+        # For Fundamentals, extract the explicit numbers from the condition string 
+        # (e.g., 'grpPrb3_12' becomes the list ['3', '12'])
+        cond_nums = re.findall(r'\d+', str(row['Condition']))
+        
+        # Only keep the row if its frequency matches a number actually in the condition
+        return str(row['Freq_Hz_Str']) in cond_nums
+        
+    melted['Valid'] = melted.apply(is_valid_frequency, axis=1)
+    melted_clean = melted[melted['Valid']]
+
+    return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
 
 @st.cache_data
 def get_processed_fft_grid():
