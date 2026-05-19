@@ -17,6 +17,10 @@ import pandas as pd  # <--- ADD THIS LINE
 import json          # <--- ADD THIS LINE (if not already there)
 import streamlit.components.v1 as components
 
+from plotly.subplots import make_subplots # <--- NEW IMPORT
+import plotly.graph_objects as go
+from scipy.stats import ttest_1samp # <--- NEW IMPORT for Index stats
+
 # --- PATH CONFIGURATION ---
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -35,6 +39,7 @@ from loaders.academic_research_loader import (
     get_vwm_behavioral_data,    # <-- NEW
     get_vwm_eeg_time_data,      # <--- NEW SPLIT LOADER 1
     get_vwm_eeg_power_data,     # <--- NEW SPLIT LOADER 2
+    get_vwm_eeg_full_spectrum_data, # <--- NEW
     calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
@@ -80,6 +85,88 @@ def process_vwm_snr(_df_power):
         'Grouped', 'Non-Grouped'
     )
     return melted.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].mean().reset_index()
+
+@st.cache_data
+def process_full_fft_grid(_df_fft):
+    """Isolates the 8 specific conditions and averages across subjects for the 2x4 Grid."""
+    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+    res = []
+    for pair in target_pairs:
+        grp_cond = f'grpPrb{pair}'
+        nogrp_cond = f'noGrp{pair}'
+        df_pair = _df_fft[_df_fft['Condition'].isin([grp_cond, nogrp_cond])]
+        
+        # Average across subjects
+        df_avg = df_pair.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+        df_avg['Pair'] = pair
+        df_avg['Grouping'] = np.where(df_avg['Condition'] == grp_cond, 'Grouped', 'Not Grouped')
+        res.append(df_avg)
+    return pd.concat(res, ignore_index=True)
+
+@st.cache_data
+def process_fft_index(_df_fft):
+    """Calculates the (Grp - noGrp)/(Grp + noGrp) Index aligned by Harmonic Tags."""
+    target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+    records = []
+
+    for pair in target_pairs:
+        ft_str, fg_str = pair.split('_')
+        ft, fg = int(ft_str), int(fg_str)
+
+        # Dynamic Harmonic & IM Mapping
+        freq_map = {
+            'f_t': ft, '2f_t': 2*ft, '3f_t': 3*ft,
+            'f_g': fg, '2f_g': 2*fg, '3f_g': 3*fg,
+            'f_t+f_g': ft+fg, '|f_t-f_g|': abs(ft-fg),
+            '2f_t+f_g': 2*ft+fg, '|2f_t-f_g|': abs(2*ft-fg),
+            'f_t+2f_g': ft+2*fg, '|f_t-2f_g|': abs(ft-2*fg)
+        }
+
+        grp_cond = f'grpPrb{pair}'
+        nogrp_cond = f'noGrp{pair}'
+
+        # Calculate index per subject to allow for statistical testing later
+        for subj in _df_fft['Subject_ID'].unique():
+            df_grp = _df_fft[(_df_fft['Condition'] == grp_cond) & (_df_fft['Subject_ID'] == subj)]
+            df_nogrp = _df_fft[(_df_fft['Condition'] == nogrp_cond) & (_df_fft['Subject_ID'] == subj)]
+
+            if df_grp.empty or df_nogrp.empty: continue
+
+            for tag, hz in freq_map.items():
+                hz_float = float(hz)
+                # Find the closest frequency bin
+                grp_match = df_grp.iloc[(df_grp['Frequency_Hz'] - hz_float).abs().argsort()[:1]]
+                nogrp_match = df_nogrp.iloc[(df_nogrp['Frequency_Hz'] - hz_float).abs().argsort()[:1]]
+
+                if not grp_match.empty and not nogrp_match.empty:
+                    p_g = grp_match['Power'].values[0]
+                    p_ng = nogrp_match['Power'].values[0]
+                    idx_val = (p_g - p_ng) / (p_g + p_ng) if (p_g + p_ng) != 0 else 0
+
+                    records.append({'Subject_ID': subj, 'Pair': pair, 'Tag': tag, 'Index_Value': idx_val})
+
+    df_idx = pd.DataFrame(records)
+    
+    # Calculate Mean Index and 1-Sample T-Test vs 0 (Chance)
+    stats_records = []
+    for tag in df_idx['Tag'].unique():
+        tag_data = df_idx[df_idx['Tag'] == tag]['Index_Value']
+        t_stat, p_val = ttest_1samp(tag_data, 0.0)
+        mean_val = tag_data.mean()
+        
+        # Assign Significance Stars
+        star = ""
+        if p_val < 0.001: star = "***"
+        elif p_val < 0.01: star = "**"
+        elif p_val < 0.05: star = "*"
+        
+        stats_records.append({'Tag': tag, 'Mean_Index': mean_val, 'Star': star, 'p_val': p_val})
+        
+    # Standardize the order of categories for the plot
+    cat_order = ['f_t', '2f_t', '3f_t', 'f_g', '2f_g', '3f_g', '|f_t-f_g|', 'f_t+f_g', '|2f_t-f_g|', '2f_t+f_g', '|f_t-2f_g|', 'f_t+2f_g']
+    df_stats = pd.DataFrame(stats_records)
+    df_stats['Tag'] = pd.Categorical(df_stats['Tag'], categories=cat_order, ordered=True)
+    return df_stats.sort_values('Tag')
 
 # ==========================================
 # TOP SECTION: CV & PUBLICATIONS
@@ -865,6 +952,86 @@ with tabs[2]:
                     fig_time.add_vline(x=2.0, line_dash="dash", line_color="green")
                     
                     st.plotly_chart(fig_time, use_container_width=True, config=PLOTLY_CONFIG)
+
+                    st.divider()
+
+                    # ========================================================
+                    # PLOT: 2x4 GRID OF 1-100Hz SPECTRA
+                    # ========================================================
+                    st.markdown("#### Frequency Tagging: 1-100Hz Spectra")
+                    st.write("Full-spectrum FFTs comparing Grouped vs. Not Grouped conditions across specific frequency pairs.")
+                    
+                    df_full_fft = get_vwm_eeg_full_spectrum_data()
+                    
+                    if df_full_fft is not None and not df_full_fft.empty:
+                        with st.spinner("Processing 1-100Hz Subplots..."):
+                            df_grid = process_full_fft_grid(df_full_fft)
+                            
+                        target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
+                        fig_grid = make_subplots(rows=2, cols=4, subplot_titles=[f"Condition {p.replace('_', 'Hz & ')}Hz" for p in target_pairs])
+                        
+                        row, col = 1, 1
+                        for i, pair in enumerate(target_pairs):
+                            pair_data = df_grid[df_grid['Pair'] == pair]
+                            grp_data = pair_data[pair_data['Grouping'] == 'Grouped']
+                            nogrp_data = pair_data[pair_data['Grouping'] == 'Not Grouped']
+                            
+                            show_leg = True if i == 0 else False
+                            
+                            # Using Bar traces with a tiny width makes perfect "Stem Plots" in Plotly
+                            fig_grid.add_trace(go.Bar(x=grp_data['Frequency_Hz'], y=grp_data['Power'], name='Grouped', marker_color='#3b82f6', showlegend=show_leg, width=0.4), row=row, col=col)
+                            fig_grid.add_trace(go.Bar(x=nogrp_data['Frequency_Hz'], y=nogrp_data['Power'], name='Not Grouped', marker_color='#ef4444', showlegend=show_leg, width=0.4, opacity=0.7), row=row, col=col)
+                            
+                            col += 1
+                            if col > 4:
+                                col = 1
+                                row += 1
+                                
+                        fig_grid.update_layout(height=600, barmode='overlay', title_text="1-100Hz FFT Power Spectrum (Trial Averaged)")
+                        # Zoom the X-axis to 1-40Hz to see the peaks better, but data is there up to 100Hz
+                        fig_grid.update_xaxes(range=[1, 40])
+                        st.plotly_chart(fig_grid, use_container_width=True, config=PLOTLY_CONFIG)
+    
+                        st.divider()
+    
+                        # ========================================================
+                        # PLOT: THE HARMONIC INDEX STEM PLOT
+                        # ========================================================
+                        st.markdown("#### Harmonic Index Analysis")
+                        st.write("To isolate the exact neural variance responsible for grouping, we calculate an Index: `(Grouped - Not Grouped) / (Grouped + Not Grouped)`. This collapses the data by harmonic relationship ($f_t$, $f_g$, and Intermodulations). Stars indicate significance from a 1-sample t-test against 0 (chance).")
+                        
+                        with st.spinner("Aligning Harmonic Indices..."):
+                            df_index = process_fft_index(df_full_fft)
+                            
+                        # Build a Stem Plot (Bar + Scatter)
+                        fig_index = go.Figure()
+                        
+                        # The "Stems" (Thin Bars)
+                        fig_index.add_trace(go.Bar(
+                            x=df_index['Tag'], y=df_index['Mean_Index'], 
+                            width=0.05, marker_color='black', showlegend=False
+                        ))
+                        
+                        # The "Caps" (Markers)
+                        fig_index.add_trace(go.Scatter(
+                            x=df_index['Tag'], y=df_index['Mean_Index'],
+                            mode='markers+text', marker=dict(size=12, color='#10b981', line=dict(width=2, color='white')),
+                            text=df_index['Star'], textposition='top center',
+                            textfont=dict(size=16, color='black'), showlegend=False
+                        ))
+                        
+                        fig_index.add_hline(y=0.0, line_color='red', line_width=1)
+                        fig_index.update_layout(
+                            title="Harmonic Index Values Across All Pair Combinations",
+                            yaxis_title="Index Value (Grouped > Not Grouped)",
+                            xaxis_title="Harmonic Identifier",
+                            height=450
+                        )
+                        st.plotly_chart(fig_index, use_container_width=True, config=PLOTLY_CONFIG)
+                        
+                    else:
+                        st.info("Loading Full Spectrum FFT Data...")
+            
                 else:
                     st.info("Loading EEG Time-Series Data...")
 
