@@ -623,7 +623,17 @@ from scipy.stats import ttest_rel, ttest_1samp
 
 def _fetch_github_parquet(base_name):
     """Fetches a single pre-aggregated Parquet file from GitHub."""
-    github_token = os.getenv('GITHUB_TOKEN', st.secrets.get("GITHUB_TOKEN"))
+    
+    # 1. Safely check the cloud environment FIRST
+    github_token = os.environ.get("GITHUB_TOKEN")
+    
+    # 2. Only attempt Streamlit secrets if running locally, and catch the error if it fails
+    if not github_token:
+        try:
+            github_token = st.secrets["GITHUB_TOKEN"]
+        except Exception:
+            pass
+
     headers = {'Authorization': f"token {github_token}"} if github_token else {}
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
     
