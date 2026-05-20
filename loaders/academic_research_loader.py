@@ -678,10 +678,9 @@ def get_processed_vwm_vep():
 def get_processed_vwm_snr():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return df
-    
-    # 1. Filter by ROI channels before anything else
-    # Assuming your DataFrame has a 'Channel' column (1-256)
-    df = df[df['Channel'].isin(ALL_ROI_CHANNELS)] 
+
+    if 'Channel' in df.columns:
+        df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
     
     snr_cols = [c for c in df.columns if 'SNR' in c]
     # Now group by Subject, Condition, AND Channel to maintain ROI integrity
@@ -732,9 +731,6 @@ def get_processed_fft_grid():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return df
     
-    # ADD THIS FILTER
-    df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
-    
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
     
@@ -751,9 +747,6 @@ def get_processed_fft_grid():
 def get_processed_index_spectra():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return pd.DataFrame(), pd.DataFrame()
-    
-    # ADD THIS FILTER
-    df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
 
     # Generate all 12 combinations dynamically
     base_freqs = ['3', '5', '12', '20']
