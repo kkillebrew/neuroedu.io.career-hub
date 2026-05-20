@@ -887,43 +887,87 @@ with tabs[2]:
 
                 if not df_spectra.empty:
                     # ----------------------------------------------------
-                    # PLOT 1: The 12-Grid Index Spectrum
+                    # PLOT 1: The 4x3 Grid Index Spectrum with Active Stimulus Flickering
                     # ----------------------------------------------------
-                    st.markdown("##### 1-100Hz Index Spectrum (All 12 Pairs)")
-                    st.write("Participant-averaged Index values across the full frequency spectrum for each target/grouped combination.")
+                    st.markdown("##### 1-100Hz Index Spectrum (Ordered by Frequency Rows)")
+                    st.write("Rows display conditions categorized by their base modulation rate. Squares on the right accurately simulate the experimental visual flicker rates.")
                     
-                    fig_idx_grid = px.line(df_spectra, x='Frequency_Hz', y='Index_Value',
-                                           facet_col='Pair', facet_col_wrap=4,
-                                           title="Frequency Tagging Index by Condition Pair",
-                                           labels={'Index_Value': 'Grouping Index', 'Frequency_Hz': 'Frequency (Hz)'})
+                    base_frequencies = ['3', '5', '12', '20']
                     
-                    fig_idx_grid.for_each_annotation(lambda a: a.update(text="Condition: " + a.text.split("=")[-1].replace('_', 'Hz & ') + "Hz"))
-                    fig_idx_grid.update_xaxes(range=[1, 40]) # Zoomed to 1-40Hz to see the peaks clearly
-                    fig_idx_grid.add_hline(y=0, line_dash="dash", line_color="black", line_width=1)
-                    fig_idx_grid.update_layout(height=800)
+                    for f_base in base_frequencies:
+                        # Split row layout into chart area and hardware simulation column
+                        row_layout = st.columns([5, 1], gap="medium")
+                        
+                        with row_layout[0]:
+                            # Identify the 3 paired combinations for this base row frequency
+                            row_pairs = [p for p in df_spectra['Pair'].unique() if p.startswith(f_base + '_')]
+                            row_pairs = sorted(row_pairs, key=lambda x: float(x.split('_')[1])) # Sort left to right by ascending size
+                            
+                            fig_row = make_subplots(rows=1, cols=3, subplot_titles=[f"Pair {p.replace('_', 'Hz & ')}Hz" for p in row_pairs])
+                            
+                            for col_idx, pair in enumerate(row_pairs):
+                                pair_data = df_spectra[df_spectra['Pair'] == pair]
+                                fig_row.add_trace(
+                                    go.Scatter(x=pair_data['Frequency_Hz'], y=pair_data['Index_Value'], 
+                                               mode='lines', line=dict(color='#3b82f6', width=2), showlegend=False),
+                                    row=1, col=col_idx + 1
+                                )
+                                fig_row.add_hline(y=0, line_dash="dash", line_color="black", line_width=1, row=1, col=col_idx + 1)
+                            
+                            fig_row.update_xaxes(range=[1, 40])
+                            fig_row.update_yaxes(range=[-0.8, 0.8], showgrid=True, gridcolor='#e2e8f0')
+                            fig_row.update_layout(height=240, margin=dict(l=10, r=10, t=30, b=20))
+                            st.plotly_chart(fig_row, use_container_width=True, config=PLOTLY_CONFIG)
+                            
+                        with row_layout[1]:
+                            # Native CSS Animation Matrix to drive real-time browser screen flickering
+                            st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{f_base} Hz</p>", unsafe_allow_html=True)
+                            flicker_delay = 1.0 / float(f_base)
+                            flicker_html = f"""
+                            <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                                <div style="
+                                    width: 55px; 
+                                    height: 55px; 
+                                    background-color: #f8fafc;
+                                    border: 2px solid #cbd5e1;
+                                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                                    animation: ssvep_flicker_{f_base} {flicker_delay}s infinite steps(2, alternate);
+                                "></div>
+                            </div>
+                            <style>
+                                @keyframes ssvep_flicker_{f_base} {{
+                                    0% {{ opacity: 0.1; background-color: #0f172a; }}
+                                    100% {{ opacity: 1.0; background-color: #f1f5f9; }}
+                                }}
+                            </style>
+                            """
+                            components.html(flicker_html, height=130)
                     
-                    st.plotly_chart(fig_idx_grid, use_container_width=True, config=PLOTLY_CONFIG)
-
                     st.divider()
 
                     # ----------------------------------------------------
-                    # PLOT 2: Average Index by Object Role (Target vs Grouped)
+                    # PLOT 2: Average Index by Object Role (3-Way Comparison)
                     # ----------------------------------------------------
                     st.markdown("##### Average Index by Object Role")
-                    st.write("Extracting the exact index values at the Target vs. Grouped frequencies, collapsed across combinations, to see how the visual cortex prioritizes the items.")
+                    st.write("Comparing cortical tracking index values across Target frequencies, Grouped frequencies, and independent Unrelated/Control baseline channels.")
                     
                     df_role = get_vwm_role_index()
-                    
-                    # Ensure frequencies display in chronological order
                     df_role['Base_Hz'] = pd.Categorical(df_role['Base_Hz'], categories=['3Hz', '5Hz', '12Hz', '20Hz'], ordered=True)
                     
-                    fig_role = px.box(df_role, x='Base_Hz', y='Index_Value', color='Role', points='all',
-                                      title="Grouping Index: Target Frequencies vs. Grouped Frequencies",
-                                      labels={'Index_Value': 'Index (Grp > NoGrp)', 'Base_Hz': 'Frequency Tag'},
-                                      color_discrete_map={'Target Object': '#3b82f6', 'Grouped Object': '#10b981'})
+                    fig_role = px.box(
+                        df_role, x='Base_Hz', y='Index_Value', color='Role', points='all',
+                        title="Neural Index Isolation: Target vs. Grouped vs. Unrelated Baseline",
+                        labels={'Index_Value': 'Index (Grp > NoGrp)', 'Base_Hz': 'Frequency Identifier'},
+                        color_discrete_map={
+                            'Target Object': '#3b82f6',        # Balanced Blue
+                            'Grouped Object': '#10b981',       # Balanced Green
+                            'Unrelated / Control': '#ef4444'   # Pure Research Red
+                        },
+                        category_orders={"Role": ["Target Object", "Grouped Object", "Unrelated / Control"]}
+                    )
                     
-                    fig_role.add_hline(y=0.0, line_dash="dash", line_color="red", annotation_text="Chance (0)")
-                    
+                    fig_role.add_hline(y=0.0, line_dash="dash", line_color="black", annotation_text="Chance Performance")
+                    fig_role.update_layout(boxmode='group', height=500)
                     st.plotly_chart(fig_role, use_container_width=True, config=PLOTLY_CONFIG)
 
                     st.divider()

@@ -778,12 +778,13 @@ def get_processed_index_spectra():
 
 @st.cache_data
 def get_vwm_role_index():
-    """Extracts the specific Index value based on whether the frequency was the Target or the Grouped item."""
+    """Extracts Target, Grouped, and Unrelated baseline indexing per subject."""
     pivoted, _ = get_processed_index_spectra()
     if pivoted.empty: return pd.DataFrame()
 
     records = []
     unique_freqs = pivoted['Frequency_Hz'].unique()
+    all_base_freqs = ['3', '5', '12', '20']
 
     for pair in pivoted['Pair'].unique():
         t_str, g_str = pair.split('_')
@@ -791,23 +792,37 @@ def get_vwm_role_index():
 
         pair_df = pivoted[pivoted['Pair'] == pair]
 
-        # Find closest frequency bins
+        # Locate closest frequency bins
         closest_t = unique_freqs[np.abs(unique_freqs - t_hz).argmin()]
         closest_g = unique_freqs[np.abs(unique_freqs - g_hz).argmin()]
 
-        # Extract the index when this Hz was the TARGET
+        # Role 1: Target Object
         df_t = pair_df[pair_df['Frequency_Hz'] == closest_t].copy()
         df_t['Base_Hz'] = t_str + 'Hz'
         df_t['Role'] = 'Target Object'
+        records.append(df_t)
 
-        # Extract the index when this Hz was the GROUPED object
+        # Role 2: Grouped Object
         df_g = pair_df[pair_df['Frequency_Hz'] == closest_g].copy()
         df_g['Base_Hz'] = g_str + 'Hz'
         df_g['Role'] = 'Grouped Object'
+        records.append(df_g)
 
-        records.extend([df_t, df_g])
+        # Role 3: Unrelated / Control Object (Neither Target nor Grouped in this pair)
+        unrelated_strs = [f for f in all_base_freqs if f != t_str and f != g_str]
+        for u_str in unrelated_strs:
+            u_hz = float(u_str)
+            closest_u = unique_freqs[np.abs(unique_freqs - u_hz).argmin()]
+            
+            df_u = pair_df[pair_df['Frequency_Hz'] == closest_u].copy()
+            df_u['Base_Hz'] = u_str + 'Hz'
+            df_u['Role'] = 'Unrelated / Control'
+            records.append(df_u)
 
-    return pd.concat(records, ignore_index=True)
+    full_df = pd.concat(records, ignore_index=True)
+    
+    # Aggregate to guarantee exactly 60 entries per condition for the beeswarm profile
+    return full_df.groupby(['Subject_ID', 'Base_Hz', 'Role'])['Index_Value'].mean().reset_index()
 
 @st.cache_data
 def get_processed_fft_index():
