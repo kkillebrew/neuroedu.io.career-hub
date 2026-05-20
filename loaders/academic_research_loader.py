@@ -809,6 +809,68 @@ def get_vwm_role_index():
 
     return pd.concat(records, ignore_index=True)
 
+@st.cache_data
+def get_processed_fft_index():
+    """Calculates the Harmonic Stem Plot Index and 1-sample t-tests."""
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
+    
+    # 1. Enforce ROI filtering
+    if 'Channel' in df.columns:
+        df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
+        
+    snr_cols = [c for c in df.columns if 'SNR' in c]
+    
+    # 2. Collapse spatial channels into a single Subject mean per condition
+    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+    
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
+                          value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
+    
+    melted['Freq_Hz'] = melted['Freq_Col'].str.extract(r'(\d+)').astype(float)
+    
+    # 3. Dynamically assign the harmonic tags based on condition strings
+    def assign_harmonic_tag(row):
+        cond = str(row['Condition'])
+        freq = row['Freq_Hz']
+        if 'IM' in str(row['Freq_Col']): return 'Intermodulation'
+        
+        # Extract numbers from condition, e.g., 'grpPrb3_12' -> [3, 12]
+        nums = re.findall(r'\d+', cond)
+        if len(nums) == 2:
+            t_hz, g_hz = float(nums[0]), float(nums[1])
+            if freq == t_hz: return 'Target ($f_t$)'
+            if freq == g_hz: return 'Grouped ($f_g$)'
+        return 'Other'
+        
+    melted['Tag'] = melted.apply(assign_harmonic_tag, axis=1)
+    melted = melted[melted['Tag'] != 'Other']
+    
+    # 4. Determine Grouping Status
+    cond_lower = melted['Condition'].str.lower()
+    melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
+    
+    # 5. Index Math: (Grp - NoGrp) / (Grp + NoGrp)
+    subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
+    pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
+    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
+    
+    pivoted['Index'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    
+    # 6. Extract Means and run 1-sample t-test vs 0
+    stats_list = []
+    for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
+        tag_data = pivoted[pivoted['Tag'] == tag]
+        if tag_data.empty: continue
+        
+        mean_idx = tag_data['Index'].mean()
+        _, p_val = ttest_1samp(tag_data['Index'], 0)
+        
+        star = "***" if p_val <= 0.001 else "**" if p_val <= 0.01 else "*" if p_val <= 0.05 else ""
+        stats_list.append({'Tag': tag, 'Mean_Index': mean_idx, 'Star': star})
+        
+    return pd.DataFrame(stats_list)
+
 def calculate_vwm_stats(df_stats, metric_col):
     """Calculates paired t-tests for the VWM Grouping conditions."""
     def get_sig_stars(p):

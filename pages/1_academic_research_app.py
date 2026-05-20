@@ -42,6 +42,7 @@ from loaders.academic_research_loader import (
     get_processed_fft_grid,     # <--- NEW
     get_processed_index_spectra, # <--- NEW
     get_vwm_role_index,          # <--- NEW
+    get_processed_fft_index,   # <--- ADD THIS LINE BACK IN
     calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
