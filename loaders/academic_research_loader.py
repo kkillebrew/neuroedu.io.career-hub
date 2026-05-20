@@ -731,13 +731,16 @@ def get_processed_fft_grid():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return df
     
+    # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
+    df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
     
     df_filt = df[df['Condition'].isin(conds)].copy()
-    # Group by Subject to ensure the ROI average is clean
-    df_avg = df_filt.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
-    df_avg = df_avg.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    
+    # 2. Group Average: Collapse across all subjects for the final 2x4 Line Plot
+    df_avg = df_filt.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
     
     df_avg['Grouping'] = np.where(df_avg['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
     df_avg['Pair'] = df_avg['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
@@ -748,10 +751,12 @@ def get_processed_index_spectra():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return pd.DataFrame(), pd.DataFrame()
 
-    # Generate all 12 combinations dynamically
+    # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
+    # This prevents the Beeswarm from plotting 36 dots per participant!
+    df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+
     base_freqs = ['3', '5', '12', '20']
     target_pairs = [f"{t}_{g}" for t in base_freqs for g in base_freqs if t != g]
-
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
 
     df_filt = df[df['Condition'].isin(conds)].copy()
@@ -762,14 +767,13 @@ def get_processed_index_spectra():
     pivoted = df_filt.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], columns='Grouping', values='Power').reset_index()
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
-    # Calculate Index: (Grp - noGrp) / (Grp + noGrp)
+    # 2. Calculate Index
     idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
     pivoted['Index_Value'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
-    # Average across subjects for the 12 line plots
+    # 3. Average across subjects for the 12-Grid Line Plot
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
-    # We return the raw pivoted data too, so the Role summary plot can use it without recalculating!
     return pivoted, df_spectra
 
 @st.cache_data
