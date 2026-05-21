@@ -730,8 +730,9 @@ def get_processed_fft_grid():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return df
     
-    # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
-    df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    # Changing how this is exported in the colab file.
+    # # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
+    # df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
     
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
@@ -750,9 +751,10 @@ def get_processed_index_spectra():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return pd.DataFrame(), pd.DataFrame()
 
-    # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
-    # This prevents the Beeswarm from plotting 36 dots per participant!
-    df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    # Changing how this is exported in the colab file.
+    # # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
+    # # This prevents the Beeswarm from plotting 36 dots per participant!
+    # df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
 
     base_freqs = ['3', '5', '12', '20']
     target_pairs = [f"{t}_{g}" for t in base_freqs for g in base_freqs if t != g]
