@@ -11,7 +11,6 @@ DESCRIPTION:
     multiple workspace variables (Tables and Structs) for the UI to display.
 =============================================================================
 """
-
 import os
 import pandas as pd
 import numpy as np
