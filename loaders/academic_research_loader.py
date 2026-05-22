@@ -638,10 +638,18 @@ def get_rotating_line_data():
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
 @st.cache_data
-def _fetch_github_parquet(base_name):
+def _fetch_github_parquet(base_name, columns=None):
     """
     Memory-Optimized Fetcher: Bypasses the `requests` library memory duplication 
     by letting Pandas stream the Parquet file directly from the URL.
+    
+    CRITICAL UPDATE: Added 'columns=None' to the function signature.
+    This allows us to pass a list of specific columns to load, preventing the server
+    from loading the entire multi-gigabyte dataset into RAM at once.
+    
+    MATLAB Analogy: This is exactly like using the `matfile()` function to peek 
+    into a .mat file and load only specific variables into the workspace, 
+    rather than using `load()` on the whole file.
     """
     github_token = os.environ.get("GITHUB_TOKEN")
     if not github_token:
@@ -654,11 +662,9 @@ def _fetch_github_parquet(base_name):
     storage_options = {'Authorization': f'token {github_token}'} if github_token else None
     
     try:
-        # CRITICAL OOM FIX: Hardcode columns for the massive file here
-        if base_name == 'vwm_eeg_trial_power_summary':
-            cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
-            return pd.read_parquet(url, storage_options=storage_options, columns=cols)
-        return pd.read_parquet(url, storage_options=storage_options)
+        # We pass the 'columns' argument directly into pandas!
+        # If columns is None, it loads everything. If it's a list, it loads only those columns.
+        return pd.read_parquet(url, storage_options=storage_options, columns=columns)
     except Exception as e:
         print(f"Failed to load {base_name}: {e}")
         return pd.DataFrame()
@@ -797,8 +803,10 @@ def get_processed_fft_grid():
 def get_processed_index_spectra():
     """
     Calculates the Neural Index of Grouping. 
-    Refactored to aggregate data BEFORE melting to prevent OOM memory crashes.
+    Refactored to melt SNR columns into a single 'SNR' value column 
+    and aggregate BEFORE melting to prevent OOM memory crashes.
     """
+    # 1. Fetch only the columns we strictly need for this calculation
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
                                columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
     
@@ -811,7 +819,8 @@ def get_processed_index_spectra():
     # MATLAB Analogy: Using groupsummary() to average your matrix before reshaping it.
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
-    # 1. Melt the aggregated dataframe, NOT the massive raw one
+    # 2. Melt the aggregated dataframe, NOT the massive raw one
+    # MATLAB Analogy: 'stack()' or 'reshape()' to transform wide format to long format
     df_melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
                              value_vars=snr_cols, 
                              var_name='Frequency_Hz', 
@@ -820,22 +829,23 @@ def get_processed_index_spectra():
     # Clean the frequency label (remove 'SNR_' and 'Hz')
     df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
     
-    # 2. Assign Pair and Grouping status
+    # 3. Assign Pair and Grouping status
     df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
 
-    # 3. Pivot the long-format data
+    # 4. Pivot the long-format data
+    # MATLAB Analogy: 'unstack' or pivot back to wide format for index math
     pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
                                    values='SNR').reset_index()
     
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
-    # 4. Calculate Index (with division-by-zero protection)
+    # 5. Calculate Index (with division-by-zero protection)
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
 
-    # 5. Average across subjects
+    # 6. Average across subjects for the final output
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
