@@ -792,17 +792,20 @@ def get_processed_fft_grid():
 
 @st.cache_data
 def get_processed_index_spectra():
-    # 1. Fetch only necessary columns to reduce initial memory footprint
+    """
+    Calculates the Neural Index of Grouping. 
+    Aggregates to subject-level averages BEFORE pivot to save RAM.
+    """
+    # 1. Fetch only necessary columns to prevent OOM
     cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
     if df.empty: return pd.DataFrame(), pd.DataFrame()
     
     # 2. Memory Optimization: Aggregate to Subject-Condition Level before melting
-    # MATLAB Analogy: 'groupsummary()' to shrink the data before resizing it
     snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     
-    # 3. Melt to long format
+    # 3. Melt
     df_melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
                             value_vars=snr_cols, 
                             var_name='Frequency_Hz', 
@@ -813,18 +816,17 @@ def get_processed_index_spectra():
     df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
     
-    # 5. Pivot (Preserves indices required for plotting)
+    # 5. Pivot
     pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
                                    values='SNR').reset_index()
-    
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
-
+    
     # 6. Calculate Index
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
-
-    # 7. Aggregate for the 12-grid plot
+    
+    # 7. Final aggregate for spectrum plot
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
