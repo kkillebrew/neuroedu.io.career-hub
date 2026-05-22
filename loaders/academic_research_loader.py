@@ -802,50 +802,44 @@ def get_processed_fft_grid():
 @st.cache_data
 def get_processed_index_spectra():
     """
-    Calculates the Neural Index of Grouping. 
-    Refactored to melt SNR columns into a single 'SNR' value column 
-    and aggregate BEFORE melting to prevent OOM memory crashes.
+    Calculates the Neural Index of Grouping.
+    MATLAB Analogy: This is equivalent to running groupsummary() to compress
+    your data matrix before applying the index formula.
     """
-    # 1. Fetch only the columns we strictly need for this calculation
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
-                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
-    
+    # Load ONLY the columns needed to calculate the index
+    cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
     if df.empty: return pd.DataFrame(), pd.DataFrame()
-
+    
+    # 1. Aggregation (The Memory Saver)
+    # MATLAB Analogy: Compress the matrix before reshape to avoid OOM
     snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
-
-    # --- CRITICAL MEMORY FIX ---
-    # We MUST collapse the thousands of raw trial/channel rows into subject averages first.
-    # MATLAB Analogy: Using groupsummary() to average your matrix before reshaping it.
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
-
-    # 2. Melt the aggregated dataframe, NOT the massive raw one
-    # MATLAB Analogy: 'stack()' or 'reshape()' to transform wide format to long format
+    
+    # 2. Melt to long format
     df_melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
-                             value_vars=snr_cols, 
-                             var_name='Frequency_Hz', 
-                             value_name='SNR')
+                            value_vars=snr_cols, 
+                            var_name='Frequency_Hz', 
+                            value_name='SNR')
     
-    # Clean the frequency label (remove 'SNR_' and 'Hz')
+    # 3. Clean labels
     df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
-    
-    # 3. Assign Pair and Grouping status
     df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
 
-    # 4. Pivot the long-format data
-    # MATLAB Analogy: 'unstack' or pivot back to wide format for index math
+    # 4. Pivot (Subject_ID, Pair, Frequency_Hz are your indices)
+    # This is now memory-safe because we aggregated to subject-level averages in Step 1
     pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
                                    values='SNR').reset_index()
     
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
-    # 5. Calculate Index (with division-by-zero protection)
+    # 5. Calculate Index
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
 
-    # 6. Average across subjects for the final output
+    # 6. Final aggregate for spectrum plot
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
