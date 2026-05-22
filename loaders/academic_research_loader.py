@@ -792,31 +792,44 @@ def get_processed_fft_grid():
 
 @st.cache_data
 def get_processed_index_spectra():
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
+    """
+    Calculates the Neural Index of Grouping. 
+    Refactored to melt SNR columns into a single 'SNR' value column 
+    to prevent the KeyError: 'Power'.
+    """
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
+                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
+    
     if df.empty: return pd.DataFrame(), pd.DataFrame()
 
-    # Changing how this is exported in the colab file.
-    # # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
-    # # This prevents the Beeswarm from plotting 36 dots per participant!
-    # df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
+    # 1. Melt the SNR columns into a single 'SNR' column
+    # MATLAB Analogy: 'stack()' or 'reshape()' to transform wide format to long format
+    snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+    df_melted = df.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
+                        value_vars=snr_cols, 
+                        var_name='Frequency_Hz', 
+                        value_name='SNR')
+    
+    # Clean the frequency label (remove 'SNR_' and 'Hz')
+    df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
+    
+    # 2. Assign Pair and Grouping status
+    df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
+    df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
 
-    base_freqs = ['3', '5', '12', '20']
-    target_pairs = [f"{t}_{g}" for t in base_freqs for g in base_freqs if t != g]
-    conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
-
-    df_filt = df[df['Condition'].isin(conds)].copy()
-    df_filt['Pair'] = df_filt['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
-    df_filt['Grouping'] = np.where(df_filt['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
-
-    # Pivot to align Grouped/NotGrouped side-by-side per Subject/Freq
-    pivoted = df_filt.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], columns='Grouping', values='Power').reset_index()
+    # 3. Pivot the long-format data
+    # MATLAB Analogy: 'unstack' or pivot back to wide format for index math
+    pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
+                                   columns='Grouping', 
+                                   values='SNR').reset_index()
+    
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
-    # 2. Calculate Index
-    idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
-    pivoted['Index_Value'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    # 4. Calculate Index (with division-by-zero protection)
+    denom = pivoted['Grouped'] + pivoted['Not Grouped']
+    pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
 
-    # 3. Average across subjects for the 12-Grid Line Plot
+    # 5. Average across subjects
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
