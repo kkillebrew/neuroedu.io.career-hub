@@ -4,3 +4,4 @@ numpy
 plotly
 requests
 scipy
+mne==1.6.1
