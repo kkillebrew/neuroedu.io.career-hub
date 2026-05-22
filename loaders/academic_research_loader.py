@@ -640,16 +640,8 @@ def get_rotating_line_data():
 @st.cache_data
 def _fetch_github_parquet(base_name, columns=None):
     """
-    Memory-Optimized Fetcher: Bypasses the `requests` library memory duplication 
-    by letting Pandas stream the Parquet file directly from the URL.
-    
-    CRITICAL UPDATE: Added 'columns=None' to the function signature.
-    This allows us to pass a list of specific columns to load, preventing the server
-    from loading the entire multi-gigabyte dataset into RAM at once.
-    
-    MATLAB Analogy: This is exactly like using the `matfile()` function to peek 
-    into a .mat file and load only specific variables into the workspace, 
-    rather than using `load()` on the whole file.
+    Fetch parquet with proper signature.
+    The 'columns' argument is now explicitly defined.
     """
     github_token = os.environ.get("GITHUB_TOKEN")
     if not github_token:
@@ -662,8 +654,7 @@ def _fetch_github_parquet(base_name, columns=None):
     storage_options = {'Authorization': f'token {github_token}'} if github_token else None
     
     try:
-        # We pass the 'columns' argument directly into pandas!
-        # If columns is None, it loads everything. If it's a list, it loads only those columns.
+        # We pass columns=columns here. If None, it loads all columns.
         return pd.read_parquet(url, storage_options=storage_options, columns=columns)
     except Exception as e:
         print(f"Failed to load {base_name}: {e}")
@@ -801,45 +792,39 @@ def get_processed_fft_grid():
 
 @st.cache_data
 def get_processed_index_spectra():
-    """
-    Calculates the Neural Index of Grouping.
-    MATLAB Analogy: This is equivalent to running groupsummary() to compress
-    your data matrix before applying the index formula.
-    """
-    # Load ONLY the columns needed to calculate the index
+    # 1. Fetch only necessary columns to reduce initial memory footprint
     cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
     if df.empty: return pd.DataFrame(), pd.DataFrame()
     
-    # 1. Aggregation (The Memory Saver)
-    # MATLAB Analogy: Compress the matrix before reshape to avoid OOM
+    # 2. Memory Optimization: Aggregate to Subject-Condition Level before melting
+    # MATLAB Analogy: 'groupsummary()' to shrink the data before resizing it
     snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     
-    # 2. Melt to long format
+    # 3. Melt to long format
     df_melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
                             value_vars=snr_cols, 
                             var_name='Frequency_Hz', 
                             value_name='SNR')
     
-    # 3. Clean labels
+    # 4. Clean labels
     df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
     df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
-
-    # 4. Pivot (Subject_ID, Pair, Frequency_Hz are your indices)
-    # This is now memory-safe because we aggregated to subject-level averages in Step 1
+    
+    # 5. Pivot (Preserves indices required for plotting)
     pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
                                    values='SNR').reset_index()
     
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
-    # 5. Calculate Index
+    # 6. Calculate Index
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
 
-    # 6. Final aggregate for spectrum plot
+    # 7. Aggregate for the 12-grid plot
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
