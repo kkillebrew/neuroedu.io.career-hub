@@ -13,7 +13,7 @@ DESCRIPTION:
 """
 # --- CRITICAL CLOUD SERVER CONFIGURATION ---
 import matplotlib
-matplotlib.use('Agg') # Force headless rendering
+matplotlib.use('Agg') # Force headless rendering to prevent GUI segfault crashes
 import matplotlib.pyplot as plt
 import mne
 
@@ -133,7 +133,7 @@ def get_project_narratives():
     ]
 
 #############################################
-#---   Load in the SFM Behavioral Data   ---#
+#---    Load in the SFM Behavioral Data   ---#
 #############################################
 # --- PLOTLY CONFIGURATION ---
 def get_category_colors():
@@ -296,7 +296,7 @@ def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     
     return df
 #########################################################
-#---   Analyze and Process the SFM Behavioral Data   ---#
+#---    Analyze and Process the SFM Behavioral Data   ---#
 #########################################################
 def generate_live_statistics(df, metric_col):
     """
@@ -637,26 +637,28 @@ def get_rotating_line_data():
 # =====================================================================
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
-# --- DATA HUB FETCHING ---
 @st.cache_data
-def _fetch_github_parquet(base_name, columns=None):
+def _fetch_github_parquet(base_name):
     """
-    Fetches parquet from GitHub. 
-    Strictly uses os.environ to align with your deployment pipeline.
+    Memory-Optimized Fetcher: Bypasses the `requests` library memory duplication 
+    by letting Pandas stream the Parquet file directly from the URL.
     """
-    # Use only os.environ as defined in your working deployment
-    token = os.environ.get("GITHUB_TOKEN")
-    
+    github_token = os.environ.get("GITHUB_TOKEN")
+    if not github_token:
+        try:
+            github_token = st.secrets["GITHUB_TOKEN"]
+        except Exception:
+            pass
+
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
-    
-    # Pass headers directly using the token
-    headers = {'Authorization': f'token {token}'} if token else {}
+    storage_options = {'Authorization': f'token {github_token}'} if github_token else None
     
     try:
-        # Use requests for streaming content to avoid memory duplication in BytesIO
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        return pd.read_parquet(BytesIO(response.content), columns=columns)
+        # CRITICAL OOM FIX: Hardcode columns for the massive file here
+        if base_name == 'vwm_eeg_trial_power_summary':
+            cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+            return pd.read_parquet(url, storage_options=storage_options, columns=cols)
+        return pd.read_parquet(url, storage_options=storage_options)
     except Exception as e:
         print(f"Failed to load {base_name}: {e}")
         return pd.DataFrame()
@@ -665,7 +667,6 @@ def _fetch_github_parquet(base_name, columns=None):
 def get_vwm_behavioral_data():
     return _fetch_github_parquet('vwm_behavioral')
 
-# --- MEMORY OPTIMIZED PROCESSORS (DOWNLOAD & VAPORIZE) ---
 @st.cache_data
 def get_processed_vwm_vep():
     df = _fetch_github_parquet('vwm_eeg_time_summary')
@@ -680,13 +681,10 @@ def get_processed_vwm_vep():
 
 @st.cache_data
 def get_processed_vwm_snr():
-    # Only load Condition, Channel, and SNR columns
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=['Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])  
+    # Calling fetcher WITHOUT columns argument now
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')  
     if df.empty: return df
 
-    # REMOVED df['Channel'].isin(ALL_ROI_CHANNELS) filter here.
-    # The ETL script already exported exactly the 36 electrodes we need.
-    
     snr_cols = [c for c in df.columns if 'SNR' in c]
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
@@ -720,24 +718,25 @@ def get_processed_vwm_snr():
 
     return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].median().reset_index()
 
-# --- STATISTICAL ENGINE ---
 @st.cache_data
 def get_processed_fft_index():
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
-                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
+    """Calculates the Harmonic Stem Plot Index and 1-sample t-tests."""
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
-    
+        
     snr_cols = [c for c in df.columns if 'SNR' in c]
-    df[snr_cols] = df[snr_cols].astype('float32')
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     
-    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
+                          value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
+    
     melted['Freq_Hz'] = melted['Freq_Col'].str.extract(r'(\d+)').astype(float)
     
     def assign_harmonic_tag(row):
         cond = str(row['Condition'])
         freq = row['Freq_Hz']
         if 'IM' in str(row['Freq_Col']): return 'Intermodulation'
+        
         nums = re.findall(r'\d+', cond)
         if len(nums) == 2:
             t_hz, g_hz = float(nums[0]), float(nums[1])
@@ -747,26 +746,34 @@ def get_processed_fft_index():
         
     melted['Tag'] = melted.apply(assign_harmonic_tag, axis=1)
     melted = melted[melted['Tag'] != 'Other']
-    melted['Grouping'] = np.where(melted['Condition'].str.lower().str.contains('grp') & ~melted['Condition'].str.lower().str.contains('nogrp'), 'Grouped', 'Not Grouped')
+    
+    cond_lower = melted['Condition'].str.lower()
+    melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
     
     subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
     pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
     
+    # SAFETY FIX: Ensure columns exist before executing math
     if 'Grouped' not in pivoted.columns or 'Not Grouped' not in pivoted.columns:
         return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
         
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
-    denom = pivoted['Grouped'] + pivoted['Not Grouped']
-    pivoted['Index'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
+    
+    # SAFETY FIX: Prevent division-by-zero propagating NaNs
+    idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    pivoted['Index'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
     
     stats_list = []
     for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
         tag_data = pivoted[pivoted['Tag'] == tag]
         if tag_data.empty: continue
+        
         mean_idx = tag_data['Index'].mean()
         _, p_val = ttest_1samp(tag_data['Index'], 0)
+        
         star = "***" if p_val <= 0.001 else "**" if p_val <= 0.01 else "*" if p_val <= 0.05 else ""
         stats_list.append({'Tag': tag, 'Mean_Index': mean_idx, 'Star': star})
+        
     return pd.DataFrame(stats_list)
 
 @st.cache_data
@@ -774,16 +781,11 @@ def get_processed_fft_grid():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return df
     
-    # Changing how this is exported in the colab file.
-    # # 1. Spatial Average: Collapse the 36 electrodes into a single ROI Mean Power per Subject
-    # df = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
-    
     target_pairs = ['3_5', '3_12', '5_3', '5_12', '12_3', '12_5', '20_3', '20_5']
     conds = [f'grpPrb{p}' for p in target_pairs] + [f'noGrp{p}' for p in target_pairs]
     
     df_filt = df[df['Condition'].isin(conds)].copy()
     
-    # 2. Group Average: Collapse across all subjects for the final 2x4 Line Plot
     df_avg = df_filt.groupby(['Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
     
     df_avg['Grouping'] = np.where(df_avg['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
@@ -792,51 +794,34 @@ def get_processed_fft_grid():
 
 @st.cache_data
 def get_processed_index_spectra():
-    """
-    Calculates the Neural Index of Grouping. 
-    Refactored to melt SNR columns into a single 'SNR' value column 
-    to prevent the KeyError: 'Power'.
-    """
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
-                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
-    
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return pd.DataFrame(), pd.DataFrame()
 
-    # 1. Melt the SNR columns into a single 'SNR' column
-    # MATLAB Analogy: 'stack()' or 'reshape()' to transform wide format to long format
     snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df_melted = df.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
                         value_vars=snr_cols, 
                         var_name='Frequency_Hz', 
                         value_name='SNR')
     
-    # Clean the frequency label (remove 'SNR_' and 'Hz')
     df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
-    
-    # 2. Assign Pair and Grouping status
     df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
 
-    # 3. Pivot the long-format data
-    # MATLAB Analogy: 'unstack' or pivot back to wide format for index math
     pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
                                    values='SNR').reset_index()
     
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
-    # 4. Calculate Index (with division-by-zero protection)
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
 
-    # 5. Average across subjects
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
 
 @st.cache_data
 def get_vwm_role_index():
-    """Extracts Target, Grouped, and Unrelated baseline indexing per subject."""
     pivoted, _ = get_processed_index_spectra()
     if pivoted.empty: return pd.DataFrame()
 
@@ -850,23 +835,19 @@ def get_vwm_role_index():
 
         pair_df = pivoted[pivoted['Pair'] == pair]
 
-        # Locate closest frequency bins
         closest_t = unique_freqs[np.abs(unique_freqs - t_hz).argmin()]
         closest_g = unique_freqs[np.abs(unique_freqs - g_hz).argmin()]
 
-        # Role 1: Target Object
         df_t = pair_df[pair_df['Frequency_Hz'] == closest_t].copy()
         df_t['Base_Hz'] = t_str + 'Hz'
         df_t['Role'] = 'Target Object'
         records.append(df_t)
 
-        # Role 2: Grouped Object
         df_g = pair_df[pair_df['Frequency_Hz'] == closest_g].copy()
         df_g['Base_Hz'] = g_str + 'Hz'
         df_g['Role'] = 'Grouped Object'
         records.append(df_g)
 
-        # Role 3: Unrelated / Control Object (Neither Target nor Grouped in this pair)
         unrelated_strs = [f for f in all_base_freqs if f != t_str and f != g_str]
         for u_str in unrelated_strs:
             u_hz = float(u_str)
@@ -878,20 +859,8 @@ def get_vwm_role_index():
             records.append(df_u)
 
     full_df = pd.concat(records, ignore_index=True)
-    
-    # Aggregate to guarantee exactly 60 entries per condition for the beeswarm profile
     return full_df.groupby(['Subject_ID', 'Base_Hz', 'Role'])['Index_Value'].mean().reset_index()
 
-@st.cache_data
-def get_raw_power_data():
-    """
-    The Single-Source-of-Truth fetcher. 
-    Loads the data ONCE. All other functions reference this cached object.
-    """
-    # Cast to float32 to instantly reduce RAM usage by 50%
-    return _fetch_github_parquet('vwm_eeg_trial_power_summary').astype({'SNR_3Hz': 'float32', 'SNR_5Hz': 'float32', 'SNR_12Hz': 'float32', 'SNR_20Hz': 'float32'})
-
-# --- TOPOPLOT ENGINE ---
 @st.cache_data
 def get_topoplot_spatial_averages():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
@@ -902,16 +871,37 @@ def get_topoplot_spatial_averages():
 def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
     df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
     if df_filt.empty:
-        fig, ax = plt.subplots(figsize=(5, 5)); fig.patch.set_alpha(0.0); ax.axis('off'); return fig
+        fig, ax = plt.subplots(figsize=(5, 5))
+        fig.patch.set_alpha(0.0)
+        ax.axis('off')
+        return fig
+        
     spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
+    
     montage = mne.channels.make_standard_montage('standard_1020')
-    info = mne.create_info(ch_names=montage.ch_names[:len(spatial_avg)], sfreq=500, ch_types='eeg')
+    valid_names = montage.ch_names[:len(spatial_avg)]
+    
+    info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
+    
     fig, ax = plt.subplots(figsize=(5, 5))
-    fig.patch.set_alpha(0.0); ax.patch.set_alpha(0.0)
-    im, _ = mne.viz.plot_topomap(spatial_avg, info, axes=ax, cmap='viridis', show=False, contours=0, extrapolate='local')
+    fig.patch.set_alpha(0.0)
+    ax.patch.set_alpha(0.0)
+    
+    im, _ = mne.viz.plot_topomap(
+        spatial_avg, 
+        info, 
+        axes=ax, 
+        cmap='viridis', 
+        show=False,
+        contours=0,
+        extrapolate='local'
+    )
+    
     cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
     cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
+    cbar.ax.tick_params(colors='gray')
+    
     return fig
 
 def calculate_vwm_stats(df_stats, metric_col):
