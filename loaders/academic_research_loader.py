@@ -678,7 +678,8 @@ def get_processed_vwm_vep():
 
 @st.cache_data
 def get_processed_vwm_snr():
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    # Only load Condition, Channel, and SNR columns
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=['Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])  
     if df.empty: return df
 
     # REMOVED df['Channel'].isin(ALL_ROI_CHANNELS) filter here.
@@ -740,7 +741,7 @@ def get_processed_fft_grid():
 
 @st.cache_data
 def get_processed_index_spectra():
-    df = _fetch_github_parquet('vwm_eeg_full_spectrum')
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
     if df.empty: return pd.DataFrame(), pd.DataFrame()
 
     # Changing how this is exported in the colab file.
@@ -827,66 +828,20 @@ def get_raw_power_data():
     return _fetch_github_parquet('vwm_eeg_trial_power_summary').astype({'SNR_3Hz': 'float32', 'SNR_5Hz': 'float32', 'SNR_12Hz': 'float32', 'SNR_20Hz': 'float32'})
 
 @st.cache_data
-def get_processed_fft_index():
-    # Force a check to see if the raw data is even available
-    raw_df = get_raw_power_data()
-    if raw_df is None or raw_df.empty:
-        st.error("Data Hub empty.")
-        return pd.DataFrame()
-        
-    """Calculates the Harmonic Stem Plot Index and 1-sample t-tests."""
-    df = get_raw_power_data() # Uses the cached object
-    if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
+def _fetch_github_parquet(base_name, columns=None):
+    """
+    Memory-Optimized Fetcher: Loads ONLY the requested columns.
+    """
+    github_token = os.environ.get("GITHUB_TOKEN")
+    if not github_token:
+        try: github_token = st.secrets["GITHUB_TOKEN"]
+        except: pass
+
+    url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
+    storage_options = {'Authorization': f'token {github_token}'} if github_token else None
     
-    # REMOVED df['Channel'].isin(ALL_ROI_CHANNELS) filter here to prevent the fatal KeyError.
-        
-    snr_cols = [c for c in df.columns if 'SNR' in c]
-    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
-    
-    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
-                          value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
-    
-    melted['Freq_Hz'] = melted['Freq_Col'].str.extract(r'(\d+)').astype(float)
-    
-    def assign_harmonic_tag(row):
-        cond = str(row['Condition'])
-        freq = row['Freq_Hz']
-        if 'IM' in str(row['Freq_Col']): return 'Intermodulation'
-        
-        nums = re.findall(r'\d+', cond)
-        if len(nums) == 2:
-            t_hz, g_hz = float(nums[0]), float(nums[1])
-            if freq == t_hz: return 'Target ($f_t$)'
-            if freq == g_hz: return 'Grouped ($f_g$)'
-        return 'Other'
-        
-    melted['Tag'] = melted.apply(assign_harmonic_tag, axis=1)
-    melted = melted[melted['Tag'] != 'Other']
-    
-    cond_lower = melted['Condition'].str.lower()
-    melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
-    
-    # Pivot and Calculate
-    subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
-    pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
-    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
-    
-    # Division-by-Zero Safety
-    denom = pivoted['Grouped'] + pivoted['Not Grouped']
-    pivoted['Index'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
-    
-    stats_list = []
-    for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
-        tag_data = pivoted[pivoted['Tag'] == tag]
-        if tag_data.empty: continue
-        
-        mean_idx = tag_data['Index'].mean()
-        _, p_val = ttest_1samp(tag_data['Index'], 0)
-        
-        star = "***" if p_val <= 0.001 else "**" if p_val <= 0.01 else "*" if p_val <= 0.05 else ""
-        stats_list.append({'Tag': tag, 'Mean_Index': mean_idx, 'Star': star})
-        
-    return pd.DataFrame(stats_list)
+    # We load ONLY the columns requested to keep memory usage minimal
+    return pd.read_parquet(url, storage_options=storage_options, columns=columns)
 
 @st.cache_data
 def get_topoplot_spatial_averages():
@@ -895,7 +850,7 @@ def get_topoplot_spatial_averages():
     MATLAB Bridge: We execute a mean() operation across Trials and Subjects locally, 
     and only cache the resulting vector to prevent workspace RAM overload.
     """
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=['Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
     if df.empty: return pd.DataFrame()
     
     snr_cols = [c for c in df.columns if 'SNR' in c]
