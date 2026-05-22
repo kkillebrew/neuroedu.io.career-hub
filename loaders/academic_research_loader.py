@@ -17,12 +17,14 @@ import numpy as np
 import plotly.express as px
 from scipy import stats # <--- NEW STATS ENGINE
 from scipy.optimize import curve_fit
+from scipy.stats import ttest_rel, ttest_1samp
 import re # Import Python's Regular Expression library
 import requests
 from io import BytesIO, StringIO
 import streamlit as st
 import json
 import time
+# --- CRITICAL CLOUD SERVER CONFIGURATION ---
 import matplotlib
 matplotlib.use('Agg') # Force headless rendering to prevent GUI segfault crashes
 import matplotlib.pyplot as plt
@@ -634,8 +636,7 @@ def get_rotating_line_data():
 # =====================================================================
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
-from scipy.stats import ttest_rel, ttest_1samp
-
+@st.cache_data
 def _fetch_github_parquet(base_name):
     """Fetches a single pre-aggregated Parquet file from GitHub."""
     
@@ -875,7 +876,9 @@ def get_processed_fft_index():
     pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
     
-    pivoted['Index'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    # SAFETY FIX: Prevent division-by-zero propagating NaNs
+    idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    pivoted['Index'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
     
     # 6. Extract Means and run 1-sample t-test vs 0
     stats_list = []
@@ -901,46 +904,32 @@ def get_topoplot_spatial_averages():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return pd.DataFrame()
     
-    # Isolate SNR columns
     snr_cols = [c for c in df.columns if 'SNR' in c]
-    
-    # Collapse Subjects and Trials, preserving ONLY Condition and Channel
-    # This reduces a 500,000+ row dataframe down to ~1,100 rows.
     spatial_avg_df = df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
-    
     return spatial_avg_df
 
 def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
-    """
-    Constructs the MNE spatial map using the highly compressed spatial_avg_df.
-    """
-    # 1. Isolate the specific condition and ensure channels are sorted correctly
+    """Constructs the MNE spatial map using the highly compressed spatial_avg_df."""
     df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
     
     if df_filt.empty:
-        # Return an empty transparent figure to prevent UI collapse
         fig, ax = plt.subplots(figsize=(5, 5))
         fig.patch.set_alpha(0.0)
         ax.axis('off')
         return fig
         
-    # Extract the 1D NumPy array for the specific target frequency
     spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
     
-    # 2. Build the Spatial Montage (EEG.chanlocs equivalent)
     montage = mne.channels.make_standard_montage('standard_1020')
     valid_names = montage.ch_names[:len(spatial_avg)]
     
     info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
-    # 3. Initialize the Figure Workspace (Transparent Background)
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     ax.patch.set_alpha(0.0)
     
-    # 4. Render Interpolation Map
-    # Data-to-Ink: 'viridis' provides perceptual uniformity; contours=0 removes clutter.
     im, _ = mne.viz.plot_topomap(
         spatial_avg, 
         info, 
@@ -951,7 +940,6 @@ def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
         extrapolate='local'
     )
     
-    # 5. Colorbar Alignment
     cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
     cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
     cbar.ax.tick_params(colors='gray')

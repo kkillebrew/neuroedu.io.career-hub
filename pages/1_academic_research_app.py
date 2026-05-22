@@ -1019,7 +1019,6 @@ with tabs[2]:
                     df_spatial_snr = get_topoplot_spatial_averages()
 
                     if not df_spatial_snr.empty:
-                        # Set the precise conditions and target frequency to visualize
                         target_hz = 5
                         cond_grouped = 'grpPrb3_5'
                         cond_nogrp = 'noGrp3_5'
