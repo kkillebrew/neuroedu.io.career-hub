@@ -23,6 +23,8 @@ from io import BytesIO, StringIO
 import streamlit as st
 import json
 import time
+import mne
+import matplotlib.pyplot as plt
 
 # ROI Channel Map (1-based indices as per your specification)
 ROI_MAP = {
@@ -886,6 +888,64 @@ def get_processed_fft_index():
         stats_list.append({'Tag': tag, 'Mean_Index': mean_idx, 'Star': star})
         
     return pd.DataFrame(stats_list)
+
+@st.cache_data
+def get_spatial_stream_b_data():
+    """
+    Fetches Stream B while STRICTLY PRESERVING the 'Channel' dimension.
+    Bypasses the spatial collapse used in get_processed_vwm_snr().
+    """
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    return df
+
+def generate_topoplot_figure(df_spatial, target_freq, condition):
+    """
+    Computes the Grand Average spatial map for a specific frequency/condition,
+    maps the coordinates, and constructs the figure.
+    """
+    # 1. Isolate the specific condition
+    df_filt = df_spatial[df_spatial['Condition'] == condition].copy()
+    
+    if df_filt.empty:
+        # Return an empty transparent figure to prevent UI collapse
+        fig, ax = plt.subplots()
+        fig.patch.set_alpha(0.0)
+        ax.axis('off')
+        return fig
+        
+    # 2. Collapse Subjects and Trials, preserving Channels
+    spatial_avg = df_filt.groupby('Channel')[f'SNR_{target_freq}Hz'].mean().values
+    
+    # 3. Build the Spatial Montage (EEG.chanlocs equivalent)
+    montage = mne.channels.make_standard_montage('standard_1020')
+    valid_names = montage.ch_names[:len(spatial_avg)]
+    
+    info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
+    info.set_montage(montage)
+    
+    # 4. Initialize the Figure Workspace
+    fig, ax = plt.subplots(figsize=(5, 5))
+    fig.patch.set_alpha(0.0)
+    ax.patch.set_alpha(0.0)
+    
+    # 5. Render Interpolation Map
+    # Utilizing 'viridis' for maximum data-to-ink ratio and perceptual uniformity
+    im, _ = mne.viz.plot_topomap(
+        spatial_avg, 
+        info, 
+        axes=ax, 
+        cmap='viridis', 
+        show=False,
+        contours=0,
+        extrapolate='local'
+    )
+    
+    # 6. Colorbar Alignment
+    cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
+    cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
+    cbar.ax.tick_params(colors='gray')
+    
+    return fig
 
 def calculate_vwm_stats(df_stats, metric_col):
     """Calculates paired t-tests for the VWM Grouping conditions."""

@@ -42,6 +42,8 @@ from loaders.academic_research_loader import (
     get_processed_index_spectra, # <--- NEW
     get_vwm_role_index,          # <--- NEW
     get_processed_fft_index,   # <--- ADD THIS LINE BACK IN
+    get_spatial_stream_b_data,  # <--- CRITICAL ADDITION
+    generate_topoplot_figure,   # <--- CRITICAL ADDITION
     calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
@@ -1006,8 +1008,42 @@ with tabs[2]:
                     )
                     st.plotly_chart(fig_index, use_container_width=True, config=PLOTLY_CONFIG)
 
+
+                    # ----------------------------------------------------
+                    # PLOT 4: Topographic Heat Maps
+                    # ----------------------------------------------------
+                    st.markdown("#### Topographical Maps: Grouping Signatures")
+                    st.write("Spatial distribution of SNR across the scalp for Grouped vs. Not Grouped conditions. High-density signals are mapped to a standard 10-20 layout.")
+
+                    # Fetch the raw 3D spatial data (Subject x Channel x SNR)
+                    df_spatial_snr = get_spatial_stream_b_data()
+
+                    if df_spatial_snr is not None and not df_spatial_snr.empty:
+                        # Set the precise conditions and target frequency to visualize
+                        target_hz = 5
+                        cond_grouped = 'grpPrb3_5'
+                        cond_nogrp = 'noGrp3_5'
+                        
+                        topo_col1, topo_col2 = st.columns(2)
+                        
+                        with topo_col1:
+                            st.markdown(f"<h5 style='text-align: center;'>Grouped ({cond_grouped})</h5>", unsafe_allow_html=True)
+                            fig_grouped = generate_topoplot_figure(df_spatial_snr, target_freq=target_hz, condition=cond_grouped)
+                            
+                            # clear_figure=True aggressively dumps the matplotlib object from RAM after rendering
+                            st.pyplot(fig_grouped, clear_figure=True) 
+                            
+                        with topo_col2:
+                            st.markdown(f"<h5 style='text-align: center;'>Not Grouped ({cond_nogrp})</h5>", unsafe_allow_html=True)
+                            fig_nogrp = generate_topoplot_figure(df_spatial_snr, target_freq=target_hz, condition=cond_nogrp)
+                            st.pyplot(fig_nogrp, clear_figure=True)
+                    else:
+                        st.info("Loading Spatial SNR Data...")
+
                 else:
                     st.info("Loading FFT Index Data...")
+
+
 
     # ---------------------------------------------------------------------
     # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)
