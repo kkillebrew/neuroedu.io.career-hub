@@ -818,9 +818,24 @@ def get_vwm_role_index():
     return full_df.groupby(['Subject_ID', 'Base_Hz', 'Role'])['Index_Value'].mean().reset_index()
 
 @st.cache_data
+def get_raw_power_data():
+    """
+    The Single-Source-of-Truth fetcher. 
+    Loads the data ONCE. All other functions reference this cached object.
+    """
+    # Cast to float32 to instantly reduce RAM usage by 50%
+    return _fetch_github_parquet('vwm_eeg_trial_power_summary').astype({'SNR_3Hz': 'float32', 'SNR_5Hz': 'float32', 'SNR_12Hz': 'float32', 'SNR_20Hz': 'float32'})
+
+@st.cache_data
 def get_processed_fft_index():
+    # Force a check to see if the raw data is even available
+    raw_df = get_raw_power_data()
+    if raw_df is None or raw_df.empty:
+        st.error("Data Hub empty.")
+        return pd.DataFrame()
+        
     """Calculates the Harmonic Stem Plot Index and 1-sample t-tests."""
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    df = get_raw_power_data() # Uses the cached object
     if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
     
     # REMOVED df['Channel'].isin(ALL_ROI_CHANNELS) filter here to prevent the fatal KeyError.
@@ -851,18 +866,14 @@ def get_processed_fft_index():
     cond_lower = melted['Condition'].str.lower()
     melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
     
+    # Pivot and Calculate
     subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
     pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
-    
-    # SAFETY FIX: Ensure columns exist before executing math
-    if 'Grouped' not in pivoted.columns or 'Not Grouped' not in pivoted.columns:
-        return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
-        
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
     
-    # SAFETY FIX: Prevent division-by-zero propagating NaNs
-    idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
-    pivoted['Index'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    # Division-by-Zero Safety
+    denom = pivoted['Grouped'] + pivoted['Not Grouped']
+    pivoted['Index'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
     
     stats_list = []
     for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
