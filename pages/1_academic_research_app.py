@@ -7,6 +7,10 @@ DESCRIPTION:
     Builds the UI dynamically and integrates live Plotly visualizations.
 =============================================================================
 """
+# This MUST be at the absolute top of the file before Streamlit or Plotly load.
+import matplotlib
+matplotlib.use('Agg')
+
 import streamlit as st
 import sys
 import os

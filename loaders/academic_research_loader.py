@@ -11,6 +11,12 @@ DESCRIPTION:
     multiple workspace variables (Tables and Structs) for the UI to display.
 =============================================================================
 """
+# --- CRITICAL CLOUD SERVER CONFIGURATION ---
+import matplotlib
+matplotlib.use('Agg') # Force headless rendering to prevent GUI segfault crashes
+import matplotlib.pyplot as plt
+import mne
+
 import os
 import pandas as pd
 import numpy as np
@@ -24,11 +30,6 @@ from io import BytesIO, StringIO
 import streamlit as st
 import json
 import time
-# --- CRITICAL CLOUD SERVER CONFIGURATION ---
-import matplotlib
-matplotlib.use('Agg') # Force headless rendering to prevent GUI segfault crashes
-import matplotlib.pyplot as plt
-import mne
 
 # ROI Channel Map (1-based indices as per your specification)
 ROI_MAP = {
@@ -638,25 +639,22 @@ def get_rotating_line_data():
 # =====================================================================
 @st.cache_data
 def _fetch_github_parquet(base_name):
-    """Fetches a single pre-aggregated Parquet file from GitHub."""
-    
-    # 1. Safely check the cloud environment FIRST
+    """
+    Memory-Optimized Fetcher: Bypasses the `requests` library memory duplication 
+    by letting Pandas stream the Parquet file directly from the URL.
+    """
     github_token = os.environ.get("GITHUB_TOKEN")
-    
-    # 2. Only attempt Streamlit secrets if running locally, and catch the error if it fails
     if not github_token:
         try:
             github_token = st.secrets["GITHUB_TOKEN"]
         except Exception:
             pass
 
-    headers = {'Authorization': f"token {github_token}"} if github_token else {}
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
+    storage_options = {'Authorization': f'token {github_token}'} if github_token else None
     
     try:
-        res = requests.get(url, headers=headers, timeout=15)
-        res.raise_for_status() 
-        return pd.read_parquet(BytesIO(res.content))
+        return pd.read_parquet(url, storage_options=storage_options)
     except Exception as e:
         print(f"Failed to load {base_name}: {e}")
         return pd.DataFrame()
@@ -683,18 +681,16 @@ def get_processed_vwm_snr():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return df
 
-    if 'Channel' in df.columns:
-        df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
+    # REMOVED df['Channel'].isin(ALL_ROI_CHANNELS) filter here.
+    # The ETL script already exported exactly the 36 electrodes we need.
     
     snr_cols = [c for c in df.columns if 'SNR' in c]
-    # Now group by Subject, Condition, AND Channel to maintain ROI integrity
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
 
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
                           value_vars=snr_cols, 
                           var_name='Frequency_Type', value_name='SNR')
 
-    # The Original Labeling Logic
     melted['Signal_Type'] = np.where(
         melted['Frequency_Type'].str.contains('IM', case=False), 
         'Intermodulation (Sum/Diff)', 
@@ -707,27 +703,18 @@ def get_processed_vwm_snr():
         'Grouped', 'Non-Grouped'
     )
 
-    # --- CRITICAL DATA RESTORATION (REGEX FILTER) ---
     import re
-    # Extract the exact integer from the column name (e.g., 'SNR_3Hz' -> '3')
     melted['Freq_Hz_Str'] = melted['Frequency_Type'].str.extract(r'(\d+)')
     
     def is_valid_frequency(row):
-        # Keep all Intermodulation frequencies
         if row['Signal_Type'] == 'Intermodulation (Sum/Diff)':
             return True
-        
-        # For Fundamentals, extract the explicit numbers from the condition string 
-        # (e.g., 'grpPrb3_12' becomes the list ['3', '12'])
         cond_nums = re.findall(r'\d+', str(row['Condition']))
-        
-        # Only keep the row if its frequency matches a number actually in the condition
         return str(row['Freq_Hz_Str']) in cond_nums
         
     melted['Valid'] = melted.apply(is_valid_frequency, axis=1)
     melted_clean = melted[melted['Valid']]
 
-    # Change the final return line in get_processed_vwm_snr to:
     return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].median().reset_index()
 
 @st.cache_data
@@ -836,13 +823,9 @@ def get_processed_fft_index():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
     
-    # 1. Enforce ROI filtering
-    if 'Channel' in df.columns:
-        df = df[df['Channel'].isin(ALL_ROI_CHANNELS)]
+    # REMOVED df['Channel'].isin(ALL_ROI_CHANNELS) filter here to prevent the fatal KeyError.
         
     snr_cols = [c for c in df.columns if 'SNR' in c]
-    
-    # 2. Collapse spatial channels into a single Subject mean per condition
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     
     melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
@@ -850,13 +833,11 @@ def get_processed_fft_index():
     
     melted['Freq_Hz'] = melted['Freq_Col'].str.extract(r'(\d+)').astype(float)
     
-    # 3. Dynamically assign the harmonic tags based on condition strings
     def assign_harmonic_tag(row):
         cond = str(row['Condition'])
         freq = row['Freq_Hz']
         if 'IM' in str(row['Freq_Col']): return 'Intermodulation'
         
-        # Extract numbers from condition, e.g., 'grpPrb3_12' -> [3, 12]
         nums = re.findall(r'\d+', cond)
         if len(nums) == 2:
             t_hz, g_hz = float(nums[0]), float(nums[1])
@@ -867,20 +848,22 @@ def get_processed_fft_index():
     melted['Tag'] = melted.apply(assign_harmonic_tag, axis=1)
     melted = melted[melted['Tag'] != 'Other']
     
-    # 4. Determine Grouping Status
     cond_lower = melted['Condition'].str.lower()
     melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
     
-    # 5. Index Math: (Grp - NoGrp) / (Grp + NoGrp)
     subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
     pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
+    
+    # SAFETY FIX: Ensure columns exist before executing math
+    if 'Grouped' not in pivoted.columns or 'Not Grouped' not in pivoted.columns:
+        return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
+        
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
     
     # SAFETY FIX: Prevent division-by-zero propagating NaNs
     idx_math = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
     pivoted['Index'] = idx_math.replace([np.inf, -np.inf], np.nan).fillna(0.0)
     
-    # 6. Extract Means and run 1-sample t-test vs 0
     stats_list = []
     for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
         tag_data = pivoted[pivoted['Tag'] == tag]
