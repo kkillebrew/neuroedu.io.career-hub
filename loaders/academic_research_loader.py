@@ -681,8 +681,9 @@ def get_processed_vwm_vep():
 
 @st.cache_data
 def get_processed_vwm_snr():
-    # Calling fetcher WITHOUT columns argument now
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')  
+    # FIX: Added 'Subject_ID' to the columns fetch list to prevent a KeyError.
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
+                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])  
     if df.empty: return df
 
     snr_cols = [c for c in df.columns if 'SNR' in c]
@@ -794,28 +795,47 @@ def get_processed_fft_grid():
 
 @st.cache_data
 def get_processed_index_spectra():
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    """
+    Calculates the Neural Index of Grouping. 
+    Refactored to aggregate data BEFORE melting to prevent OOM memory crashes.
+    """
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
+                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
+    
     if df.empty: return pd.DataFrame(), pd.DataFrame()
 
     snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
-    df_melted = df.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
-                        value_vars=snr_cols, 
-                        var_name='Frequency_Hz', 
-                        value_name='SNR')
+
+    # --- CRITICAL MEMORY FIX ---
+    # We MUST collapse the thousands of raw trial/channel rows into subject averages first.
+    # MATLAB Analogy: Using groupsummary() to average your matrix before reshaping it.
+    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+
+    # 1. Melt the aggregated dataframe, NOT the massive raw one
+    df_melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
+                             value_vars=snr_cols, 
+                             var_name='Frequency_Hz', 
+                             value_name='SNR')
     
+    # Clean the frequency label (remove 'SNR_' and 'Hz')
     df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
+    
+    # 2. Assign Pair and Grouping status
     df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
 
+    # 3. Pivot the long-format data
     pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
                                    values='SNR').reset_index()
     
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
 
+    # 4. Calculate Index (with division-by-zero protection)
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
 
+    # 5. Average across subjects
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
