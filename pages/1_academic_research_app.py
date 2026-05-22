@@ -7,7 +7,6 @@ DESCRIPTION:
     Builds the UI dynamically and integrates live Plotly visualizations.
 =============================================================================
 """
-
 import streamlit as st
 import sys
 import os
