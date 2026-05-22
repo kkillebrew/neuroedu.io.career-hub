@@ -23,8 +23,10 @@ from io import BytesIO, StringIO
 import streamlit as st
 import json
 import time
-import mne
+import matplotlib
+matplotlib.use('Agg') # Force headless rendering to prevent GUI segfault crashes
 import matplotlib.pyplot as plt
+import mne
 
 # ROI Channel Map (1-based indices as per your specification)
 ROI_MAP = {
@@ -890,46 +892,55 @@ def get_processed_fft_index():
     return pd.DataFrame(stats_list)
 
 @st.cache_data
-def get_spatial_stream_b_data():
+def get_topoplot_spatial_averages():
     """
-    Fetches Stream B while STRICTLY PRESERVING the 'Channel' dimension.
-    Bypasses the spatial collapse used in get_processed_vwm_snr().
+    Memory-Optimized Loader.
+    MATLAB Bridge: We execute a mean() operation across Trials and Subjects locally, 
+    and only cache the resulting vector to prevent workspace RAM overload.
     """
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
-    return df
+    if df.empty: return pd.DataFrame()
+    
+    # Isolate SNR columns
+    snr_cols = [c for c in df.columns if 'SNR' in c]
+    
+    # Collapse Subjects and Trials, preserving ONLY Condition and Channel
+    # This reduces a 500,000+ row dataframe down to ~1,100 rows.
+    spatial_avg_df = df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
+    
+    return spatial_avg_df
 
-def generate_topoplot_figure(df_spatial, target_freq, condition):
+def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
     """
-    Computes the Grand Average spatial map for a specific frequency/condition,
-    maps the coordinates, and constructs the figure.
+    Constructs the MNE spatial map using the highly compressed spatial_avg_df.
     """
-    # 1. Isolate the specific condition
-    df_filt = df_spatial[df_spatial['Condition'] == condition].copy()
+    # 1. Isolate the specific condition and ensure channels are sorted correctly
+    df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
     
     if df_filt.empty:
         # Return an empty transparent figure to prevent UI collapse
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(5, 5))
         fig.patch.set_alpha(0.0)
         ax.axis('off')
         return fig
         
-    # 2. Collapse Subjects and Trials, preserving Channels
-    spatial_avg = df_filt.groupby('Channel')[f'SNR_{target_freq}Hz'].mean().values
+    # Extract the 1D NumPy array for the specific target frequency
+    spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
     
-    # 3. Build the Spatial Montage (EEG.chanlocs equivalent)
+    # 2. Build the Spatial Montage (EEG.chanlocs equivalent)
     montage = mne.channels.make_standard_montage('standard_1020')
     valid_names = montage.ch_names[:len(spatial_avg)]
     
     info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
-    # 4. Initialize the Figure Workspace
+    # 3. Initialize the Figure Workspace (Transparent Background)
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     ax.patch.set_alpha(0.0)
     
-    # 5. Render Interpolation Map
-    # Utilizing 'viridis' for maximum data-to-ink ratio and perceptual uniformity
+    # 4. Render Interpolation Map
+    # Data-to-Ink: 'viridis' provides perceptual uniformity; contours=0 removes clutter.
     im, _ = mne.viz.plot_topomap(
         spatial_avg, 
         info, 
@@ -940,7 +951,7 @@ def generate_topoplot_figure(df_spatial, target_freq, condition):
         extrapolate='local'
     )
     
-    # 6. Colorbar Alignment
+    # 5. Colorbar Alignment
     cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
     cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
     cbar.ax.tick_params(colors='gray')
