@@ -1016,12 +1016,11 @@ with tabs[2]:
 
 
                     # ----------------------------------------------------
-                    # PLOT 4: Topographic Heat Maps (Fixed Indentation)
+                    # PLOT 4: Topographic Heat Maps
                     # ----------------------------------------------------
                     st.markdown("#### Topographical Maps: Grouping Signatures")
-                    st.write("Spatial distribution of SNR across the scalp for Grouped vs. Not Grouped conditions.")
 
-                    # Fetch the pre-compressed spatial averages
+                    # Ensure this block is indented correctly
                     df_spatial_snr = get_topoplot_spatial_averages()
 
                     if not df_spatial_snr.empty:
@@ -1032,21 +1031,21 @@ with tabs[2]:
                         topo_col1, topo_col2 = st.columns(2)
                         
                         with topo_col1:
-                            st.markdown(f"**Grouped ({cond_grouped})**", unsafe_allow_html=True)
+                            st.markdown(f"**Grouped**", unsafe_allow_html=True)
                             try:
-                                fig_grouped = generate_topoplot_figure(df_spatial_snr, target_freq=target_hz, condition=cond_grouped)
+                                fig_grouped = generate_topoplot_figure(df_spatial_snr, target_hz, cond_grouped)
                                 st.pyplot(fig_grouped, clear_figure=True) 
                             except Exception as e:
-                                st.error(f"Error plotting Grouped map: {e}")
+                                st.error(f"Error: {e}")
                                 
                         with topo_col2:
-                            st.markdown(f"**Not Grouped ({cond_nogrp})**", unsafe_allow_html=True)
+                            st.markdown(f"**Not Grouped**", unsafe_allow_html=True)
                             try:
-                                fig_nogrp = generate_topoplot_figure(df_spatial_snr, target_freq=target_hz, condition=cond_nogrp)
+                                fig_nogrp = generate_topoplot_figure(df_spatial_snr, target_hz, cond_nogrp)
                                 st.pyplot(fig_nogrp, clear_figure=True)
                             except Exception as e:
-                                st.error(f"Error plotting Not Grouped map: {e}")
-                    else:
+                                st.error(f"Error: {e}")
+                    else: # This ELSE must align with the IF statement above it
                         st.info("Loading Spatial SNR Data...")
 
                 else:

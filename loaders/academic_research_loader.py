@@ -11,6 +11,11 @@ DESCRIPTION:
     multiple workspace variables (Tables and Structs) for the UI to display.
 =============================================================================
 """
+# --- CRITICAL CLOUD SERVER CONFIGURATION ---
+import matplotlib
+matplotlib.use('Agg') # Force headless rendering
+import matplotlib.pyplot as plt
+import mne
 
 import os
 import pandas as pd
@@ -632,9 +637,9 @@ def get_rotating_line_data():
 # =====================================================================
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
+# --- DATA HUB FETCHING ---
 @st.cache_data
 def _fetch_github_parquet(base_name, columns=None):
-    """Memory-Optimized Fetcher: Loads ONLY requested columns."""
     token = os.environ.get("GITHUB_TOKEN", st.secrets.get("GITHUB_TOKEN", ""))
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
     storage_options = {'Authorization': f'token {token}'} if token else None
@@ -699,35 +704,24 @@ def get_processed_vwm_snr():
 
     return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].median().reset_index()
 
+# --- STATISTICAL ENGINE ---
 @st.cache_data
 def get_processed_fft_index():
-    """
-    Calculates the Harmonic Stem Plot Index and 1-sample t-tests.
-    Optimized for low RAM usage using float32.
-    """
-    # Fetch data: Optimized to load only necessary columns to prevent OOM crash
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
                                columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
     if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
     
-    # Cast to float32 to save RAM
     snr_cols = [c for c in df.columns if 'SNR' in c]
     df[snr_cols] = df[snr_cols].astype('float32')
-    
-    # 2. Collapse spatial channels into a single Subject mean per condition
     df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
     
-    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
-                          value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
-    
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
     melted['Freq_Hz'] = melted['Freq_Col'].str.extract(r'(\d+)').astype(float)
     
-    # 3. Dynamically assign the harmonic tags
     def assign_harmonic_tag(row):
         cond = str(row['Condition'])
         freq = row['Freq_Hz']
         if 'IM' in str(row['Freq_Col']): return 'Intermodulation'
-        
         nums = re.findall(r'\d+', cond)
         if len(nums) == 2:
             t_hz, g_hz = float(nums[0]), float(nums[1])
@@ -737,35 +731,26 @@ def get_processed_fft_index():
         
     melted['Tag'] = melted.apply(assign_harmonic_tag, axis=1)
     melted = melted[melted['Tag'] != 'Other']
-    
-    cond_lower = melted['Condition'].str.lower()
-    melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
+    melted['Grouping'] = np.where(melted['Condition'].str.lower().str.contains('grp') & ~melted['Condition'].str.lower().str.contains('nogrp'), 'Grouped', 'Not Grouped')
     
     subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
     pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
     
-    # Safety Check
     if 'Grouped' not in pivoted.columns or 'Not Grouped' not in pivoted.columns:
         return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
         
     pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
-    
-    # Calculate Index with division-by-zero protection
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
     
-    # Run stats
     stats_list = []
     for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
         tag_data = pivoted[pivoted['Tag'] == tag]
         if tag_data.empty: continue
-        
         mean_idx = tag_data['Index'].mean()
         _, p_val = ttest_1samp(tag_data['Index'], 0)
-        
         star = "***" if p_val <= 0.001 else "**" if p_val <= 0.01 else "*" if p_val <= 0.05 else ""
         stats_list.append({'Tag': tag, 'Mean_Index': mean_idx, 'Star': star})
-        
     return pd.DataFrame(stats_list)
 
 @st.cache_data
@@ -877,6 +862,7 @@ def get_raw_power_data():
     # Cast to float32 to instantly reduce RAM usage by 50%
     return _fetch_github_parquet('vwm_eeg_trial_power_summary').astype({'SNR_3Hz': 'float32', 'SNR_5Hz': 'float32', 'SNR_12Hz': 'float32', 'SNR_20Hz': 'float32'})
 
+# --- TOPOPLOT ENGINE ---
 @st.cache_data
 def get_topoplot_spatial_averages():
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
@@ -885,19 +871,15 @@ def get_topoplot_spatial_averages():
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
 def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
-    """Constructs MNE spatial map (Single definition)."""
     df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
     if df_filt.empty:
         fig, ax = plt.subplots(figsize=(5, 5)); fig.patch.set_alpha(0.0); ax.axis('off'); return fig
-        
     spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
     montage = mne.channels.make_standard_montage('standard_1020')
     info = mne.create_info(ch_names=montage.ch_names[:len(spatial_avg)], sfreq=500, ch_types='eeg')
     info.set_montage(montage)
-    
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0); ax.patch.set_alpha(0.0)
-    
     im, _ = mne.viz.plot_topomap(spatial_avg, info, axes=ax, cmap='viridis', show=False, contours=0, extrapolate='local')
     cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
     cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
