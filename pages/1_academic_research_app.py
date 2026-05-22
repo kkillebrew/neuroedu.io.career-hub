@@ -1014,36 +1014,36 @@ with tabs[2]:
 
 
                     # ----------------------------------------------------
-                    # PLOT 4: Topographic Heat Maps (Defensive Implementation)
+                    # PLOT 4: Topographic Heat Maps (Fixed Indentation)
                     # ----------------------------------------------------
                     st.markdown("#### Topographical Maps: Grouping Signatures")
+                    st.write("Spatial distribution of SNR across the scalp for Grouped vs. Not Grouped conditions.")
 
-                    # Use a placeholder to prevent UI jumping
-                    topo_placeholder = st.empty()
+                    # Fetch the pre-compressed spatial averages
+                    df_spatial_snr = get_topoplot_spatial_averages()
 
-                    with topo_placeholder:
-                        # Fetch data
-                        df_spatial_snr = get_topoplot_spatial_averages()
-
-                        if df_spatial_snr is not None and not df_spatial_snr.empty:
-                            target_hz = 5
-                            cond_grouped = 'grpPrb3_5'
-                            cond_nogrp = 'noGrp3_5'
-                            
-                            c1, c2 = st.columns(2)
+                    if not df_spatial_snr.empty:
+                        target_hz = 5
+                        cond_grouped = 'grpPrb3_5'
+                        cond_nogrp = 'noGrp3_5'
+                        
+                        topo_col1, topo_col2 = st.columns(2)
+                        
+                        with topo_col1:
+                            st.markdown(f"**Grouped ({cond_grouped})**", unsafe_allow_html=True)
                             try:
-                                with c1:
-                                    st.markdown(f"**Grouped**", unsafe_allow_html=True)
-                                    fig_grouped = generate_topoplot_figure(df_spatial_snr, target_hz, cond_grouped)
-                                    st.pyplot(fig_grouped, clear_figure=True) 
-                                with c2:
-                                    st.markdown(f"**Not Grouped**", unsafe_allow_html=True)
-                                    fig_nogrp = generate_topoplot_figure(df_spatial_snr, target_hz, cond_nogrp)
-                                    st.pyplot(fig_nogrp, clear_figure=True)
+                                fig_grouped = generate_topoplot_figure(df_spatial_snr, target_freq=target_hz, condition=cond_grouped)
+                                st.pyplot(fig_grouped, clear_figure=True) 
                             except Exception as e:
-                                st.error(f"Plotting Error: {e}")
-                        else:
-                            st.info("Data loading or empty.")
+                                st.error(f"Error plotting Grouped map: {e}")
+                                
+                        with topo_col2:
+                            st.markdown(f"**Not Grouped ({cond_nogrp})**", unsafe_allow_html=True)
+                            try:
+                                fig_nogrp = generate_topoplot_figure(df_spatial_snr, target_freq=target_hz, condition=cond_nogrp)
+                                st.pyplot(fig_nogrp, clear_figure=True)
+                            except Exception as e:
+                                st.error(f"Error plotting Not Grouped map: {e}")
                     else:
                         st.info("Loading Spatial SNR Data...")
 

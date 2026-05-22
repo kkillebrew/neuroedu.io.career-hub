@@ -11,11 +11,6 @@ DESCRIPTION:
     multiple workspace variables (Tables and Structs) for the UI to display.
 =============================================================================
 """
-# --- CRITICAL CLOUD SERVER CONFIGURATION ---
-import matplotlib
-matplotlib.use('Agg') # Force headless rendering to prevent GUI segfault crashes
-import matplotlib.pyplot as plt
-import mne
 
 import os
 import pandas as pd
@@ -828,34 +823,47 @@ def get_raw_power_data():
     return _fetch_github_parquet('vwm_eeg_trial_power_summary').astype({'SNR_3Hz': 'float32', 'SNR_5Hz': 'float32', 'SNR_12Hz': 'float32', 'SNR_20Hz': 'float32'})
 
 @st.cache_data
-def _fetch_github_parquet(base_name, columns=None):
-    """
-    Memory-Optimized Fetcher: Loads ONLY the requested columns.
-    """
-    github_token = os.environ.get("GITHUB_TOKEN")
-    if not github_token:
-        try: github_token = st.secrets["GITHUB_TOKEN"]
-        except: pass
-
-    url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
-    storage_options = {'Authorization': f'token {github_token}'} if github_token else None
-    
-    # We load ONLY the columns requested to keep memory usage minimal
-    return pd.read_parquet(url, storage_options=storage_options, columns=columns)
-
-@st.cache_data
 def get_topoplot_spatial_averages():
-    """
-    Memory-Optimized Loader.
-    MATLAB Bridge: We execute a mean() operation across Trials and Subjects locally, 
-    and only cache the resulting vector to prevent workspace RAM overload.
-    """
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=['Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
+    """Aggregates data into a tiny dataframe to save RAM."""
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return pd.DataFrame()
-    
     snr_cols = [c for c in df.columns if 'SNR' in c]
-    spatial_avg_df = df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
-    return spatial_avg_df
+    # Reduce to Condition/Channel (approx 1,000 rows instead of 500,000)
+    return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
+
+def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
+    """
+    Lazy-Loaded MNE Implementation.
+    Libraries are loaded only when this function is called.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import mne
+    
+    df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
+    
+    if df_filt.empty:
+        fig, ax = plt.subplots(figsize=(5, 5))
+        fig.patch.set_alpha(0.0)
+        ax.axis('off')
+        return fig
+        
+    spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
+    montage = mne.channels.make_standard_montage('standard_1020')
+    info = mne.create_info(ch_names=montage.ch_names[:len(spatial_avg)], sfreq=500, ch_types='eeg')
+    info.set_montage(montage)
+    
+    fig, ax = plt.subplots(figsize=(5, 5))
+    fig.patch.set_alpha(0.0); ax.patch.set_alpha(0.0)
+    
+    im, _ = mne.viz.plot_topomap(spatial_avg, info, axes=ax, cmap='viridis', show=False, contours=0, extrapolate='local')
+    
+    cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
+    cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
+    cbar.ax.tick_params(colors='gray')
+    
+    return fig
 
 def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
     """Constructs the MNE spatial map using the highly compressed spatial_avg_df."""
