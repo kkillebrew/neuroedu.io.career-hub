@@ -633,26 +633,12 @@ def get_rotating_line_data():
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
 @st.cache_data
-def _fetch_github_parquet(base_name):
-    """
-    Memory-Optimized Fetcher: Bypasses the `requests` library memory duplication 
-    by letting Pandas stream the Parquet file directly from the URL.
-    """
-    github_token = os.environ.get("GITHUB_TOKEN")
-    if not github_token:
-        try:
-            github_token = st.secrets["GITHUB_TOKEN"]
-        except Exception:
-            pass
-
+def _fetch_github_parquet(base_name, columns=None):
+    """Memory-Optimized Fetcher: Loads ONLY requested columns."""
+    token = os.environ.get("GITHUB_TOKEN", st.secrets.get("GITHUB_TOKEN", ""))
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
-    storage_options = {'Authorization': f'token {github_token}'} if github_token else None
-    
-    try:
-        return pd.read_parquet(url, storage_options=storage_options)
-    except Exception as e:
-        print(f"Failed to load {base_name}: {e}")
-        return pd.DataFrame()
+    storage_options = {'Authorization': f'token {token}'} if token else None
+    return pd.read_parquet(url, storage_options=storage_options, columns=columns)
 
 @st.cache_data
 def get_vwm_behavioral_data():
@@ -712,6 +698,75 @@ def get_processed_vwm_snr():
     melted_clean = melted[melted['Valid']]
 
     return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].median().reset_index()
+
+@st.cache_data
+def get_processed_fft_index():
+    """
+    Calculates the Harmonic Stem Plot Index and 1-sample t-tests.
+    Optimized for low RAM usage using float32.
+    """
+    # Fetch data: Optimized to load only necessary columns to prevent OOM crash
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
+                               columns=['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'])
+    if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
+    
+    # Cast to float32 to save RAM
+    snr_cols = [c for c in df.columns if 'SNR' in c]
+    df[snr_cols] = df[snr_cols].astype('float32')
+    
+    # 2. Collapse spatial channels into a single Subject mean per condition
+    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
+    
+    melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
+                          value_vars=snr_cols, var_name='Freq_Col', value_name='SNR')
+    
+    melted['Freq_Hz'] = melted['Freq_Col'].str.extract(r'(\d+)').astype(float)
+    
+    # 3. Dynamically assign the harmonic tags
+    def assign_harmonic_tag(row):
+        cond = str(row['Condition'])
+        freq = row['Freq_Hz']
+        if 'IM' in str(row['Freq_Col']): return 'Intermodulation'
+        
+        nums = re.findall(r'\d+', cond)
+        if len(nums) == 2:
+            t_hz, g_hz = float(nums[0]), float(nums[1])
+            if freq == t_hz: return 'Target ($f_t$)'
+            if freq == g_hz: return 'Grouped ($f_g$)'
+        return 'Other'
+        
+    melted['Tag'] = melted.apply(assign_harmonic_tag, axis=1)
+    melted = melted[melted['Tag'] != 'Other']
+    
+    cond_lower = melted['Condition'].str.lower()
+    melted['Grouping'] = np.where(cond_lower.str.contains('grp') & ~cond_lower.str.contains('nogrp'), 'Grouped', 'Not Grouped')
+    
+    subj_avg = melted.groupby(['Subject_ID', 'Grouping', 'Tag'])['SNR'].mean().reset_index()
+    pivoted = subj_avg.pivot_table(index=['Subject_ID', 'Tag'], columns='Grouping', values='SNR').reset_index()
+    
+    # Safety Check
+    if 'Grouped' not in pivoted.columns or 'Not Grouped' not in pivoted.columns:
+        return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
+        
+    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
+    
+    # Calculate Index with division-by-zero protection
+    denom = pivoted['Grouped'] + pivoted['Not Grouped']
+    pivoted['Index'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
+    
+    # Run stats
+    stats_list = []
+    for tag in ['Target ($f_t$)', 'Grouped ($f_g$)', 'Intermodulation']:
+        tag_data = pivoted[pivoted['Tag'] == tag]
+        if tag_data.empty: continue
+        
+        mean_idx = tag_data['Index'].mean()
+        _, p_val = ttest_1samp(tag_data['Index'], 0)
+        
+        star = "***" if p_val <= 0.001 else "**" if p_val <= 0.01 else "*" if p_val <= 0.05 else ""
+        stats_list.append({'Tag': tag, 'Mean_Index': mean_idx, 'Star': star})
+        
+    return pd.DataFrame(stats_list)
 
 @st.cache_data
 def get_processed_fft_grid():
@@ -824,30 +879,16 @@ def get_raw_power_data():
 
 @st.cache_data
 def get_topoplot_spatial_averages():
-    """Aggregates data into a tiny dataframe to save RAM."""
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
     if df.empty: return pd.DataFrame()
     snr_cols = [c for c in df.columns if 'SNR' in c]
-    # Reduce to Condition/Channel (approx 1,000 rows instead of 500,000)
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
 def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
-    """
-    Lazy-Loaded MNE Implementation.
-    Libraries are loaded only when this function is called.
-    """
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    import mne
-    
+    """Constructs MNE spatial map (Single definition)."""
     df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
-    
     if df_filt.empty:
-        fig, ax = plt.subplots(figsize=(5, 5))
-        fig.patch.set_alpha(0.0)
-        ax.axis('off')
-        return fig
+        fig, ax = plt.subplots(figsize=(5, 5)); fig.patch.set_alpha(0.0); ax.axis('off'); return fig
         
     spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
     montage = mne.channels.make_standard_montage('standard_1020')
@@ -858,49 +899,8 @@ def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
     fig.patch.set_alpha(0.0); ax.patch.set_alpha(0.0)
     
     im, _ = mne.viz.plot_topomap(spatial_avg, info, axes=ax, cmap='viridis', show=False, contours=0, extrapolate='local')
-    
     cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
     cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
-    cbar.ax.tick_params(colors='gray')
-    
-    return fig
-
-def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
-    """Constructs the MNE spatial map using the highly compressed spatial_avg_df."""
-    df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
-    
-    if df_filt.empty:
-        fig, ax = plt.subplots(figsize=(5, 5))
-        fig.patch.set_alpha(0.0)
-        ax.axis('off')
-        return fig
-        
-    spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
-    
-    montage = mne.channels.make_standard_montage('standard_1020')
-    valid_names = montage.ch_names[:len(spatial_avg)]
-    
-    info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
-    info.set_montage(montage)
-    
-    fig, ax = plt.subplots(figsize=(5, 5))
-    fig.patch.set_alpha(0.0)
-    ax.patch.set_alpha(0.0)
-    
-    im, _ = mne.viz.plot_topomap(
-        spatial_avg, 
-        info, 
-        axes=ax, 
-        cmap='viridis', 
-        show=False,
-        contours=0,
-        extrapolate='local'
-    )
-    
-    cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
-    cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
-    cbar.ax.tick_params(colors='gray')
-    
     return fig
 
 def calculate_vwm_stats(df_stats, metric_col):

@@ -10,6 +10,8 @@ DESCRIPTION:
 # This MUST be at the absolute top of the file before Streamlit or Plotly load.
 import matplotlib
 matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import mne
 
 import streamlit as st
 import sys
