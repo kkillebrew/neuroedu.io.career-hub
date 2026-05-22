@@ -640,10 +640,26 @@ def get_rotating_line_data():
 # --- DATA HUB FETCHING ---
 @st.cache_data
 def _fetch_github_parquet(base_name, columns=None):
-    token = os.environ.get("GITHUB_TOKEN", st.secrets.get("GITHUB_TOKEN", ""))
+    """
+    Fetches parquet from GitHub. 
+    Strictly uses os.environ to align with your deployment pipeline.
+    """
+    # Use only os.environ as defined in your working deployment
+    token = os.environ.get("GITHUB_TOKEN")
+    
     url = f"https://raw.githubusercontent.com/kkillebrew/workingMemoryGrouping/main/Color/VWM_Parquet_Master/{base_name}.parquet"
-    storage_options = {'Authorization': f'token {token}'} if token else None
-    return pd.read_parquet(url, storage_options=storage_options, columns=columns)
+    
+    # Pass headers directly using the token
+    headers = {'Authorization': f'token {token}'} if token else {}
+    
+    try:
+        # Use requests for streaming content to avoid memory duplication in BytesIO
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        return pd.read_parquet(BytesIO(response.content), columns=columns)
+    except Exception as e:
+        print(f"Failed to load {base_name}: {e}")
+        return pd.DataFrame()
 
 @st.cache_data
 def get_vwm_behavioral_data():
