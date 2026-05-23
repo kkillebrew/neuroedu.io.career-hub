@@ -892,15 +892,9 @@ def get_topoplot_spatial_averages():
 def generate_topoplot_figure(spatial_index_df, target_hz):
     col_name = f'Index_SNR_{target_hz}Hz'
     
-    # 1. Debug: Check if data is populated
-    # This will appear on the web page and let us see the actual numbers
-    if col_name in spatial_index_df.columns:
-        st.write(f"Debug: Stats for {col_name} - Max: {spatial_index_df[col_name].max():.4f}, Min: {spatial_index_df[col_name].min():.4f}")
-    
-    full_data = np.zeros(257) 
-    
+    # 1. Prepare data array
+    full_data = np.zeros(257)
     for _, row in spatial_index_df.iterrows():
-        # Check if Channel is numeric
         try:
             idx = int(row['Channel']) - 1
             if idx < 257:
@@ -908,10 +902,15 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         except:
             continue
             
-    # 2. Debug: See if the array has any non-zero values at all
-    st.write(f"Debug: Non-zero values in array: {np.count_nonzero(full_data)}")
+    # 2. DYNAMIC SCALING (MATLAB Analogy: equivalent to caxis manual limits 
+    # based on data variance, rather than a fixed arbitrary scale)
+    abs_max = np.max(np.abs(full_data))
+    
+    # Use this if you want the plots to be comparable side-by-side
+    v_limit = 0.06  # Fixed to the approximate max seen in your diagnostic data
+    vmin, vmax = -v_limit, v_limit
 
-    # 3. Create Mask
+    # 3. Create Mask & Plot
     mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: mask[ch-1] = True
@@ -923,14 +922,12 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # 4. FIX: Force vmin/vmax to ensure colors appear even for small values
-    # We set it to -0.5 and 0.5. If your data values are smaller than this, 
-    # adjust these numbers.
+    # Updated with dynamic vmin/vmax
     mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
         mask=mask, 
         mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
-        vmin=-0.5, vmax=0.5, 
+        vmin=vmin, vmax=vmax, 
         show=False, contours=0, extrapolate='local'
     )
     return fig
