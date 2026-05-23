@@ -888,7 +888,7 @@ def get_topoplot_spatial_averages():
     snr_cols = [c for c in df.columns if 'SNR' in c]
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
-Python
+
 def generate_topoplot_figure(spatial_index_df, target_freq):
     """
     Renders the EEG topographic map.
