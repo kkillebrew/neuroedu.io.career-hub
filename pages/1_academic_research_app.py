@@ -50,6 +50,7 @@ from loaders.academic_research_loader import (
     get_processed_fft_index,   # <--- ADD THIS LINE BACK IN
     get_topoplot_spatial_averages,  # <--- UPDATED
     generate_topoplot_figure,   # <--- CRITICAL ADDITION
+    get_spatial_index_data,
     calculate_vwm_stats,        # <--- ADD THIS LINE
     PLOTLY_CONFIG
 )
