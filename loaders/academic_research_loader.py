@@ -892,21 +892,27 @@ def get_topoplot_spatial_averages():
 def generate_topoplot_figure(spatial_index_df, target_hz):
     col_name = f'Index_SNR_{target_hz}Hz'
     
-    # 1. Extraction
+    # 1. TRACE: Verify the signal is on the wire
+    if col_name not in spatial_index_df.columns:
+        st.error(f"Signal Missing: {col_name} not in DataFrame. Columns: {spatial_index_df.columns.tolist()}")
+        return None
+
+    # 2. Extract Data
     full_data = np.zeros(257)
+    # Ensure Channel is treated as integer
+    spatial_index_df['Channel'] = spatial_index_df['Channel'].astype(int)
+    
     for _, row in spatial_index_df.iterrows():
-        try:
-            idx = int(row['Channel']) - 1
-            if 0 <= idx < 257:
-                full_data[idx] = row[col_name]
-        except:
-            continue
-            
-    # 2. Scaling (Force the colormap to handle very small variance)
-    # Using the absolute max to center the plot's range around the data
+        idx = row['Channel'] - 1
+        if 0 <= idx < 257:
+            full_data[idx] = row[col_name]
+    
+    # 3. TRACE: Display range to the user (Remove this after confirming signal exists)
+    st.write(f"**Signal Diagnostic ({target_hz} Hz):** Min: {full_data.min():.4f}, Max: {full_data.max():.4f}, Non-Zero Count: {np.count_nonzero(full_data)}")
+
+    # 4. SCALING: If the signal range is tiny (e.g., 1e-6), we must force a scale
     abs_max = np.max(np.abs(full_data))
-    # If the variance is extremely small, use a floor to ensure colors render
-    v_limit = max(abs_max, 0.01)
+    v_limit = max(abs_max, 0.001) 
     
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
@@ -915,21 +921,23 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # 3. Plotting with High-Contrast Colormap & Sensor Verification
-    # Changed cmap to 'viridis' to debug range issues. 
-    # Added 'sensors=True' to see if the sensors actually map to the head.
+    # 5. PLOT
     mne.viz.plot_topomap(
-        full_data, info, axes=ax, cmap='viridis', 
+        full_data, info, axes=ax, cmap='RdBu_r', 
         vlim=(-v_limit, v_limit), 
-        show=False, 
-        contours=0, 
-        extrapolate='head',
-        sensors=True  # If you see dots, the montage is mapping to the head correctly
+        show=False, contours=0, extrapolate='head'
     )
     
-    # MEMORY GUARDRAIL
-    plt.close(fig) 
+    # ROI Overlay (Gray rings)
+    roi_mask = np.zeros(257, dtype=bool)
+    for ch in ALL_ROI_CHANNELS:
+        if ch-1 < 257: roi_mask[ch-1] = True
+    mne.viz.plot_topomap(np.zeros(257), info, axes=ax, mask=roi_mask,
+                         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
+                                      'markeredgecolor': 'gray', 'markersize': 2},
+                         show=False, contours=0, extrapolate='head')
     
+    plt.close(fig) 
     return fig
 
 @st.cache_data
