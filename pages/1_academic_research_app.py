@@ -1018,35 +1018,22 @@ with tabs[2]:
                     # ----------------------------------------------------
                     # PLOT 4: Topographic Heat Maps
                     # ----------------------------------------------------
-                    st.markdown("#### Topographical Maps: Grouping Signatures")
+                    st.markdown("#### Topographical Maps: Neural Index of Grouping")
+                    st.write("Maps show the Mean Neural Index $(Grp - NoGrp) / (Grp + NoGrp)$. Non-ROI channels are masked.")
 
-                    # Ensure this block is indented correctly
-                    df_spatial_snr = get_topoplot_spatial_averages()
+                    # 1. Fetch the computed index data (averaged by channel/freq)
+                    df_index = get_spatial_index_data() 
 
-                    if not df_spatial_snr.empty:
-                        target_hz = 5
-                        cond_grouped = 'grpPrb3_5'
-                        cond_nogrp = 'noGrp3_5'
-                        
-                        topo_col1, topo_col2 = st.columns(2)
-                        
-                        with topo_col1:
-                            st.markdown(f"**Grouped**", unsafe_allow_html=True)
-                            try:
-                                fig_grouped = generate_topoplot_figure(df_spatial_snr, target_hz, cond_grouped)
-                                st.pyplot(fig_grouped, clear_figure=True) 
-                            except Exception as e:
-                                st.error(f"Error: {e}")
-                                
-                        with topo_col2:
-                            st.markdown(f"**Not Grouped**", unsafe_allow_html=True)
-                            try:
-                                fig_nogrp = generate_topoplot_figure(df_spatial_snr, target_hz, cond_nogrp)
-                                st.pyplot(fig_nogrp, clear_figure=True)
-                            except Exception as e:
-                                st.error(f"Error: {e}")
-                    else: # This ELSE must align with the IF statement above it
-                        st.info("Loading Spatial SNR Data...")
+                    # 2. Iterate through your target frequencies
+                    freqs = [3, 5, 12, 20]
+                    cols = st.columns(4)
+
+                    for i, hz in enumerate(freqs):
+                        with cols[i]:
+                            st.markdown(f"**{hz} Hz**")
+                            # Now passing only df and target_hz (the index math happens inside)
+                            fig = generate_topoplot_figure(df_index, hz)
+                            st.pyplot(fig, clear_figure=True)
 
                 else:
                     st.info("Loading FFT Index Data...")

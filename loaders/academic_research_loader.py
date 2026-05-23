@@ -888,47 +888,65 @@ def get_topoplot_spatial_averages():
     snr_cols = [c for c in df.columns if 'SNR' in c]
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
-def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
-    df_filt = spatial_avg_df[spatial_avg_df['Condition'] == condition].sort_values('Channel')
-    if df_filt.empty:
-        fig, ax = plt.subplots(figsize=(5, 5))
-        fig.patch.set_alpha(0.0)
-        ax.axis('off')
-        return fig
-        
-    spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
+def generate_topoplot_figure(spatial_index_df, target_freq):
+    # Filter for the specific frequency
+    freq_col = f'SNR_{target_freq}Hz' # Assuming input DF is structured by freq columns
+    df_filt = spatial_index_df[spatial_index_df['Freq'] == f'SNR_{target_freq}Hz'].sort_values('Channel')
     
-    # FIX: Use the specific EGI 257-channel montage
-    # MATLAB Analogy: This is like setting the 'ChannelLocation' property 
-    # once for the sensor struct, rather than redefining the struct twice.
+    # Initialize 257 channels with zeros
+    full_data = np.zeros(257) 
+    for _, row in df_filt.iterrows():
+        idx = int(row['Channel']) - 1 
+        if idx < 257: full_data[idx] = row['Index']
+    
+    # Create Mask (False = Gray/Masked, True = Colored/Active)
+    # This assumes ALL_ROI_CHANNELS is already defined in your loader
+    mask = np.zeros(257, dtype=bool)
+    for ch in ALL_ROI_CHANNELS:
+        if ch-1 < 257: mask[ch-1] = True
+    
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
-    
-    # Map the montage names to match the length of your filtered data array
-    valid_names = montage.ch_names[:len(spatial_avg)]
-    
-    # Initialize the Info object once
-    info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
+    info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
-    ax.patch.set_alpha(0.0)
     
-    im, _ = mne.viz.plot_topomap(
-        spatial_avg, 
-        info, 
-        axes=ax, 
-        cmap='viridis', 
-        show=False,
-        contours=0,
-        extrapolate='local'
+    mne.viz.plot_topomap(
+        full_data, info, axes=ax, cmap='RdBu_r', 
+        mask=mask, mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
+        show=False, contours=0, extrapolate='local'
     )
-    
-    cbar = plt.colorbar(im, ax=ax, shrink=0.6, orientation='horizontal', pad=0.05)
-    cbar.set_label(f'SNR ({target_freq}Hz)', color='gray')
-    cbar.ax.tick_params(colors='gray')
-    
     return fig
+
+@st.cache_data
+def get_spatial_index_data():
+    """
+    Computes the Neural Index (Grp - NoGrp / Grp + NoGrp) per channel per frequency.
+    Aggregates to channel-level means.
+    """
+    cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
+    
+    # 1. Melt to long format for easier math
+    df_melt = df.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
+                      value_vars=['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'], 
+                      var_name='Freq', value_name='SNR')
+    
+    # 2. Tag conditions
+    df_melt['Grouping'] = np.where(df_melt['Condition'].str.contains('grp') & ~df_melt['Condition'].str.contains('noGrp'), 
+                                   'Grouped', 'Not Grouped')
+    
+    # 3. Pivot to calculate Index per Subject/Channel/Freq
+    pivoted = df_melt.pivot_table(index=['Subject_ID', 'Channel', 'Freq'], 
+                                   columns='Grouping', values='SNR').reset_index()
+    
+    # Calculate Index: (G - N) / (G + N)
+    pivoted['Index'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
+    
+    # 4. Final aggregate (Subject average)
+    return pivoted.groupby(['Channel', 'Freq'])['Index'].mean().reset_index()
+    
 
 def calculate_vwm_stats(df_stats, metric_col):
     """Calculates paired t-tests for the VWM Grouping conditions."""
