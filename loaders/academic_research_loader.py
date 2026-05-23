@@ -891,55 +891,47 @@ def get_topoplot_spatial_averages():
 
 def generate_topoplot_figure(spatial_index_df, target_freq):
     """
-    Renders the EEG topographic map.
-    MATLAB Analogy: This is your 'plot' command, wrapped in a function that 
-    prepares the 'figure' object and maps the data to the 'channel' struct.
+    Renders topoplot using the Wide-format Index DataFrame.
     """
-    # 1. FIX: Use the argument passed to the function (target_freq)
-    # We filter the dataframe to get only the rows for the frequency we want.
-    # MATLAB: idx = strcmp(spatial_index_df.Freq, ['SNR_' num2str(target_freq) 'Hz']);
-    freq_str = f'SNR_{target_freq}Hz'
-    df_filt = spatial_index_df[spatial_index_df['Freq'] == freq_str].sort_values('Channel')
+    # 1. Use the pre-calculated column name directly (e.g., 'SNR_3Hz')
+    # Because we aggregated earlier, we don't need to filter by 'Freq' anymore.
+    col_name = f'SNR_{target_freq}Hz'
     
+    # Check if the column exists
+    if col_name not in spatial_index_df.columns:
+        st.error(f"Column {col_name} not found. Available: {spatial_index_df.columns.tolist()}")
+        return None
+
     # 2. Initialize 257 channels with zeros
     # This creates our empty canvas. All electrodes start at 0.0 (gray).
     full_data = np.zeros(257) 
     
-    # 3. Map ROI data into the canvas
-    for _, row in df_filt.iterrows():
-        # Ensure we use 0-based indexing for the array
-        idx = int(row['Channel']) - 1
+    # 3. Map the ROI data into the canvas
+    # We iterate over the aggregated DataFrame (which is very small now!)
+    for _, row in spatial_index_df.iterrows():
+        idx = int(row['Channel']) - 1 # Convert 1-based index to 0-based
         if idx < 257:
-            full_data[idx] = row['Index']
+            # We explicitly pull the Index value from the column
+            full_data[idx] = row[col_name]
     
-    # 4. Create Mask (False = Gray/Masked, True = Colored/Active)
-    # We leverage the fact that MNE will treat masked areas as background.
+    # 4. Create Mask (Non-ROI = Gray/0.0)
     mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
-        if ch-1 < 257:
-            mask[ch-1] = True
+        if ch-1 < 257: mask[ch-1] = True
     
-    # 5. Initialize standard montage for EGI 256 system
+    # 5. MNE Plotting logic
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
-    # 6. Render the plot
     fig, ax = plt.subplots(figsize=(5, 5))
-    fig.patch.set_alpha(0.0) # Transparent background for Streamlit integration
+    fig.patch.set_alpha(0.0)
     
     mne.viz.plot_topomap(
-        full_data, 
-        info, 
-        axes=ax, 
-        cmap='RdBu_r', # Red-Blue reversed is standard for Index values (-1 to 1)
-        mask=mask, 
-        mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
-        show=False, 
-        contours=0, 
-        extrapolate='local'
+        full_data, info, axes=ax, cmap='RdBu_r', 
+        mask=mask, mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
+        show=False, contours=0, extrapolate='local'
     )
-    
     return fig
 
 @st.cache_data
