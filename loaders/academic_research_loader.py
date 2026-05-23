@@ -890,47 +890,47 @@ def get_topoplot_spatial_averages():
 
 
 def generate_topoplot_figure(spatial_index_df, target_hz):
-    """
-    Renders topoplot using the Wide-format Index DataFrame.
-    """
-    # 1. FIX: Construct the correct column name directly. 
-    # Do NOT filter by 'Freq' anymore; the loader has already pivoted the data.
     col_name = f'Index_SNR_{target_hz}Hz'
     
-    if col_name not in spatial_index_df.columns:
-        st.error(f"Column '{col_name}' not found. Available columns: {spatial_index_df.columns.tolist()}")
-        return None
-
-    # 2. Initialize 257 channels with zeros (The Cap)
+    # 1. Debug: Check if data is populated
+    # This will appear on the web page and let us see the actual numbers
+    if col_name in spatial_index_df.columns:
+        st.write(f"Debug: Stats for {col_name} - Max: {spatial_index_df[col_name].max():.4f}, Min: {spatial_index_df[col_name].min():.4f}")
+    
     full_data = np.zeros(257) 
     
-    # 3. Map the ROI data directly from the pivoted columns
-    # We no longer need df_filt filtering because the data is already wide.
     for _, row in spatial_index_df.iterrows():
-        # Ensure we use 0-based indexing for the 257-array (row['Channel'] is 1-based)
-        idx = int(row['Channel']) - 1 
-        if idx < 257:
-            # Direct mapping from our new index column
-            full_data[idx] = row[col_name]
-    
-    # 4. Create Mask (Non-ROI = Gray/0.0)
-    # MNE plot_topomap treats masked values as background/gray.
+        # Check if Channel is numeric
+        try:
+            idx = int(row['Channel']) - 1
+            if idx < 257:
+                full_data[idx] = row[col_name]
+        except:
+            continue
+            
+    # 2. Debug: See if the array has any non-zero values at all
+    st.write(f"Debug: Non-zero values in array: {np.count_nonzero(full_data)}")
+
+    # 3. Create Mask
     mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: mask[ch-1] = True
     
-    # 5. Plotting (With Matplotlib figure object creation to ensure thread-safety)
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
-    # Ensure fig and ax are created locally to avoid Streamlit threading warnings
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
+    # 4. FIX: Force vmin/vmax to ensure colors appear even for small values
+    # We set it to -0.5 and 0.5. If your data values are smaller than this, 
+    # adjust these numbers.
     mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
-        mask=mask, mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
+        mask=mask, 
+        mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
+        vmin=-0.5, vmax=0.5, 
         show=False, contours=0, extrapolate='local'
     )
     return fig
