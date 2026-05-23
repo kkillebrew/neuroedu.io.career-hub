@@ -889,10 +889,10 @@ def get_topoplot_spatial_averages():
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
 
+Python
 def generate_topoplot_figure(spatial_index_df, target_hz):
     col_name = f'Index_SNR_{target_hz}Hz'
     
-    # 1. Prepare data array
     full_data = np.zeros(257)
     for _, row in spatial_index_df.iterrows():
         try:
@@ -902,20 +902,11 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         except:
             continue
             
-    # 2. DYNAMIC SCALING (Updated for MNE 1.6.1+)
+    # DYNAMIC SCALING
     abs_max = np.max(np.abs(full_data))
-    
-    # Set a minimum threshold to avoid crashes on zero-variance plots
     v_limit = max(abs_max, 0.01) 
-    
-    # MNE now uses 'vlim' as a tuple (vmin, vmax)
     vlim = (-v_limit, v_limit)
 
-    # 3. Create Mask & Plot
-    mask = np.zeros(257, dtype=bool)
-    for ch in ALL_ROI_CHANNELS:
-        if ch-1 < 257: mask[ch-1] = True
-    
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
@@ -923,14 +914,27 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # Updated with dynamic vmin/vmax
+    # 1. PLOT THE FULL SCALP (No mask applied here)
     mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
-        mask=mask, 
-        mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
-        vlim=vlim, # <--- THIS IS THE FIX
-        show=False, contours=0, extrapolate='local'
+        vlim=vlim, 
+        show=False, contours=0, extrapolate='head' # 'head' ensures full scalp interpolation
     )
+    
+    # 2. OPTIONAL: Highlight ROIs as an overlay
+    # This keeps the nice gray dots for your ROIs without masking the whole plot
+    roi_mask = np.zeros(257, dtype=bool)
+    for ch in ALL_ROI_CHANNELS:
+        if ch-1 < 257: roi_mask[ch-1] = True
+            
+    # Using the mask as an overlay highlight
+    mne.viz.plot_topomap(
+        np.zeros(257), info, axes=ax, 
+        mask=roi_mask,
+        mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
+        show=False, contours=0, extrapolate='head'
+    )
+    
     return fig
 
 @st.cache_data
