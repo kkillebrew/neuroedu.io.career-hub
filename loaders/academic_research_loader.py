@@ -892,47 +892,53 @@ def get_topoplot_spatial_averages():
 def generate_topoplot_figure(spatial_index_df, target_hz):
     col_name = f'Index_SNR_{target_hz}Hz'
     
+    # 1. Safely extract data
     full_data = np.zeros(257)
+    valid_data_points = 0
     for _, row in spatial_index_df.iterrows():
         try:
             idx = int(row['Channel']) - 1
-            if idx < 257:
+            if 0 <= idx < 257:
                 full_data[idx] = row[col_name]
+                if row[col_name] != 0: valid_data_points += 1
         except:
             continue
             
-    # DYNAMIC SCALING
+    # MEMORY GUARDRAIL: If no data, return None to prevent Streamlit from trying to render a crash-inducing plot
+    if valid_data_points == 0:
+        return None
+
+    # 2. Dynamic Scaling (Centering on data variance)
     abs_max = np.max(np.abs(full_data))
-    v_limit = max(abs_max, 0.01) 
+    # Ensure a non-zero range to prevent flat-color scaling
+    v_limit = max(abs_max, 0.001) 
     vlim = (-v_limit, v_limit)
 
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
+    # 3. Create Figure & Plot
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # 1. PLOT THE FULL SCALP (No mask applied here)
     mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
-        vlim=vlim, 
-        show=False, contours=0, extrapolate='head' # 'head' ensures full scalp interpolation
+        vlim=vlim, show=False, contours=0, extrapolate='head'
     )
     
-    # 2. OPTIONAL: Highlight ROIs as an overlay
-    # This keeps the nice gray dots for your ROIs without masking the whole plot
+    # Overlay ROIs
     roi_mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: roi_mask[ch-1] = True
-            
-    # Using the mask as an overlay highlight
-    mne.viz.plot_topomap(
-        np.zeros(257), info, axes=ax, 
-        mask=roi_mask,
-        mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
-        show=False, contours=0, extrapolate='head'
-    )
+    mne.viz.plot_topomap(np.zeros(257), info, axes=ax, mask=roi_mask,
+                         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
+                                      'markeredgecolor': 'gray', 'markersize': 2},
+                         show=False, contours=0, extrapolate='head')
+    
+    # 4. MEMORY CLEANUP (Crucial for Streamlit/Heroku/DigitalOcean)
+    # This prevents the memory leak that causes the loading crashes.
+    plt.close(fig) 
     
     return fig
 
