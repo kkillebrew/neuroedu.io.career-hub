@@ -1,9 +1,13 @@
 # Use a lightweight Python 3.11 image
 FROM python:3.12-slim
 
+# Replace your current apt-get line with this block:
 RUN apt-get update && apt-get install -y \
     build-essential \
     gfortran \
+    libblas-dev \
+    liblapack-dev \
+    pkg-config \
     curl \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
