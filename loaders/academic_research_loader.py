@@ -898,9 +898,15 @@ def generate_topoplot_figure(spatial_avg_df, target_freq, condition):
         
     spatial_avg = df_filt[f'SNR_{target_freq}Hz'].values
     
-    montage = mne.channels.make_standard_montage('standard_1020')
+    # FIX: Use the specific EGI 257-channel montage
+    # MATLAB Analogy: This is like setting the 'ChannelLocation' property 
+    # once for the sensor struct, rather than redefining the struct twice.
+    montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
+    
+    # Map the montage names to match the length of your filtered data array
     valid_names = montage.ch_names[:len(spatial_avg)]
     
+    # Initialize the Info object once
     info = mne.create_info(ch_names=valid_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
