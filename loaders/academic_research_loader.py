@@ -892,52 +892,42 @@ def get_topoplot_spatial_averages():
 def generate_topoplot_figure(spatial_index_df, target_hz):
     col_name = f'Index_SNR_{target_hz}Hz'
     
-    # 1. Safely extract data
+    # 1. Extraction
     full_data = np.zeros(257)
-    valid_data_points = 0
     for _, row in spatial_index_df.iterrows():
         try:
             idx = int(row['Channel']) - 1
             if 0 <= idx < 257:
                 full_data[idx] = row[col_name]
-                if row[col_name] != 0: valid_data_points += 1
         except:
             continue
             
-    # MEMORY GUARDRAIL: If no data, return None to prevent Streamlit from trying to render a crash-inducing plot
-    if valid_data_points == 0:
-        return None
-
-    # 2. Dynamic Scaling (Centering on data variance)
+    # 2. Scaling (Force the colormap to handle very small variance)
+    # Using the absolute max to center the plot's range around the data
     abs_max = np.max(np.abs(full_data))
-    # Ensure a non-zero range to prevent flat-color scaling
-    v_limit = max(abs_max, 0.001) 
-    vlim = (-v_limit, v_limit)
-
+    # If the variance is extremely small, use a floor to ensure colors render
+    v_limit = max(abs_max, 0.01)
+    
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
-    # 3. Create Figure & Plot
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
+    # 3. Plotting with High-Contrast Colormap & Sensor Verification
+    # Changed cmap to 'viridis' to debug range issues. 
+    # Added 'sensors=True' to see if the sensors actually map to the head.
     mne.viz.plot_topomap(
-        full_data, info, axes=ax, cmap='RdBu_r', 
-        vlim=vlim, show=False, contours=0, extrapolate='head'
+        full_data, info, axes=ax, cmap='viridis', 
+        vlim=(-v_limit, v_limit), 
+        show=False, 
+        contours=0, 
+        extrapolate='head',
+        sensors=True  # If you see dots, the montage is mapping to the head correctly
     )
     
-    # Overlay ROIs
-    roi_mask = np.zeros(257, dtype=bool)
-    for ch in ALL_ROI_CHANNELS:
-        if ch-1 < 257: roi_mask[ch-1] = True
-    mne.viz.plot_topomap(np.zeros(257), info, axes=ax, mask=roi_mask,
-                         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
-                                      'markeredgecolor': 'gray', 'markersize': 2},
-                         show=False, contours=0, extrapolate='head')
-    
-    # 4. MEMORY CLEANUP (Crucial for Streamlit/Heroku/DigitalOcean)
-    # This prevents the memory leak that causes the loading crashes.
+    # MEMORY GUARDRAIL
     plt.close(fig) 
     
     return fig
