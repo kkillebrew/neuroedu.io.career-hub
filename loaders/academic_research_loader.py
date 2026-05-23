@@ -719,7 +719,10 @@ def get_processed_vwm_snr():
 @st.cache_data
 def get_processed_fft_index():
     """Calculates the Harmonic Stem Plot Index and 1-sample t-tests."""
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    # CRITICAL FIX: Added 'columns' argument to prevent OOM server crash (infinite spinner)
+    cols = ['Subject_ID', 'Condition', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
+    
     if df.empty: return pd.DataFrame(columns=['Tag', 'Mean_Index', 'Star'])
         
     snr_cols = [c for c in df.columns if 'SNR' in c]
@@ -793,40 +796,34 @@ def get_processed_fft_grid():
 @st.cache_data
 def get_processed_index_spectra():
     """
-    Calculates the Neural Index of Grouping. 
-    Aggregates to subject-level averages BEFORE pivot to save RAM.
+    Calculates the Neural Index of Grouping across the FULL frequency spectrum. 
     """
-    # 1. Fetch only necessary columns to prevent OOM
-    cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
+    # CRITICAL FIX: Repointed to the full_spectrum file to restore the 1-100Hz continuous x-axis.
+    # Added columns filter to prevent OOM crash.
+    cols = ['Subject_ID', 'Condition', 'Frequency_Hz', 'Power']
+    df = _fetch_github_parquet('vwm_eeg_full_spectrum', columns=cols)
+    
     if df.empty: return pd.DataFrame(), pd.DataFrame()
+
+    # 1. Aggregate to Subject-level immediately to shrink RAM footprint
+    df_mean = df.groupby(['Subject_ID', 'Condition', 'Frequency_Hz'])['Power'].mean().reset_index()
     
-    # 2. Memory Optimization: Aggregate to Subject-Condition Level before melting
-    snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
-    df_mean = df.groupby(['Subject_ID', 'Condition'])[snr_cols].mean().reset_index()
-    
-    # 3. Melt
-    df_melted = df_mean.melt(id_vars=['Subject_ID', 'Condition'], 
-                            value_vars=snr_cols, 
-                            var_name='Frequency_Hz', 
-                            value_name='SNR')
-    
-    # 4. Clean labels
-    df_melted['Frequency_Hz'] = df_melted['Frequency_Hz'].str.extract(r'(\d+)').astype(float)
-    df_melted['Pair'] = df_melted['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
-    df_melted['Grouping'] = np.where(df_melted['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
-    
-    # 5. Pivot
-    pivoted = df_melted.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
+    # 2. Assign Pair and Grouping status
+    df_mean['Pair'] = df_mean['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
+    df_mean['Grouping'] = np.where(df_mean['Condition'].str.startswith('grp'), 'Grouped', 'Not Grouped')
+
+    # 3. Pivot the Power values side-by-side
+    pivoted = df_mean.pivot_table(index=['Subject_ID', 'Pair', 'Frequency_Hz'], 
                                    columns='Grouping', 
-                                   values='SNR').reset_index()
-    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
+                                   values='Power').reset_index()
     
-    # 6. Calculate Index
+    pivoted.dropna(subset=['Grouped', 'Not Grouped'], inplace=True)
+
+    # 4. Calculate Index: (Grouped - Not Grouped) / (Grouped + Not Grouped)
     denom = pivoted['Grouped'] + pivoted['Not Grouped']
     pivoted['Index_Value'] = np.where(denom != 0, (pivoted['Grouped'] - pivoted['Not Grouped']) / denom, 0.0)
-    
-    # 7. Final aggregate for spectrum plot
+
+    # 5. Average across subjects for the 12-grid Line Plot
     df_spectra = pivoted.groupby(['Pair', 'Frequency_Hz'])['Index_Value'].mean().reset_index()
 
     return pivoted, df_spectra
@@ -874,7 +871,10 @@ def get_vwm_role_index():
 
 @st.cache_data
 def get_topoplot_spatial_averages():
-    df = _fetch_github_parquet('vwm_eeg_trial_power_summary')
+    # CRITICAL FIX: Added columns argument. Prevents OOM when drawing Topo maps.
+    cols = ['Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+    df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
+    
     if df.empty: return pd.DataFrame()
     snr_cols = [c for c in df.columns if 'SNR' in c]
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
