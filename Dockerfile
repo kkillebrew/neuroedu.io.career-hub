@@ -1,5 +1,5 @@
 # Use a lightweight Python 3.11 image
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install system dependencies required for compiling heavy data libraries
 # MATLAB Analogy: This is like installing the C/C++ MinGW or Fortran Compiler Add-on 
