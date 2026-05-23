@@ -31,6 +31,15 @@ import streamlit as st
 import json
 import time
 
+from scipy import special
+# SHIM: Newer Scipy versions moved/deprecated sph_harm in special. 
+# This ensures MNE 1.6.1 can still find it.
+if not hasattr(special, 'sph_harm'):
+    def sph_harm(m, n, theta, phi):
+        # MNE internally often expects the scipy.special implementation
+        return special.sph_harm(m, n, theta, phi)
+    special.sph_harm = sph_harm
+
 # ROI Channel Map (1-based indices as per your specification)
 ROI_MAP = {
     'O1': [116, 125, 124, 123, 136, 135],

@@ -3,5 +3,5 @@ pandas
 numpy
 plotly
 requests
-scipy>=1.13.0,<1.14.0
+scipy>=1.14.0
 mne==1.6.1
