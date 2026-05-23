@@ -902,13 +902,14 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         except:
             continue
             
-    # 2. DYNAMIC SCALING (MATLAB Analogy: equivalent to caxis manual limits 
-    # based on data variance, rather than a fixed arbitrary scale)
+    # 2. DYNAMIC SCALING (Updated for MNE 1.6.1+)
     abs_max = np.max(np.abs(full_data))
     
-    # Use this if you want the plots to be comparable side-by-side
-    v_limit = 0.06  # Fixed to the approximate max seen in your diagnostic data
-    vmin, vmax = -v_limit, v_limit
+    # Set a minimum threshold to avoid crashes on zero-variance plots
+    v_limit = max(abs_max, 0.01) 
+    
+    # MNE now uses 'vlim' as a tuple (vmin, vmax)
+    vlim = (-v_limit, v_limit)
 
     # 3. Create Mask & Plot
     mask = np.zeros(257, dtype=bool)
@@ -927,7 +928,7 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         full_data, info, axes=ax, cmap='RdBu_r', 
         mask=mask, 
         mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
-        vmin=vmin, vmax=vmax, 
+        vlim=vlim, # <--- THIS IS THE FIX
         show=False, contours=0, extrapolate='local'
     )
     return fig
