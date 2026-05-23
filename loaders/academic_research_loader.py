@@ -889,7 +889,6 @@ def get_topoplot_spatial_averages():
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
 
-Python
 def generate_topoplot_figure(spatial_index_df, target_hz):
     col_name = f'Index_SNR_{target_hz}Hz'
     
