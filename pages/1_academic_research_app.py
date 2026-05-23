@@ -1017,24 +1017,21 @@ with tabs[2]:
 
 
                     # ----------------------------------------------------
-                    # PLOT 4: Topographic Heat Maps
+                    # PLOT 4: Topographic Heat Maps (Normalized Index)
                     # ----------------------------------------------------
                     st.markdown("#### Topographical Maps: Neural Index of Grouping")
-                    st.write("Maps show the Mean Neural Index $(Grp - NoGrp) / (Grp + NoGrp)$. Non-ROI channels are masked.")
+                    df_index = get_spatial_index_data() # This returns the wide-format DF
 
-                    # 1. Fetch the computed index data (averaged by channel/freq)
-                    df_index = get_spatial_index_data() 
-
-                    # 2. Iterate through your target frequencies
                     freqs = [3, 5, 12, 20]
                     cols = st.columns(4)
 
                     for i, hz in enumerate(freqs):
                         with cols[i]:
                             st.markdown(f"**{hz} Hz**")
-                            # Now passing only df and target_hz (the index math happens inside)
+                            # Pass the pre-computed wide DataFrame; the plotter will pick the correct column
                             fig = generate_topoplot_figure(df_index, hz)
-                            st.pyplot(fig, clear_figure=True)
+                            if fig:
+                                st.pyplot(fig, clear_figure=True)
 
                 else:
                     st.info("Loading FFT Index Data...")

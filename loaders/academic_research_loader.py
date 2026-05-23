@@ -889,41 +889,42 @@ def get_topoplot_spatial_averages():
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
 
-def generate_topoplot_figure(spatial_index_df, target_freq):
+def generate_topoplot_figure(spatial_index_df, target_hz):
     """
     Renders topoplot using the Wide-format Index DataFrame.
     """
-    # 1. Use the pre-calculated column name directly (e.g., 'SNR_3Hz')
-    # Because we aggregated earlier, we don't need to filter by 'Freq' anymore.
-    col_name = f'SNR_{target_freq}Hz'
+    # 1. FIX: Construct the correct column name directly. 
+    # Do NOT filter by 'Freq' anymore; the loader has already pivoted the data.
+    col_name = f'Index_SNR_{target_hz}Hz'
     
-    # Check if the column exists
     if col_name not in spatial_index_df.columns:
-        st.error(f"Column {col_name} not found. Available: {spatial_index_df.columns.tolist()}")
+        st.error(f"Column '{col_name}' not found. Available columns: {spatial_index_df.columns.tolist()}")
         return None
 
-    # 2. Initialize 257 channels with zeros
-    # This creates our empty canvas. All electrodes start at 0.0 (gray).
+    # 2. Initialize 257 channels with zeros (The Cap)
     full_data = np.zeros(257) 
     
-    # 3. Map the ROI data into the canvas
-    # We iterate over the aggregated DataFrame (which is very small now!)
+    # 3. Map the ROI data directly from the pivoted columns
+    # We no longer need df_filt filtering because the data is already wide.
     for _, row in spatial_index_df.iterrows():
-        idx = int(row['Channel']) - 1 # Convert 1-based index to 0-based
+        # Ensure we use 0-based indexing for the 257-array (row['Channel'] is 1-based)
+        idx = int(row['Channel']) - 1 
         if idx < 257:
-            # We explicitly pull the Index value from the column
+            # Direct mapping from our new index column
             full_data[idx] = row[col_name]
     
     # 4. Create Mask (Non-ROI = Gray/0.0)
+    # MNE plot_topomap treats masked values as background/gray.
     mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: mask[ch-1] = True
     
-    # 5. MNE Plotting logic
+    # 5. Plotting (With Matplotlib figure object creation to ensure thread-safety)
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
+    # Ensure fig and ax are created locally to avoid Streamlit threading warnings
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
