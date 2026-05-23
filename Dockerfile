@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory inside the container
 WORKDIR /app
 
+# CRITICAL FIX: Upgrade build tools before installing dependencies
+# MATLAB Analogy: This is like running 'update' on your toolbox manager 
+# before installing a library to ensure the installer is compatible with the new version.
+RUN pip install --upgrade pip setuptools wheel
+
 # Copy the dependency list first to leverage Docker's caching
 COPY requirements.txt .
 
