@@ -888,65 +888,98 @@ def get_topoplot_spatial_averages():
     snr_cols = [c for c in df.columns if 'SNR' in c]
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
+Python
 def generate_topoplot_figure(spatial_index_df, target_freq):
-    # Filter for the specific frequency
-    freq_col = f'SNR_{target_freq}Hz' # Assuming input DF is structured by freq columns
-    df_filt = spatial_index_df[spatial_index_df['Freq'] == f'SNR_{target_freq}Hz'].sort_values('Channel')
+    """
+    Renders the EEG topographic map.
+    MATLAB Analogy: This is your 'plot' command, wrapped in a function that 
+    prepares the 'figure' object and maps the data to the 'channel' struct.
+    """
+    # 1. FIX: Use the argument passed to the function (target_freq)
+    # We filter the dataframe to get only the rows for the frequency we want.
+    # MATLAB: idx = strcmp(spatial_index_df.Freq, ['SNR_' num2str(target_freq) 'Hz']);
+    freq_str = f'SNR_{target_freq}Hz'
+    df_filt = spatial_index_df[spatial_index_df['Freq'] == freq_str].sort_values('Channel')
     
-    # Initialize 257 channels with zeros
+    # 2. Initialize 257 channels with zeros
+    # This creates our empty canvas. All electrodes start at 0.0 (gray).
     full_data = np.zeros(257) 
-    for _, row in df_filt.iterrows():
-        idx = int(row['Channel']) - 1 
-        if idx < 257: full_data[idx] = row['Index']
     
-    # Create Mask (False = Gray/Masked, True = Colored/Active)
-    # This assumes ALL_ROI_CHANNELS is already defined in your loader
+    # 3. Map ROI data into the canvas
+    for _, row in df_filt.iterrows():
+        # Ensure we use 0-based indexing for the array
+        idx = int(row['Channel']) - 1
+        if idx < 257:
+            full_data[idx] = row['Index']
+    
+    # 4. Create Mask (False = Gray/Masked, True = Colored/Active)
+    # We leverage the fact that MNE will treat masked areas as background.
     mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
-        if ch-1 < 257: mask[ch-1] = True
+        if ch-1 < 257:
+            mask[ch-1] = True
     
+    # 5. Initialize standard montage for EGI 256 system
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
+    # 6. Render the plot
     fig, ax = plt.subplots(figsize=(5, 5))
-    fig.patch.set_alpha(0.0)
+    fig.patch.set_alpha(0.0) # Transparent background for Streamlit integration
     
     mne.viz.plot_topomap(
-        full_data, info, axes=ax, cmap='RdBu_r', 
-        mask=mask, mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
-        show=False, contours=0, extrapolate='local'
+        full_data, 
+        info, 
+        axes=ax, 
+        cmap='RdBu_r', # Red-Blue reversed is standard for Index values (-1 to 1)
+        mask=mask, 
+        mask_params={'marker': 'o', 'markerfacecolor': 'gray', 'markeredgecolor': 'none'},
+        show=False, 
+        contours=0, 
+        extrapolate='local'
     )
+    
     return fig
 
 @st.cache_data
 def get_spatial_index_data():
     """
-    Computes the Neural Index (Grp - NoGrp / Grp + NoGrp) per channel per frequency.
-    Aggregates to channel-level means.
+    Computes the Neural Index using PRE-AGGREGATION to save RAM.
     """
     cols = ['Subject_ID', 'Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary', columns=cols)
+    if df.empty: return pd.DataFrame()
+
+    # 1. AGGREGATE FIRST (The Memory Saver)
+    # MATLAB Analogy: Use 'groupsummary' to reduce the matrix size before doing any math.
+    snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
+    df_agg = df.groupby(['Subject_ID', 'Channel', 'Condition'])[snr_cols].mean().reset_index()
     
-    # 1. Melt to long format for easier math
-    df_melt = df.melt(id_vars=['Subject_ID', 'Condition', 'Channel'], 
-                      value_vars=['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz'], 
-                      var_name='Freq', value_name='SNR')
+    # 2. Assign Grouping Tag
+    df_agg['Grouping'] = np.where(
+        df_agg['Condition'].str.contains('grp') & ~df_agg['Condition'].str.contains('noGrp'), 
+        'Grouped', 'Not Grouped'
+    )
     
-    # 2. Tag conditions
-    df_melt['Grouping'] = np.where(df_melt['Condition'].str.contains('grp') & ~df_melt['Condition'].str.contains('noGrp'), 
-                                   'Grouped', 'Not Grouped')
+    # 3. Pivot (Now working on a tiny aggregated table, not the raw trial data)
+    # We pivot to get Grouped/Not Grouped side-by-side
+    pivoted = df_agg.pivot_table(
+        index=['Subject_ID', 'Channel', 'Grouping'], 
+        values=snr_cols
+    ).unstack(level='Grouping') # This puts Grouped/Not Grouped in columns
     
-    # 3. Pivot to calculate Index per Subject/Channel/Freq
-    pivoted = df_melt.pivot_table(index=['Subject_ID', 'Channel', 'Freq'], 
-                                   columns='Grouping', values='SNR').reset_index()
+    # 4. Calculate Index: (G - N) / (G + N)
+    # We iterate over frequencies to keep the code clean and vectorized
+    results = pd.DataFrame(index=pivoted.index)
+    for hz in snr_cols:
+        G = pivoted[(hz, 'Grouped')]
+        N = pivoted[(hz, 'Not Grouped')]
+        results[f'Index_{hz}'] = (G - N) / (G + N)
     
-    # Calculate Index: (G - N) / (G + N)
-    pivoted['Index'] = (pivoted['Grouped'] - pivoted['Not Grouped']) / (pivoted['Grouped'] + pivoted['Not Grouped'])
-    
-    # 4. Final aggregate (Subject average)
-    return pivoted.groupby(['Channel', 'Freq'])['Index'].mean().reset_index()
-    
+    # 5. Final aggregate across subjects
+    return results.groupby(['Channel']).mean().reset_index()
+
 
 def calculate_vwm_stats(df_stats, metric_col):
     """Calculates paired t-tests for the VWM Grouping conditions."""
