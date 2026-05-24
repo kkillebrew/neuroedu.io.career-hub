@@ -24,6 +24,7 @@ from career_hub_sidebar import apply_global_settings, render_sidebar
 
 # This import now works because the circular reference is broken in the component file
 from pages.components.geometry_demo import render_geometry_area_demo
+from pages.components.probability_demo import render_probability_demo  # <-- NEW: Import Galton Board
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -92,29 +93,14 @@ elif "Probability" in active_lesson:
     st.subheader("Visualizing Probability Space")
     st.write("Instead of tracking abstract formulas, children learn better by seeing outcomes populate a frequency plane.")
     
-    # Simulating rolling dice or choosing chips
+    # 1. Parameter Input
     num_samples = st.selectbox("Select Number of Empirical Trials to Run:", [10, 50, 200, 500])
     
-    import numpy as np
-    import pandas as pd
-    import plotly.express as px
-    
-    np.random.seed(42)
-    x_outcomes = np.random.randint(1, 7, size=num_samples)
-    y_outcomes = np.random.randint(1, 7, size=num_samples)
-    df_prob = pd.DataFrame({'Die 1': x_outcomes, 'Die 2': y_outcomes})
-    df_prob['Sum'] = df_prob['Die 1'] + df_prob['Die 2']
-    
-    # Group results for distribution layout
-    df_dist = df_prob['Sum'].value_counts().reset_index().sort_values('Sum')
-    
-    fig_prob = px.bar(df_dist, x='Sum', y='count', labels={'count': 'Times Rolled', 'Sum': 'Sum of Two Dice'}, title=f"Empirical Frequency Distribution Across {num_samples} Matrix Points")
-    fig_prob.update_traces(marker_color='#38BDF8')
-    fig_prob.update_layout(
-        height=300, 
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig_prob, use_container_width=True, config={'displayModeBar': False})
+    # 2. Render the Matter.js Physics Component
+    # We no longer process Pandas/NumPy arrays here. We pass the parameter directly 
+    # to the browser to handle the Plinko state machine.
+    st.info("💡 **Watch the Distribution Form**\n\nNotice how the random binary choices at each peg naturally assemble into a Gaussian distribution.")
+    render_probability_demo(sample_count=num_samples)
 
 st.divider()
 
