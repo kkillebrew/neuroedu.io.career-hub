@@ -226,7 +226,7 @@ def render_geometry_area_demo(base_units, height_units):
                 let alphaNum = t > 2000 ? Math.min(1, (t - 2000) / 1500) : 0;
                 let alphaAreaTri = t > 10500 ? Math.min(1, (t - 10500) / 1500) : 0;
 
-                if (t < 7000) {{}
+                if (t < 7000) {{
                     drawFadingText(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, eqX - slotWidth, 120, slotWidth);
                     drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', alphaNum, eqX + eqWidth, 120, slotWidth);
                     context.fillText(" × ", eqX + eqWidth + slotWidth + 20, 120);
