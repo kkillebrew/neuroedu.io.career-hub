@@ -185,14 +185,14 @@ def render_geometry_area_demo(base_units, height_units):
                     let moveY = Math.sin(perpAngle) * delta;
                     
                     // Triangle group 1 (Left Side Assembly + Left Sword Cap) slides away
-                    Body.translate(ceiling, {x: -moveX, y: -moveY});
-                    Body.translate(leftWall, {x: -moveX, y: -moveY});
-                    Body.translate(splitLeft, {x: -moveX, y: -moveY});
+                    Body.translate(ceiling, {{x: -moveX, y: -moveY}});
+                    Body.translate(leftWall, {{x: -moveX, y: -moveY}});
+                    Body.translate(splitLeft, {{x: -moveX, y: -moveY}});
                     
                     // Triangle group 2 (Right Side Assembly + Right Sword Cap) slides away opposite
-                    Body.translate(ground, {x: moveX, y: moveY});
-                    Body.translate(rightWall, {x: moveX, y: moveY});
-                    Body.translate(splitRight, {x: moveX, y: moveY});
+                    Body.translate(ground, {{x: moveX, y: moveY}});
+                    Body.translate(rightWall, {{x: moveX, y: moveY}});
+                    Body.translate(splitRight, {{x: moveX, y: moveY}});
                 }}
             }});
 
@@ -227,19 +227,19 @@ def render_geometry_area_demo(base_units, height_units):
                 const fy = 120;
                 let currentX = fx;
                 
-                function drawText(text, color) {
+                function drawText(text, color) {{
                     context.fillStyle = color;
                     context.fillText(text, currentX, fy);
                     currentX += context.measureText(text).width;
-                }
+                }}
 
-                if (t < 7000) {
+                if (t < 7000) {{
                     drawText("Area", '#475569'); drawText(" = ", '#475569');
                     drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
-                } else {
+                }} else {{
                     drawText("Area", '#475569'); drawText(" = ", '#475569'); drawText("½", '#475569');
                     drawText(" × ", '#475569'); drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
-                }
+                }}
 
                 // 2. Draw Orbiting Upright Side Labels
                 let off = (thickness / 2) + 30;
