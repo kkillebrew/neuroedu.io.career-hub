@@ -11,8 +11,11 @@ DESCRIPTION:
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import mne
 
+# <--- CRITICAL FIX 1: Wipes all zombie figures from memory on every UI rerun
+plt.close('all')
+
+import mne
 import streamlit as st
 import sys
 import os
@@ -1036,6 +1039,8 @@ with tabs[2]:
                             fig = generate_topoplot_figure(df_index, hz, show_colorbar=1)
                             if fig:
                                 st.pyplot(fig, clear_figure=True)
+                                # <--- CRITICAL FIX 2: Forces immediate RAM garbage collection 
+                                plt.close(fig)
 
                 else:
                     st.info("Loading FFT Index Data...")

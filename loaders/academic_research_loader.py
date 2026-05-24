@@ -559,7 +559,9 @@ def get_rotating_line_data():
         if response.status_code != 200:
             return None, None
             
-        df = pd.read_parquet(BytesIO(response.content))
+        d# <--- CRITICAL FIX 3: Explicitly define columns to prevent loading unused data into RAM
+        cols_to_keep = ['Subject_ID', 'Task', 'Size', 'X_Value', 'Percent_Faster']
+        df = pd.read_parquet(BytesIO(response.content), columns=cols_to_keep)
         
         # --- THE MATH ENGINES ---
         def sigmoid_curve(x, k, x0):
