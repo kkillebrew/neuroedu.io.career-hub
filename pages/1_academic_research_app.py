@@ -1008,38 +1008,59 @@ elif "Encoding Visual Objects" in active_project:
                     st.divider()
 
                     # ----------------------------------------------------
-                    # PLOT 3: The Harmonic Index Stem Plot (Moved here)
+                    # PLOT 3: The Harmonic Index Stem Plot (Updated)
                     # ----------------------------------------------------
                     st.markdown("#### Harmonic Index Analysis")
                     st.write("We use this index to isolate neural variance driven by grouping (target vs. non-probed).")
                     
-                    # We reuse the df_spectra we already processed for the 12-grid
-                    # but we need to derive the index stats for this specific stem plot format
+                    # --- INTERACTIVE WIDGET ---
+                    # Allows the user to toggle the visual noise of significance markers
+                    show_stars = st.checkbox("Show Significance Markers (*)", value=True, key="toggle_stars_idx")
+
+                    # Load the data
                     df_idx_stats = get_processed_fft_index()
                     
                     fig_index = go.Figure()
                     
-                    # Stems
+                    # Stems (The vertical lines)
                     fig_index.add_trace(go.Bar(
-                        x=df_idx_stats['Tag'], y=df_idx_stats['Mean_Index'], 
-                        width=0.05, marker_color='black', showlegend=False
+                        x=df_idx_stats['Tag'], 
+                        y=df_idx_stats['Mean_Index'], 
+                        width=0.05, 
+                        marker_color='black', 
+                        showlegend=False
                     ))
                     
-                    # Caps
+                    # Caps (The scatter points on top)
+                    # We conditionally render the 'text' property based on the Streamlit widget state
                     fig_index.add_trace(go.Scatter(
-                        x=df_idx_stats['Tag'], y=df_idx_stats['Mean_Index'],
-                        mode='markers+text', marker=dict(size=12, color='#10b981', line=dict(width=2, color='white')),
-                        text=df_idx_stats['Star'], textposition='top center',
-                        textfont=dict(size=16, color='black'), showlegend=False
+                        x=df_idx_stats['Tag'], 
+                        y=df_idx_stats['Mean_Index'],
+                        mode='markers+text' if show_stars else 'markers', 
+                        marker=dict(size=12, color='#10b981', line=dict(width=2, color='white')),
+                        text=df_idx_stats['Star'] if show_stars else None, 
+                        textposition='top center',
+                        textfont=dict(size=16, color='black'), 
+                        showlegend=False
                     ))
                     
                     fig_index.add_hline(y=0.0, line_color='red', line_width=1)
+                    
+                    # --- THE FIX: ENFORCING X-AXIS CATEGORY ORDER ---
+                    # By explicitly declaring categoryorder='array' and providing the array,
+                    # we override Plotly's default alphanumeric string sorting.
                     fig_index.update_layout(
                         title="Harmonic Index Values Across All Pair Combinations",
                         yaxis_title="Index Value (Grouped > Not Grouped)",
-                        xaxis_title="Harmonic Identifier",
+                        xaxis=dict(
+                            title="Harmonic Identifier",
+                            type='category', # Enforce categorical axis
+                            categoryorder='array', 
+                            categoryarray=['3Hz', '5Hz', '12Hz', '20Hz'] # The correct numerical progression
+                        ),
                         height=450
                     )
+                    
                     st.plotly_chart(fig_index, use_container_width=True, config=PLOTLY_CONFIG)
 
 
