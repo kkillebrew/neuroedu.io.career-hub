@@ -20,6 +20,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # --- IMPORT DATA ---
 from loaders.mentorship_loader import get_mentorship_data
 
+# Because we added the root to sys.path, we import from the package 'pages.components'
+from pages.components.geometry_demo import render_geometry_area_demo
+
 from career_hub_loader import (
     get_biographic_metadata,
     get_portfolio_metadata
