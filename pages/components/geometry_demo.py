@@ -20,10 +20,8 @@ import streamlit.components.v1 as components
 
 def render_geometry_area_demo(base_units, height_units):
     """
-    Renders a 10-second physics-based mathematical transformation loop.
-    Uses Matter.js to simulate marbles filling the area, tipping, and splitting.
+    Renders the physics-based Area transformation.
     """
-    
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -37,173 +35,138 @@ def render_geometry_area_demo(base_units, height_units):
     <body>
         <canvas id="geomCanvas" width="700" height="400"></canvas>
         <script>
-            // --- 1. PHYSICS ENGINE INITIALIZATION ---
-            const Engine = Matter.Engine,
-                  Render = Matter.Render,
-                  Runner = Matter.Runner,
-                  Bodies = Matter.Bodies,
-                  Body = Matter.Body,
-                  Composite = Matter.Composite,
-                  Events = Matter.Events;
+            const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner;
+            const Bodies = Matter.Bodies, Body = Matter.Body, Composite = Matter.Composite, Events = Matter.Events;
 
             const engine = Engine.create();
-            
-            // Bulletproof gravity call (handles both old and new Matter.js versions)
             const gravity = engine.gravity || engine.world.gravity;
-            gravity.y = 1;
-            gravity.x = 0;
+            gravity.y = 1; gravity.x = 0;
 
-            const canvas = document.getElementById('geomCanvas');
             const render = Render.create({{
-                canvas: canvas,
-                engine: engine,
-                options: {{
-                    width: 700,
-                    height: 400,
-                    wireframes: false, 
-                    background: 'transparent'
-                }}
+                canvas: document.getElementById('geomCanvas'), engine: engine,
+                options: {{ width: 700, height: 400, wireframes: false, background: 'transparent' }}
             }});
 
-            // --- 2. DYNAMIC GEOMETRY SCALING ---
-            const U = 40; 
+            const U = 35; 
             const W = {base_units} * U;
             const H = {height_units} * U;
-            const cx = 450; 
-            const cy = 200;
+            const cx = 450; const cy = 200;
             
-            // Calculate marble radius to perfectly fill 65% of the bounding area
-            const packingFraction = 0.65;
-            const targetArea = W * H * packingFraction;
-            const r = Math.sqrt(targetArea / (100 * Math.PI));
-
-            // --- 3. CONSTRUCTING THE RIGID BODIES ---
-            const thickness = 60; // Thick walls prevent high-speed tunneling
-            const wallColor = '#475569';
-            const wallOpt = {{ isStatic: true, friction: 0.0, render: {{ fillStyle: wallColor }} }};
+            // Calculate exactly 100 marbles to fill ~85% of the space
+            const r = Math.sqrt((W * H * 0.85) / (100 * Math.PI));
+            const thickness = 40; 
+            const wallOpt = {{ isStatic: true, friction: 0.0, render: {{ fillStyle: '#475569' }} }};
             
+            // Build the components
             let ground = Bodies.rectangle(cx, cy + H/2 + thickness/2, W + thickness*2, thickness, wallOpt);
             let ceiling = Bodies.rectangle(cx, cy - H/2 - thickness/2, W + thickness*2, thickness, wallOpt);
-            let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H, wallOpt);
-            let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H, wallOpt);
+            let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H + thickness*2, wallOpt);
+            let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H + thickness*2, wallOpt);
 
-            // The Diagonal Bulldozer (Bottom-Left to Top-Right)
-            const diagLength = Math.sqrt(W*W + H*H);
-            const diagAngle = -Math.atan2(H, W); 
-            let splitter = Bodies.rectangle(cx, cy, diagLength, 8, {{
-                isStatic: true,
-                angle: diagAngle,
-                friction: 0.0,
-                render: {{ fillStyle: '#EF4444' }} 
-            }});
+            // The Splitters (Two overlapping lines that will form the inner walls of the triangles)
+            const diagLength = Math.sqrt(W*W + H*H) + 10;
+            const diagAngle = Math.atan2(H, -W); // Angle from TR to BL
             
-            Body.setPosition(splitter, {{ x: -1000, y: -1000 }}); // Hide initially
-            Composite.add(engine.world, [ground, ceiling, leftWall, rightWall, splitter]);
+            const splitOpt = {{ isStatic: true, friction: 0.0, angle: diagAngle, render: {{ fillStyle: '#EF4444' }} }};
+            let splitLeft = Bodies.rectangle(cx, cy - 800, diagLength, 6, splitOpt);
+            let splitRight = Bodies.rectangle(cx, cy - 800, diagLength, 6, splitOpt);
+
+            // Group them to rotate the box easily
+            let box = Composite.create();
+            Composite.add(box, [ground, ceiling, leftWall, rightWall, splitLeft, splitRight]);
+            Composite.add(engine.world, box);
 
             let marbles = [];
-            let marbleCount = 0;
-
-            // --- 4. THE CHOREOGRAPHY STATE MACHINE ---
-            let startTime = performance.now();
-            let phase = 0;
             
-            function easeInOutSine(x) {{
-                return -(Math.cos(Math.PI * x) - 1) / 2;
-            }}
+            // Target angle to make the TR-BL diagonal perfectly vertical
+            const targetTilt = -Math.PI/2 - diagAngle; 
+
+            let startTime = performance.now();
+            let phase = -1;
+            let currentRotation = 0;
+
+            function easeInOut(x) {{ return -(Math.cos(Math.PI * x) - 1) / 2; }}
 
             Events.on(engine, 'beforeUpdate', function() {{
                 let t = performance.now() - startTime;
-                let cycle = t % 11000; // 11-second master loop
+                let cycle = t % 12000; 
 
-                // PHASE 1: Reset (0 - 100ms)
+                // PHASE 1: Rapid Grid Pour (0 - 2000ms)
                 if (cycle < 100 && phase !== 1) {{
                     phase = 1;
                     marbles.forEach(m => Composite.remove(engine.world, m));
                     marbles = [];
-                    marbleCount = 0;
-                    
-                    gravity.x = 0;
-                    gravity.y = 1;
+                    Composite.rotate(box, -currentRotation, {{x: cx, y: cy}}); // Reset rotation
+                    currentRotation = 0;
                     
                     Body.setPosition(ground, {{ x: cx, y: cy + H/2 + thickness/2 }});
                     Body.setPosition(ceiling, {{ x: cx, y: cy - H/2 - thickness/2 }});
                     Body.setPosition(leftWall, {{ x: cx - W/2 - thickness/2, y: cy }});
                     Body.setPosition(rightWall, {{ x: cx + W/2 + thickness/2, y: cy }});
-                    Body.setPosition(splitter, {{ x: -1000, y: -1000 }}); 
-                }}
-                
-                // PHASE 1b: Pour Marbles (100ms - 2000ms)
-                else if (cycle >= 100 && cycle < 2000 && marbleCount < 100) {{
-                    // Drop 2 marbles per physics frame to simulate pouring
-                    for(let k=0; k<2; k++) {{
-                        if(marbleCount >= 100) break;
-                        let m = Bodies.circle(cx + (Math.random()*(W - r*4)) - (W/2 - r*2), cy - H/2 + r*2 + Math.random()*10, r, {{
-                            restitution: 0.3,
-                            friction: 0.05,
+                    Body.setPosition(splitLeft, {{ x: cx, y: cy - 800 }});
+                    Body.setPosition(splitRight, {{ x: cx, y: cy - 800 }});
+
+                    // Pour 100 marbles
+                    for(let i=0; i<100; i++) {{
+                        let m = Bodies.circle(cx + (Math.random()*(W-r*2)) - W/2 + r, cy - H/2 + r*2 + (i*2), r, {{
+                            restitution: 0.2, friction: 0.05,
                             render: {{ fillStyle: '#38BDF8', strokeStyle: '#0284C7', lineWidth: 1 }}
                         }});
                         marbles.push(m);
                         Composite.add(engine.world, m);
-                        marbleCount++;
                     }}
                 }}
                 
-                // PHASE 2: Tip the Gravity Vector (3000ms - 4500ms)
-                else if (cycle >= 3000 && cycle < 4500) {{
+                // PHASE 2: Tip to Diamond (2500 - 4000ms)
+                else if (cycle >= 2500 && cycle < 4000) {{
                     phase = 2;
-                    let p = (cycle - 3000) / 1500;
-                    let angle = easeInOutSine(p) * (Math.PI / 4); // Tip 45 degrees
-                    gravity.x = Math.sin(angle);
-                    gravity.y = Math.cos(angle);
+                    let p = (cycle - 2500) / 1500;
+                    let desiredRotation = easeInOut(p) * targetTilt;
+                    let delta = desiredRotation - currentRotation;
+                    Composite.rotate(box, delta, {{x: cx, y: cy}});
+                    currentRotation = desiredRotation;
                     
-                    // Add slight jitter to unstick jammed marbles
-                    if (Math.random() < 0.1) {{
-                        marbles.forEach(m => {{
-                            Body.setVelocity(m, {{ x: m.velocity.x + (Math.random()-0.5), y: m.velocity.y + (Math.random()-0.5) }});
-                        }});
-                    }}
+                    // Jitter marbles to settle them deeply into the corner
+                    if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.001, y: 0}}));
                 }}
                 
-                // PHASE 3: Slide the Bulldozer Splitter (5500ms - 7000ms)
-                else if (cycle >= 5500 && cycle < 7000) {{
+                // PHASE 3: Slide Wedge Down (4500 - 6500ms)
+                else if (cycle >= 4500 && cycle < 6500) {{
                     phase = 3;
-                    let p = (cycle - 5500) / 1500;
-                    let pop = easeInOutSine(p);
+                    let p = (cycle - 4500) / 2000;
+                    let dropY = (cy - 800) + (800 * easeInOut(p));
                     
-                    // Slide the diagonal from the Bottom-Right corner into the Center
-                    let startX = cx + W/2;
-                    let startY = cy + H/2;
-                    Body.setPosition(splitter, {{
-                        x: startX + (cx - startX) * pop,
-                        y: startY + (cy - startY) * pop
-                    }});
+                    // The blades slide down the absolute Y axis (which aligns perfectly with the tilted diagonal)
+                    Body.setPosition(splitLeft, {{ x: cx, y: dropY }});
+                    Body.setPosition(splitRight, {{ x: cx, y: dropY }});
                 }}
                 
-                // PHASE 4: Pop Apart into Triangles (7500ms - 9000ms)
-                else if (cycle >= 7500 && cycle < 9000) {{
+                // PHASE 4: Pop Apart (7000 - 8500ms)
+                else if (cycle >= 7000 && cycle < 8500) {{
                     phase = 4;
-                    let p = (cycle - 7500) / 1500;
-                    let pop = easeInOutSine(p) * 20; // Maximum separation distance
+                    let p = (cycle - 7000) / 1500;
+                    let pop = easeInOut(p) * 2; // Move 2px per frame outwards
                     
-                    // Top-Left half moves Up/Left, Bottom-Right half moves Down/Right
-                    Body.setPosition(leftWall, {{ x: cx - W/2 - thickness/2 - pop, y: cy - pop }});
-                    Body.setPosition(ceiling, {{ x: cx - pop, y: cy - H/2 - thickness/2 - pop }});
+                    // Move Left Triangle group (Top, Left, SplitLeft) to the left
+                    Body.translate(ceiling, {{x: -pop, y: 0}});
+                    Body.translate(leftWall, {{x: -pop, y: 0}});
+                    Body.translate(splitLeft, {{x: -pop, y: 0}});
                     
-                    Body.setPosition(rightWall, {{ x: cx + W/2 + thickness/2 + pop, y: cy + pop }});
-                    Body.setPosition(ground, {{ x: cx + pop, y: cy + H/2 + thickness/2 + pop }});
+                    // Move Right Triangle group (Bottom, Right, SplitRight) to the right
+                    Body.translate(ground, {{x: pop, y: 0}});
+                    Body.translate(rightWall, {{x: pop, y: 0}});
+                    Body.translate(splitRight, {{x: pop, y: 0}});
                 }}
             }});
 
-            // --- 5. OVERLAY THE FORMULA (Runs after physics calculation) ---
+            // --- 5. OVERLAY FORMULA ---
             Events.on(render, 'afterRender', function() {{
                 const context = render.context;
-                let t = (performance.now() - startTime) % 11000;
-                
-                context.font = "bold 32px sans-serif";
-                context.textAlign = "left";
-                const fx = 50; const fy = 210;
+                let t = (performance.now() - startTime) % 12000;
+                context.font = "bold 32px sans-serif"; context.textAlign = "left";
+                const fx = 30; const fy = 210;
 
-                if (t < 5500) {{
+                if (t < 7000) {{
                     context.fillStyle = '#475569'; context.fillText("Area = ", fx, fy);
                     context.fillStyle = '#38BDF8'; context.fillText("b", fx + 110, fy);
                     context.fillStyle = '#475569'; context.fillText(" × ", fx + 130, fy);
@@ -222,5 +185,4 @@ def render_geometry_area_demo(base_units, height_units):
     </body>
     </html>
     """
-    
     components.html(html_code, height=420)
