@@ -191,7 +191,7 @@ def render_geometry_area_demo(base_units, height_units):
             }}
 
             // --- FIXED-WIDTH FADE ENGINE ---
-            function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y, fixedWidth) {{}
+            function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y, fixedWidth) {{
                 context.textAlign = "center"; // Center text within the reserved fixedWidth slot
                 let centerX = x + fixedWidth / 2;
 
@@ -207,7 +207,7 @@ def render_geometry_area_demo(base_units, height_units):
                 return x + fixedWidth;
             }}
 
-            Events.on(render, 'afterRender', function() {{}
+            Events.on(render, 'afterRender', function() {{
                 const context = render.context;
                 let t = (performance.now() - startTime) % 15000;
                 
