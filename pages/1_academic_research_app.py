@@ -1020,7 +1020,7 @@ with tabs[2]:
                     # PLOT 4: Topographic Heat Maps (Normalized Index)
                     # ----------------------------------------------------
                     st.markdown("#### Topographical Maps: Neural Index of Grouping")
-                    df_index = get_spatial_index_data() # This returns the wide-format DF
+                    df_index = get_spatial_index_data()
 
                     freqs = [3, 5, 12, 20]
                     cols = st.columns(4)
@@ -1028,8 +1028,12 @@ with tabs[2]:
                     for i, hz in enumerate(freqs):
                         with cols[i]:
                             st.markdown(f"**{hz} Hz**")
-                            # Pass the pre-computed wide DataFrame; the plotter will pick the correct column
-                            fig = generate_topoplot_figure(df_index, hz)
+                            
+                            # UI TACTICAL RULE: Activate the colorbar logic ONLY on the first column (index 0 / 3 Hz)
+                            # to anchor the color mapping scale without creating visual repetition across columns.
+                            is_first_column = (i == 0)
+                            
+                            fig = generate_topoplot_figure(df_index, hz, show_colorbar=is_first_column)
                             if fig:
                                 st.pyplot(fig, clear_figure=True)
 

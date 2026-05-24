@@ -889,13 +889,19 @@ def get_topoplot_spatial_averages():
     return df.groupby(['Condition', 'Channel'])[snr_cols].mean().reset_index()
 
 
-def generate_topoplot_figure(spatial_index_df, target_hz):
+def generate_topoplot_figure(spatial_index_df, target_hz, show_colorbar=False):
+    """
+    Renders an MNE topographical map on a transparent Matplotlib axis.
+    
+    MATLAB Analogy: Equivalent to calling topoplot(data, channel_locations) 
+    and using colorbar() conditionally based on an input flag.
+    """
     col_name = f'Index_SNR_{target_hz}Hz'
     
     if col_name not in spatial_index_df.columns:
         return None
 
-    # 1. Initialize and Extract Safely
+    # 1. Map DataFrame channels to our strict 257-sensor spatial array
     full_data = np.zeros(257)
     for _, row in spatial_index_df.iterrows():
         try:
@@ -905,36 +911,49 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         except (ValueError, TypeError):
             continue
             
-    # 2. Neutralize NaN Poisoning (from reference channels)
+    # 2. Clear out any NaN division artifacts from reference/vertex channels
     full_data = np.nan_to_num(full_data, nan=0.0, posinf=0.0, neginf=0.0)
     
-    # 3. Dynamic Scaling 
+    # 3. Establish fixed symmetrical bounds based on maximum global variance
     abs_max = np.max(np.abs(full_data))
     v_limit = max(abs_max, 0.001) 
+    vlim = (-v_limit, v_limit)
     
+    # 4. Bind the data tensor to the geodesic GSN-HydroCel sensor layout
     montage = mne.channels.make_standard_montage('GSN-HydroCel-257')
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
-    # 4. Initialize Figure
-    fig, ax = plt.subplots(figsize=(5, 5))
-    fig.patch.set_alpha(0.0)
+    # 5. Initialize the figure structure. If a colorbar is requested, we adjust
+    # the aspect ratio to preserve scalp symmetry.
+    fig, ax = plt.subplots(figsize=(5.5, 5) if show_colorbar else (5, 5))
+    fig.patch.set_alpha(0.0) # Absolute alpha transparency for clean UI overlay
     
-    # 5. Define ROI Overlay Mask
+    # 6. Generate ROI binary mask array
     roi_mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
-        if ch-1 < 257: roi_mask[ch-1] = True
+        if ch-1 < 257: 
+            roi_mask[ch-1] = True
         
-    # 6. SINGLE Plot Call (Data + Mask combined)
-    mne.viz.plot_topomap(
+    # 7. Render map topology. Capture the plot output image descriptor (im) 
+    # so we can point a colorbar mapping utility at it.
+    im, _ = mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
-        vlim=(-v_limit, v_limit), 
+        vlim=vlim, 
         mask=roi_mask,
         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
                      'markeredgecolor': 'gray', 'markersize': 2},
         show=False, contours=0, extrapolate='head'
     )
     
+    # 8. Conditional Colorbar Insertion (Isolated execution for the first tab)
+    if show_colorbar:
+        # Append a clean, unbordered axis panel to the right side of the head
+        cbar = fig.colorbar(im, ax=ax, orientation='vertical', shrink=0.75, pad=0.05)
+        cbar.ax.tick_params(labelsize=9, colors='#475569') # Clean, modern slate gray labels
+        cbar.outline.set_visible(False) # Eliminate the heavy vector box border
+        cbar.set_label('Grouping Index Value', color='#475569', fontsize=9, labelpad=8)
+        
     return fig
 
 @st.cache_data
