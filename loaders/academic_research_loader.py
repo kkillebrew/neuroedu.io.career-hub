@@ -894,23 +894,30 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     
     # 1. TRACE: Verify the signal is on the wire
     if col_name not in spatial_index_df.columns:
-        st.error(f"Signal Missing: {col_name} not in DataFrame. Columns: {spatial_index_df.columns.tolist()}")
+        st.error(f"Signal Missing: {col_name} not in DataFrame.")
         return None
 
     # 2. Extract Data
     full_data = np.zeros(257)
-    # Ensure Channel is treated as integer
-    spatial_index_df['Channel'] = spatial_index_df['Channel'].astype(int)
     
+    # Iterate through the DataFrame to map Channels to the NumPy array
     for _, row in spatial_index_df.iterrows():
-        idx = row['Channel'] - 1
-        if 0 <= idx < 257:
-            full_data[idx] = row[col_name]
+        try:
+            # CRITICAL FIX: Explicitly cast the Channel value back to an integer.
+            # This prevents the 'IndexError' caused by Pandas upcasting to floats.
+            idx = int(row['Channel']) - 1 
+            
+            # Ensure the index is within the valid 257-sensor range
+            if 0 <= idx < 257:
+                full_data[idx] = row[col_name]
+        except Exception:
+            # Silently skip any corrupted rows (e.g., NaNs in the Channel column)
+            continue
     
-    # 3. TRACE: Display range to the user (Remove this after confirming signal exists)
+    # 3. TRACE: Display range to the user (Remove after confirming signal exists)
     st.write(f"**Signal Diagnostic ({target_hz} Hz):** Min: {full_data.min():.4f}, Max: {full_data.max():.4f}, Non-Zero Count: {np.count_nonzero(full_data)}")
 
-    # 4. SCALING: If the signal range is tiny (e.g., 1e-6), we must force a scale
+    # 4. SCALING: Center the colormap dynamically based on actual signal variance
     abs_max = np.max(np.abs(full_data))
     v_limit = max(abs_max, 0.001) 
     
@@ -918,26 +925,32 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
+    # 5. CREATE FIGURE
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # 5. PLOT
+    # 6. PLOT SIGNAL (Extrapolate to 'head' to fill the entire scalp area)
     mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
         vlim=(-v_limit, v_limit), 
         show=False, contours=0, extrapolate='head'
     )
     
-    # ROI Overlay (Gray rings)
+    # 7. ROI OVERLAY (Visual confirmation of sensor mapping)
     roi_mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: roi_mask[ch-1] = True
-    mne.viz.plot_topomap(np.zeros(257), info, axes=ax, mask=roi_mask,
-                         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
-                                      'markeredgecolor': 'gray', 'markersize': 2},
-                         show=False, contours=0, extrapolate='head')
+        
+    mne.viz.plot_topomap(
+        np.zeros(257), info, axes=ax, mask=roi_mask,
+        mask_params={'marker': 'o', 'markerfacecolor': 'none', 
+                     'markeredgecolor': 'gray', 'markersize': 2},
+        show=False, contours=0, extrapolate='head'
+    )
     
+    # MEMORY CLEANUP: Prevent RAM leaks
     plt.close(fig) 
+    
     return fig
 
 @st.cache_data
