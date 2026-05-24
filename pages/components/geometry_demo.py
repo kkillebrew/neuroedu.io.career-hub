@@ -45,7 +45,6 @@ def render_geometry_area_demo(base_units, height_units):
             const CAT_SWORD = 0x0004;
 
             const engine = Engine.create();
-            // Increased solver iterations to prevent tunneling through the newly thinned walls
             engine.positionIterations = 16; 
             engine.velocityIterations = 16;
             const gravity = engine.gravity || engine.world.gravity;
@@ -57,20 +56,17 @@ def render_geometry_area_demo(base_units, height_units):
             }});
 
             // --- 2. GRID MATH & SIZING ---
-            const U = 42; // Increased by 20% (from 35) to scale up marbles safely
+            const U = 48; // Increased by ~15% to scale up the marbles
             const W = {base_units} * U;
             const H = {height_units} * U;
-            
-            // Shifted right to leave the left side completely empty for the formula
             const cx = 750; const cy = 350; 
             
-            // Diameter = U - 2px
             const marbleRadius = (U - 2) / 2;
             const cols = {base_units};
             const rows = {height_units};
             
             // --- 3. CONSTRUCT RIGID BODIES ---
-            const thickness = 6; // Halved the line thickness
+            const thickness = 6; 
             const wallOpt = {{ 
                 isStatic: true, friction: 0.0, 
                 render: {{ fillStyle: '#475569' }},
@@ -82,7 +78,8 @@ def render_geometry_area_demo(base_units, height_units):
             let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H + thickness*2, wallOpt);
             let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H + thickness*2, wallOpt);
 
-            const diagLength = Math.sqrt(W*W + H*H) + 30;
+            // Matched exact length to eliminate protruding corners
+            const diagLength = Math.sqrt(W*W + H*H) + thickness;
             const splitOpt = {{ 
                 isStatic: true, friction: 0.0, angle: Math.PI/2, 
                 render: {{ fillStyle: '#EF4444' }},
@@ -170,7 +167,6 @@ def render_geometry_area_demo(base_units, height_units):
                     let delta = pop - lastPop;
                     lastPop = pop;
                     
-                    // Fixed Pop Logic: Pure horizontal translation decouples them cleanly.
                     Body.translate(ceiling, {{x: -delta, y: 0}});
                     Body.translate(leftWall, {{x: -delta, y: 0}});
                     Body.translate(splitLeft, {{x: -delta, y: 0}});
@@ -204,8 +200,8 @@ def render_geometry_area_demo(base_units, height_units):
                 context.textBaseline = "alphabetic";
                 context.textAlign = "left";
                 
-                // Formula shifted to Upper Left quadrant, slightly offset from the exact edge
-                const fx = 80; 
+                // Formula shifted to the right relative to the left edge
+                const fx = 180; 
                 const fy = 120;
                 let currentX = fx;
                 
@@ -219,7 +215,8 @@ def render_geometry_area_demo(base_units, height_units):
                     drawText("Area", '#475569'); drawText(" = ", '#475569');
                     drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
                 }} else {{
-                    drawText("Area", '#475569'); drawText(" = ", '#475569'); drawText("½", '#475569');
+                    drawText("Area", '#475569'); drawText(" = ", '#475569'); 
+                    drawText("½", '#EF4444'); // Changed ½ color to perfectly match the red sword
                     drawText(" × ", '#475569'); drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
                 }}
 
