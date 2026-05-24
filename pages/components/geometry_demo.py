@@ -19,10 +19,6 @@ DESCRIPTION:
 import streamlit.components.v1 as components
 
 def render_geometry_area_demo(base_units, height_units):
-    """
-    Renders a physics-based geometry transformation.
-    Perfectly packs a grid of marbles, rotates, bisects, and pops apart horizontally.
-    """
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -56,14 +52,16 @@ def render_geometry_area_demo(base_units, height_units):
             }});
 
             // --- 2. GRID MATH & SIZING ---
-            const U = 48; // Increased by ~15% to scale up the marbles
+            const U = 48; 
             const W = {base_units} * U;
             const H = {height_units} * U;
-            const cx = 750; const cy = 350; 
+            const cx = 600; const cy = 350; // Perfectly centered
             
             const marbleRadius = (U - 2) / 2;
             const cols = {base_units};
             const rows = {height_units};
+            const valAreaRect = cols * rows;
+            const valAreaTri = valAreaRect / 2;
             
             // --- 3. CONSTRUCT RIGID BODIES ---
             const thickness = 6; 
@@ -78,7 +76,6 @@ def render_geometry_area_demo(base_units, height_units):
             let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H + thickness*2, wallOpt);
             let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H + thickness*2, wallOpt);
 
-            // Matched exact length to eliminate protruding corners
             const diagLength = Math.sqrt(W*W + H*H) + thickness;
             const splitOpt = {{ 
                 isStatic: true, friction: 0.0, angle: Math.PI/2, 
@@ -94,7 +91,6 @@ def render_geometry_area_demo(base_units, height_units):
             Composite.add(engine.world, [box, splitLeft, splitRight]);
 
             let marbles = [];
-            
             const diagAngle = Math.atan2(H, -W); 
             const targetTilt = Math.PI/2 - diagAngle; 
 
@@ -108,11 +104,10 @@ def render_geometry_area_demo(base_units, height_units):
 
             Events.on(engine, 'beforeUpdate', function() {{
                 let t = performance.now() - startTime;
-                let cycle = t % 12000; 
+                let cycle = t % 15000; // Expanded to 15s total loop
 
                 if (cycle < 100 && phase !== 1) {{
                     phase = 1; lastPop = 0;
-                    
                     marbles.forEach(m => Composite.remove(engine.world, m));
                     marbles = [];
                     Composite.rotate(box, -currentRotation, {{x: cx, y: cy}}); 
@@ -140,29 +135,27 @@ def render_geometry_area_demo(base_units, height_units):
                     }}
                 }}
                 
-                else if (cycle >= 2500 && cycle < 4000) {{
+                else if (cycle >= 4000 && cycle < 5500) {{
                     phase = 2;
-                    let p = (cycle - 2500) / 1500;
+                    let p = (cycle - 4000) / 1500;
                     let desiredRotation = easeInOut(p) * targetTilt;
                     let delta = desiredRotation - currentRotation;
                     Composite.rotate(box, delta, {{x: cx, y: cy}});
                     currentRotation = desiredRotation;
-                    
                     if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.001, y: 0}}));
                 }}
                 
-                else if (cycle >= 4500 && cycle < 6500) {{
+                else if (cycle >= 6000 && cycle < 8000) {{
                     phase = 3;
-                    let p = (cycle - 4500) / 2000;
+                    let p = (cycle - 6000) / 2000;
                     let dropY = (cy - 1200) + (1200 * easeInOut(p));
-                    
                     Body.setPosition(splitLeft, {{ x: cx, y: dropY }});
                     Body.setPosition(splitRight, {{ x: cx, y: dropY }});
                 }}
                 
-                else if (cycle >= 7000 && cycle < 8500) {{
+                else if (cycle >= 8500 && cycle < 10000) {{
                     phase = 4;
-                    let p = (cycle - 7000) / 1500;
+                    let p = (cycle - 8500) / 1500;
                     let pop = easeInOut(p) * U; 
                     let delta = pop - lastPop;
                     lastPop = pop;
@@ -178,53 +171,90 @@ def render_geometry_area_demo(base_units, height_units):
             }});
 
             // --- 5. OVERLAY FORMULA & TRACKING LABELS ---
-            function drawUprightLabel(context, body, text, color, localNx, localNy, offset) {{
+            
+            // Text crossfade engine prevents layout jumping by centering text within the max width of both strings
+            function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y) {{
+                let w1 = context.measureText(text1).width;
+                let w2 = context.measureText(text2).width;
+                let wMax = Math.max(w1, w2);
+
+                context.globalAlpha = Math.max(0, 1 - alpha2);
+                context.fillStyle = color1;
+                context.fillText(text1, x + (wMax - w1)/2, y);
+
+                context.globalAlpha = Math.max(0, alpha2);
+                context.fillStyle = color2;
+                context.fillText(text2, x + (wMax - w2)/2, y);
+
+                context.globalAlpha = 1.0;
+                return x + wMax;
+            }}
+
+            function drawUprightFadingLabel(context, body, text1, text2, color, alpha2, localNx, localNy, offset) {{
                 let a = body.angle;
                 let worldNx = localNx * Math.cos(a) - localNy * Math.sin(a);
                 let worldNy = localNx * Math.sin(a) + localNy * Math.cos(a);
                 let px = body.position.x + worldNx * offset;
                 let py = body.position.y + worldNy * offset;
                 
-                context.fillStyle = color;
                 context.textAlign = "center";
                 context.textBaseline = "middle";
                 context.font = "bold 34px sans-serif";
-                context.fillText(text, px, py);
+
+                context.globalAlpha = Math.max(0, 1 - alpha2);
+                context.fillStyle = color;
+                context.fillText(text1, px, py);
+
+                context.globalAlpha = Math.max(0, alpha2);
+                context.fillText(text2, px, py);
+
+                context.globalAlpha = 1.0;
             }}
 
             Events.on(render, 'afterRender', function() {{
                 const context = render.context;
-                let t = (performance.now() - startTime) % 12000;
+                let t = (performance.now() - startTime) % 15000;
                 
                 context.font = "bold 40px sans-serif"; 
                 context.textBaseline = "alphabetic";
                 context.textAlign = "left";
                 
-                // Formula shifted to the right relative to the left edge
-                const fx = 180; 
+                // Alpha Logic for Crossfades
+                let alphaNum = 0;
+                if (t > 2000 && t < 3500) alphaNum = easeInOut((t - 2000) / 1500);
+                else if (t >= 3500) alphaNum = 1;
+
+                let alphaAreaTri = 0;
+                if (t > 10500 && t < 12000) alphaAreaTri = easeInOut((t - 10500) / 1500);
+                else if (t >= 12000) alphaAreaTri = 1;
+
+                const fx = 150; 
                 const fy = 120;
-                let currentX = fx;
-                
-                function drawText(text, color) {{
-                    context.fillStyle = color;
-                    context.fillText(text, currentX, fy);
-                    currentX += context.measureText(text).width;
-                }}
+                let px = fx;
 
-                if (t < 7000) {{
-                    drawText("Area", '#475569'); drawText(" = ", '#475569');
-                    drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
+                // Render specific formula state based on the current loop phase
+                if (t < 8500) {{
+                    px = drawFadingText(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, px, fy);
+                    context.fillStyle = '#475569'; context.fillText(" = ", px, fy); px += context.measureText(" = ").width;
+                    px = drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', alphaNum, px, fy);
+                    context.fillStyle = '#475569'; context.fillText(" × ", px, fy); px += context.measureText(" × ").width;
+                    px = drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', alphaNum, px, fy);
                 }} else {{
-                    drawText("Area", '#475569'); drawText(" = ", '#475569'); 
-                    drawText("½", '#EF4444'); // Changed ½ color to perfectly match the red sword
-                    drawText(" × ", '#475569'); drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
+                    px = drawFadingText(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, px, fy);
+                    context.fillStyle = '#475569'; context.fillText(" = ", px, fy); px += context.measureText(" = ").width;
+                    context.fillStyle = '#EF4444'; context.fillText("½", px, fy); px += context.measureText("½").width;
+                    context.fillStyle = '#475569'; context.fillText(" × ", px, fy); px += context.measureText(" × ").width;
+                    px = drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', 1, px, fy);
+                    context.fillStyle = '#475569'; context.fillText(" × ", px, fy); px += context.measureText(" × ").width;
+                    px = drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', 1, px, fy);
                 }}
 
+                // Render dynamic upright labels orbiting the physical body
                 let off = (thickness / 2) + 30;
-                drawUprightLabel(context, ceiling, "b", '#38BDF8', 0, -1, off);
-                drawUprightLabel(context, ground, "b", '#38BDF8', 0, 1, off);
-                drawUprightLabel(context, leftWall, "h", '#4ADE80', -1, 0, off);
-                drawUprightLabel(context, rightWall, "h", '#4ADE80', 1, 0, off);
+                drawUprightFadingLabel(context, ceiling, "b", cols.toString(), '#38BDF8', alphaNum, 0, -1, off);
+                drawUprightFadingLabel(context, ground, "b", cols.toString(), '#38BDF8', alphaNum, 0, 1, off);
+                drawUprightFadingLabel(context, leftWall, "h", rows.toString(), '#4ADE80', alphaNum, -1, 0, off);
+                drawUprightFadingLabel(context, rightWall, "h", rows.toString(), '#4ADE80', alphaNum, 1, 0, off);
             }});
 
             Render.run(render);
