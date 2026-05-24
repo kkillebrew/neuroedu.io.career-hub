@@ -55,7 +55,7 @@ def render_geometry_area_demo(base_units, height_units):
             const U = 48; 
             const W = {base_units} * U;
             const H = {height_units} * U;
-            const cx = 600; const cy = 350; // Perfectly centered
+            const cx = 600; const cy = 350; 
             
             const marbleRadius = (U - 2) / 2;
             const cols = {base_units};
@@ -104,7 +104,7 @@ def render_geometry_area_demo(base_units, height_units):
 
             Events.on(engine, 'beforeUpdate', function() {{
                 let t = performance.now() - startTime;
-                let cycle = t % 15000; // Expanded to 15s total loop
+                let cycle = t % 15000; 
 
                 if (cycle < 100 && phase !== 1) {{
                     phase = 1; lastPop = 0;
@@ -171,22 +171,17 @@ def render_geometry_area_demo(base_units, height_units):
             }});
 
             // --- 5. OVERLAY FORMULA & TRACKING LABELS ---
-            
-            // --- FIXED-WIDTH FADE ENGINE ---
-            function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y, fixedWidth) {{
-                context.textAlign = "center"; 
-                let centerX = x + fixedWidth / 2;
-
+            function drawFadingTextAlign(context, text1, text2, color1, color2, alpha2, x, y, align) {{
+                context.textAlign = align;
                 context.globalAlpha = Math.max(0, 1 - alpha2);
                 context.fillStyle = color1;
-                context.fillText(text1, centerX, y);
+                context.fillText(text1, x, y);
 
                 context.globalAlpha = Math.max(0, alpha2);
                 context.fillStyle = color2;
-                context.fillText(text2, centerX, y);
+                context.fillText(text2, x, y);
 
                 context.globalAlpha = 1.0;
-                return x + fixedWidth;
             }}
 
             function drawUprightFadingLabel(context, body, text1, text2, color, alpha2, localNx, localNy, offset) {{
@@ -206,7 +201,6 @@ def render_geometry_area_demo(base_units, height_units):
 
                 context.globalAlpha = Math.max(0, alpha2);
                 context.fillText(text2, px, py);
-
                 context.globalAlpha = 1.0;
             }}
 
@@ -215,35 +209,69 @@ def render_geometry_area_demo(base_units, height_units):
                 let t = (performance.now() - startTime) % 15000;
                 
                 context.font = "bold 40px sans-serif"; 
-                context.textBaseline = "alphabetic";
+                context.textBaseline = "middle";
                 
-                // --- FORMULA LAYOUT (Anchored to Equals Sign) ---
-                const eqX = 250; // The fixed anchor for the '=' sign
-                const eqWidth = context.measureText(" = ").width;
-                const slotWidth = 120; // Fixed width for terms (Area, b, h)
-                
-                context.textAlign = "center";
-                context.fillStyle = '#475569';
-                context.fillText(" = ", eqX, 120);
-
+                // Alpha Logic for Crossfades
                 let alphaNum = t > 2000 ? Math.min(1, (t - 2000) / 1500) : 0;
                 let alphaAreaTri = t > 10500 ? Math.min(1, (t - 10500) / 1500) : 0;
 
-                if (t < 7000) {{
-                    drawFadingText(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, eqX - slotWidth, 120, slotWidth);
-                    drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', alphaNum, eqX + eqWidth, 120, slotWidth);
-                    context.fillText(" × ", eqX + eqWidth + slotWidth + 20, 120);
-                    drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', alphaNum, eqX + eqWidth + slotWidth + 60, 120, slotWidth);
-                }} else {{
-                    drawFadingText(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, eqX - slotWidth, 120, slotWidth);
-                    context.fillStyle = '#EF4444'; context.fillText("½", eqX + 35, 120);
-                    context.fillStyle = '#475569'; context.fillText(" × ", eqX + 75, 120);
-                    drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', 1, eqX + eqWidth + slotWidth - 40, 120, slotWidth);
-                    context.fillStyle = '#475569'; context.fillText(" × ", eqX + eqWidth + slotWidth*2 - 20, 120);
-                    drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', 1, eqX + eqWidth + slotWidth*2 + 20, 120, slotWidth);
-                }}
+                // Exact Spatial Coordinates
+                const eqX = 160; 
+                const fy = 80; // Shifted up to clear the rotating rectangle corner
                 
-                // Orbiting labels remain as before
+                const sp = context.measureText(" ").width;
+                const eqW = context.measureText("=").width;
+                const multW = context.measureText("×").width;
+                const halfW = context.measureText("½").width;
+                
+                let wB = Math.max(context.measureText("b").width, context.measureText(cols.toString()).width);
+                let wH = Math.max(context.measureText("h").width, context.measureText(rows.toString()).width);
+
+                // Draw the perfectly stationary equals sign
+                context.textAlign = "center";
+                context.fillStyle = '#475569';
+                context.fillText("=", eqX, fy);
+
+                if (t < 7000) {{
+                    // Area/Value precisely right-aligned 1 space away from the = sign
+                    drawFadingTextAlign(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, eqX - eqW/2 - sp, fy, "right");
+                    
+                    // Center anchors calculated exactly 1 space apart based on max term width
+                    let cx_b = eqX + eqW/2 + sp + wB/2;
+                    let cx_mult = cx_b + wB/2 + sp + multW/2;
+                    let cx_h = cx_mult + multW/2 + sp + wH/2;
+
+                    drawFadingTextAlign(context, "b", cols.toString(), '#38BDF8', '#38BDF8', alphaNum, cx_b, fy, "center");
+                    context.textAlign = "center";
+                    context.fillStyle = '#475569';
+                    context.fillText("×", cx_mult, fy);
+                    drawFadingTextAlign(context, "h", rows.toString(), '#4ADE80', '#4ADE80', alphaNum, cx_h, fy, "center");
+
+                }} else {{
+                    drawFadingTextAlign(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, eqX - eqW/2 - sp, fy, "right");
+
+                    // Expanded center anchors for Triangle Formula
+                    let cx_half = eqX + eqW/2 + sp + halfW/2;
+                    let cx_mult1 = cx_half + halfW/2 + sp + multW/2;
+                    let cx_b = cx_mult1 + multW/2 + sp + wB/2;
+                    let cx_mult2 = cx_b + wB/2 + sp + multW/2;
+                    let cx_h = cx_mult2 + multW/2 + sp + wH/2;
+
+                    context.textAlign = "center";
+                    context.fillStyle = '#EF4444';
+                    context.fillText("½", cx_half, fy);
+
+                    context.fillStyle = '#475569';
+                    context.fillText("×", cx_mult1, fy);
+
+                    drawFadingTextAlign(context, "b", cols.toString(), '#38BDF8', '#38BDF8', 1, cx_b, fy, "center");
+                    
+                    context.fillStyle = '#475569';
+                    context.fillText("×", cx_mult2, fy);
+                    
+                    drawFadingTextAlign(context, "h", rows.toString(), '#4ADE80', '#4ADE80', 1, cx_h, fy, "center");
+                }}
+
                 let off = (thickness / 2) + 30;
                 drawUprightFadingLabel(context, ceiling, "b", cols.toString(), '#38BDF8', alphaNum, 0, -1, off);
                 drawUprightFadingLabel(context, ground, "b", cols.toString(), '#38BDF8', alphaNum, 0, 1, off);
