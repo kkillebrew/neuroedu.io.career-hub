@@ -467,7 +467,7 @@ elif "Rotating Line" in active_project:
             st.subheader("Find Your PSE (Point of Subjective Equality)")
             st.info("Experiment logic will go here.")
             
-        elif "Control Data" in rl_active_view:
+        elif "Control Data & Analysis" in rl_active_view:
             st.subheader("Baseline Psychometric Functions")
             st.markdown("Comparing the Point of Subjective Equality (PSE) between the Control and Experimental conditions.")
             
@@ -569,7 +569,7 @@ elif "Rotating Line" in active_project:
             else:
                 st.warning("Fetching secure data from GitHub pipeline... Please wait or verify your connection.")
             
-        elif "Main Findings: Visual Size & The Nulling Effect" in rl_active_view:
+        elif "Main Findings" in rl_active_view:
             st.subheader("Baseline Psychometric Functions")
             
             import plotly.graph_objects as go
