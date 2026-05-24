@@ -20,15 +20,18 @@ import streamlit.components.v1 as components
 
 def render_geometry_area_demo(base_units, height_units):
     """
-    Renders the continuous 6-second mathematical transformation loop.
-    Escaped braces for Python f-string compatibility.
+    Renders a 10-second physics-based mathematical transformation loop.
+    Uses Matter.js to simulate 100 marbles filling the area, tipping, and splitting.
+    
+    MATLAB Bridge: This replaces a rigid-body ode45 loop. We offload the collision
+    matrix processing entirely to the browser's V8 Javascript engine.
     """
     
     html_code = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <!-- INJECT THE PHYSICS ENGINE -->
+        <!-- Inject Matter.js Physics Engine via CDN -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
         <style>
             body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #F1F5F9; overflow: hidden; font-family: 'Inter', sans-serif; }}
@@ -39,19 +42,19 @@ def render_geometry_area_demo(base_units, height_units):
         <canvas id="geomCanvas" width="700" height="400"></canvas>
         <script>
             // --- 1. PHYSICS ENGINE INITIALIZATION ---
-            // MATLAB Bridge: Equivalent to initializing a Simscape Multibody environment
             const Engine = Matter.Engine,
                   Render = Matter.Render,
                   Runner = Matter.Runner,
                   Bodies = Matter.Bodies,
+                  Body = Matter.Body,
                   Composite = Matter.Composite,
-                  Body = Matter.Body;
+                  Events = Matter.Events;
 
             const engine = Engine.create();
-            // Lower gravity slightly for a more "floaty" pedagogical aesthetic
-            engine.world.gravity.y = 0.8; 
+            // Start with standard downward gravity
+            engine.world.gravity.y = 1;
+            engine.world.gravity.x = 0;
 
-            // --- 2. CANVAS & RENDERER ---
             const canvas = document.getElementById('geomCanvas');
             const render = Render.create({{
                 canvas: canvas,
@@ -59,85 +62,173 @@ def render_geometry_area_demo(base_units, height_units):
                 options: {{
                     width: 700,
                     height: 400,
-                    wireframes: false, // Set to true for debugging bounding boxes
+                    wireframes: false, // Set to true to debug collision meshes
                     background: 'transparent'
                 }}
             }});
 
-            // Grid sizing
-            const U = 40;
+            // --- 2. DYNAMIC GEOMETRY SCALING ---
+            const U = 40; // 1 unit = 40px
             const W = {base_units} * U;
             const H = {height_units} * U;
             const cx = 450; 
             const cy = 200;
-
-            // --- 3. RECTANGLE BOUNDARIES (The "Container") ---
-            // We build the rectangle out of 4 static walls so the marbles stay inside
-            const wallOptions = {{ isStatic: true, render: {{ fillStyle: '#475569' }} }};
-            const leftWall = Bodies.rectangle(cx - W/2, cy, 10, H, wallOptions);
-            const rightWall = Bodies.rectangle(cx + W/2, cy, 10, H, wallOptions);
-            const bottomWall = Bodies.rectangle(cx, cy + H/2, W, 10, wallOptions);
-            const topWall = Bodies.rectangle(cx, cy - H/2, W, 10, wallOptions);
             
-            // The diagonal splitting line (Initially hidden off-screen or scaled to 0)
-            const diagonalSplit = Bodies.rectangle(cx, cy, Math.sqrt(W*W + H*H), 10, {{ 
-                isStatic: true, 
-                angle: Math.atan2(H, W),
-                isSensor: true // Marbles ignore it until phase 3
+            // Calculate exact marble radius so 100 marbles fill ~65% of the total volume (standard circle packing)
+            const packingFraction = 0.65;
+            const targetArea = W * H * packingFraction;
+            const r = Math.sqrt(targetArea / (100 * Math.PI));
+
+            // --- 3. CONSTRUCTING THE RIGID BODIES ---
+            const thickness = 20;
+            const wallColor = '#475569';
+            const wallOpt = {{ isStatic: true, friction: 0.0, render: {{ fillStyle: wallColor }} }};
+            
+            // We build the box out of 4 distinct walls so we can translate them later
+            let ground = Bodies.rectangle(cx, cy + H/2 + thickness/2, W + thickness*2, thickness, wallOpt);
+            let ceiling = Bodies.rectangle(cx, cy - H/2 - thickness/2, W + thickness*2, thickness, wallOpt);
+            let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H, wallOpt);
+            let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H, wallOpt);
+
+            // The Diagonal Splitter (Hypotenuse)
+            const diagLength = Math.sqrt(W*W + H*H);
+            const diagAngle = Math.atan2(H, W);
+            let splitter = Bodies.rectangle(cx, cy, diagLength, 8, {{
+                isStatic: true,
+                angle: diagAngle,
+                friction: 0.0,
+                render: {{ fillStyle: '#EF4444' }} // Red cutting line
+            }});
+            
+            // Move splitter off-screen initially
+            Body.setPosition(splitter, {{ x: -1000, y: -1000 }});
+            Composite.add(engine.world, [ground, ceiling, leftWall, rightWall, splitter]);
+
+            let marbles = [];
+            function pourMarbles() {{
+                for(let i=0; i<100; i++) {{
+                    // Add spatial jitter so they don't spawn exactly inside each other
+                    let m = Bodies.circle(cx + (Math.random()*W/2 - W/4), cy - H/2 - 50 - (i*10), r, {{
+                        restitution: 0.5, // Bounciness
+                        friction: 0.01,
+                        render: {{ fillStyle: '#38BDF8', strokeStyle: '#0284C7', lineWidth: 1 }}
+                    }});
+                    marbles.push(m);
+                    Composite.add(engine.world, m);
+                }}
+            }}
+
+            // --- 4. THE CHOREOGRAPHY STATE MACHINE ---
+            let startTime = performance.now();
+            let phase = 0;
+            
+            // Easing function for smooth mechanical movements
+            function easeInOutSine(x) {{
+                return -(Math.cos(Math.PI * x) - 1) / 2;
+            }}
+
+            Events.on(engine, 'beforeUpdate', function() {{
+                let t = performance.now() - startTime;
+                let cycle = t % 11000; // 11-second total loop
+
+                // PHASE 1: Reset & Pour (0 - 3s)
+                if (cycle < 100 && phase !== 1) {{
+                    phase = 1;
+                    marbles.forEach(m => Composite.remove(engine.world, m));
+                    marbles = [];
+                    engine.world.gravity.x = 0;
+                    engine.world.gravity.y = 1;
+                    
+                    Body.setPosition(ground, {{ x: cx, y: cy + H/2 + thickness/2 }});
+                    Body.setPosition(ceiling, {{ x: cx, y: cy - H/2 - thickness/2 }});
+                    Body.setPosition(leftWall, {{ x: cx - W/2 - thickness/2, y: cy }});
+                    Body.setPosition(rightWall, {{ x: cx + W/2 + thickness/2, y: cy }});
+                    Body.setPosition(splitter, {{ x: -1000, y: -1000 }}); // Hide
+                    
+                    pourMarbles();
+                }}
+                
+                // PHASE 2: Tip the Gravity Vector (3s - 4.5s)
+                else if (cycle >= 3000 && cycle < 4500) {{
+                    phase = 2;
+                    let p = (cycle - 3000) / 1500;
+                    let angle = easeInOutSine(p) * (Math.PI / 4); // Tip 45 degrees
+                    // Rotate the gravity vector to simulate tilting the box
+                    engine.world.gravity.x = Math.sin(angle);
+                    engine.world.gravity.y = Math.cos(angle);
+                    
+                    // Add slight random velocity jolts ("rumble") to unstick jammed marbles
+                    if (Math.random() < 0.1) {{
+                        marbles.forEach(m => {{
+                            Body.setVelocity(m, {{ x: m.velocity.x + (Math.random()-0.5), y: m.velocity.y + (Math.random()-0.5) }});
+                        }});
+                    }}
+                }}
+                
+                // PHASE 3: Slide the Splitter (5.5s - 7s)
+                else if (cycle >= 5500 && cycle < 7000) {{
+                    phase = 3;
+                    let p = (cycle - 5500) / 1500;
+                    let pop = easeInOutSine(p);
+                    
+                    // Slide the diagonal from top-left to center
+                    let startX = cx - W/2;
+                    let startY = cy - H/2;
+                    Body.setPosition(splitter, {{
+                        x: startX + (cx - startX) * pop,
+                        y: startY + (cy - startY) * pop
+                    }});
+                }}
+                
+                // PHASE 4: Pop Apart (7.5s - 9s)
+                else if (cycle >= 7500 && cycle < 9000) {{
+                    phase = 4;
+                    let p = (cycle - 7500) / 1500;
+                    let pop = easeInOutSine(p) * 20; // 20px displacement
+                    
+                    // The separation vector is perpendicular to the diagonal
+                    let dx = Math.sin(diagAngle) * pop;
+                    let dy = -Math.cos(diagAngle) * pop;
+                    
+                    // Shift the two distinct triangle halves apart
+                    Body.setPosition(leftWall, {{ x: cx - W/2 - thickness/2 - dx, y: cy - dy }});
+                    Body.setPosition(ground, {{ x: cx - dx, y: cy + H/2 + thickness/2 - dy }});
+                    
+                    Body.setPosition(rightWall, {{ x: cx + W/2 + thickness/2 + dx, y: cy + dy }});
+                    Body.setPosition(ceiling, {{ x: cx + dx, y: cy - H/2 - thickness/2 + dy }});
+                }}
             }});
 
-            Composite.add(engine.world, [leftWall, rightWall, bottomWall, topWall, diagonalSplit]);
-
-            // --- 4. THE MARBLE GENERATOR ---
-            const marbles = [];
-            function pourMarbles(count) {{
-                for (let i = 0; i < count; i++) {{
-                    // Add slight random jitter to drop positions so they bounce naturally
-                    let startX = cx + (Math.random() * 40 - 20);
-                    let startY = cy - H/2 + 20;
-                    
-                    let marble = Bodies.circle(startX, startY, 8, {{
-                        restitution: 0.6, // Bounciness
-                        friction: 0.05,
-                        render: {{ fillStyle: '#38BDF8' }}
-                    }});
-                    marbles.push(marble);
-                    Composite.add(engine.world, marble);
-                }}
-            }}
-
-            // --- 5. THE STATE MACHINE LOOP ---
-            // This replaces the procedural Math.sin loop with a timed logic controller
-            let startTime = performance.now();
-            
-            function stateMachine() {{
-                let t = (performance.now() - startTime) % 8000; // 8 second total loop
+            // --- 5. POST-RENDER UI OVERLAYS ---
+            // Draw the math formulas on top of the physics canvas
+            Events.on(render, 'afterRender', function() {{
+                const context = render.context;
+                let t = (performance.now() - startTime) % 11000;
                 
-                if (t < 100) {{
-                    // Phase 1: Reset & Pour
-                    if (marbles.length === 0) pourMarbles(40);
-                }} else if (t > 3000 && t < 4000) {{
-                    // Phase 2: Tip the container 45 degrees
-                    // Body.setAngle(container, newAngle);
-                }} else if (t > 4000 && t < 5500) {{
-                    // Phase 3: Activate diagonal split and grow it
-                }} else if (t > 5500 && t < 7000) {{
-                    // Phase 4: Pop the two triangles apart
-                }} else if (t > 7800) {{
-                    // Phase 5: Clear world for restart
+                context.font = "bold 32px sans-serif";
+                context.textAlign = "left";
+                const fx = 50; const fy = 210;
+
+                // Render specific formula state based on the current loop phase
+                if (t < 5500) {{
+                    context.fillStyle = colorLine; context.fillText("Area = ", fx, fy);
+                    context.fillStyle = '#38BDF8'; context.fillText("b", fx + 110, fy);
+                    context.fillStyle = colorLine; context.fillText(" × ", fx + 130, fy);
+                    context.fillStyle = '#4ADE80'; context.fillText("h", fx + 180, fy);
+                }} else {{
+                    context.fillStyle = colorLine; context.fillText("Area = ½ × ", fx, fy);
+                    context.fillStyle = '#38BDF8'; context.fillText("b", fx + 175, fy);
+                    context.fillStyle = colorLine; context.fillText(" × ", fx + 195, fy);
+                    context.fillStyle = '#4ADE80'; context.fillText("h", fx + 245, fy);
                 }}
+            }});
 
-                requestAnimationFrame(stateMachine);
-            }}
-
-            // Start the physics and rendering engines
+            // Ignite the Engine
             Render.run(render);
             Runner.run(Runner.create(), engine);
-            requestAnimationFrame(stateMachine);
         </script>
     </body>
     </html>
     """
     
-    # Render with a height slightly larger than the canvas to prevent scrollbars
     components.html(html_code, height=420)
