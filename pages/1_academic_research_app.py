@@ -305,8 +305,8 @@ if "Biomarkers" in active_project:
                 with ref_col2: st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
                 with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
     
-    if sfm_active_view == "Data Exploration: Switch Rates & Percept Durations":
-        st.header("Data Exploration: Switch Rates & Percept Durations")
+    if sfm_active_view == "Main Behavioral Analysis":
+        st.header("Main Behavioral Analysis: Switch Rates & Percept Durations")
         
         # --- UI CONTROLLERS ---
         ui_c1, ui_c2 = st.columns(2)
