@@ -111,7 +111,10 @@ with lesson_tab2:
     
     fig_prob = px.bar(df_dist, x='Sum', y='count', labels={'count': 'Times Rolled', 'Sum': 'Sum of Two Dice'}, title=f"Empirical Frequency Distribution Across {num_samples} Matrix Points")
     fig_prob.update_traces(marker_color='#38BDF8')
-    fig_prob.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20), displayModeBar=False)
+    fig_prob.update_layout(
+        height=300, 
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
     st.plotly_chart(fig_prob, use_container_width=True, config={'displayModeBar': False})
 
 st.divider()
