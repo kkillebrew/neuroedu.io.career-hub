@@ -895,7 +895,7 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     if col_name not in spatial_index_df.columns:
         return None
 
-    # 1. Extraction with explicit integer casting
+    # 1. Initialize and Extract Safely
     full_data = np.zeros(257)
     for _, row in spatial_index_df.iterrows():
         try:
@@ -905,7 +905,10 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         except (ValueError, TypeError):
             continue
             
-    # 2. Dynamic Scaling 
+    # 2. Neutralize NaN Poisoning (from reference channels)
+    full_data = np.nan_to_num(full_data, nan=0.0, posinf=0.0, neginf=0.0)
+    
+    # 3. Dynamic Scaling 
     abs_max = np.max(np.abs(full_data))
     v_limit = max(abs_max, 0.001) 
     
@@ -913,24 +916,24 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     info = mne.create_info(ch_names=montage.ch_names, sfreq=500, ch_types='eeg')
     info.set_montage(montage)
     
+    # 4. Initialize Figure
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # 3. PLOTTING
-    mne.viz.plot_topomap(
-        full_data, info, axes=ax, cmap='RdBu_r', 
-        vlim=(-v_limit, v_limit), 
-        show=False, contours=0, extrapolate='head'
-    )
-    
-    # 4. ROI Overlay
+    # 5. Define ROI Overlay Mask
     roi_mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: roi_mask[ch-1] = True
-    mne.viz.plot_topomap(np.zeros(257), info, axes=ax, mask=roi_mask,
-                         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
-                                      'markeredgecolor': 'gray', 'markersize': 2},
-                         show=False, contours=0, extrapolate='head')
+        
+    # 6. SINGLE Plot Call (Data + Mask combined)
+    mne.viz.plot_topomap(
+        full_data, info, axes=ax, cmap='RdBu_r', 
+        vlim=(-v_limit, v_limit), 
+        mask=roi_mask,
+        mask_params={'marker': 'o', 'markerfacecolor': 'none', 
+                     'markeredgecolor': 'gray', 'markersize': 2},
+        show=False, contours=0, extrapolate='head'
+    )
     
     return fig
 
