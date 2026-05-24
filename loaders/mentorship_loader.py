@@ -35,12 +35,15 @@ def get_mentorship_data():
             'Direct Bridge: Specialized training for MATLAB users moving to Python.',
             'Project-Centric: Learning through building actual data pipelines.'
         ],
+        # This update expands our struct array fields. It is equivalent to:
+        # history(2).school = 'University of Nevada, Reno';
+        # history(2).courses = {'PSY 301', 'NEUR 401'};
         'career_history': [
             {
                 'school': 'Lied STEM Academy',
                 'role': '6th Grade Math/Science Educator',
                 'years': '2024 - 2025',
-                'metrics': 'Analyzed longitudinal MAP test percentile growth across Fall, Winter, and Spring.',
+                'metrics': 'Analyzed longitudinal MAP test percentile growth across Fall, Winter, and Spring terms.',
                 'dataset_type': 'maps',
                 'file_path': 'documents/6th Grade Maps Growth - Period 1.csv'
             },
@@ -53,12 +56,22 @@ def get_mentorship_data():
                 'file_path': 'documents/7th Grade ELA Assessment Scores - Period 1.csv'
             },
             {
-                'school': 'University of Minnesota',
-                'role': 'Postdoctoral Researcher & Lecturer',
-                'years': '2020 - 2024',
-                'metrics': 'Mentored undergraduate research tracks in computational neuroscience and programming.',
-                'dataset_type': None,
-                'file_path': None
+                'school': 'University of Nevada, Reno',
+                'role': 'Graduate Teaching Assistant & Lecturer',
+                'years': '2015 - 2020',
+                'metrics': 'Instructed advanced university-level course tracks across behavioral data analysis, neuroscience, and experimental methods.',
+                'dataset_type': 'university',
+                'file_path': None,
+                'courses_taught': [
+                    "PSY 101: Introduction to Psychology"
+                    "PSY 210: Introduction to Statistical Methods",
+                    "PSY 240: Introduction to Research Methods",
+                    "PSY 301: Experimental Psychology",
+                    "PSY 403: Physiological Psychology",
+                    "PSY 405: Perception"
+                    "PSY 432: Human Memory",
+                    "PSY 427: Computer Applications in Social and Behavioral Science"
+                ]
             }
         ],
         # NEW: Links for external platforms
