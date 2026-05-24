@@ -1031,9 +1031,9 @@ with tabs[2]:
                             
                             # UI TACTICAL RULE: Activate the colorbar logic ONLY on the first column (index 0 / 3 Hz)
                             # to anchor the color mapping scale without creating visual repetition across columns.
-                            is_first_column = (i == 0)
+                            # is_first_column = (i == 0)
                             
-                            fig = generate_topoplot_figure(df_index, hz, show_colorbar=is_first_column)
+                            fig = generate_topoplot_figure(df_index, hz, show_colorbar=1)
                             if fig:
                                 st.pyplot(fig, clear_figure=True)
 
