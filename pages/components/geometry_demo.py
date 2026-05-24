@@ -19,10 +19,6 @@ DESCRIPTION:
 import streamlit.components.v1 as components
 
 def render_geometry_area_demo(base_units, height_units):
-    """
-    Renders a physics-based geometry transformation.
-    Perfectly packs a grid of marbles, rotates, bisects, and pops apart.
-    """
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -34,13 +30,11 @@ def render_geometry_area_demo(base_units, height_units):
         </style>
     </head>
     <body>
-        <canvas id="geomCanvas" width="700" height="400"></canvas>
+        <canvas id="geomCanvas" width="1000" height="600"></canvas>
         <script>
-            // --- 1. ENGINE & COLLISION SETUP ---
             const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner;
             const Bodies = Matter.Bodies, Body = Matter.Body, Composite = Matter.Composite, Events = Matter.Events;
 
-            // Collision Categories (Bitmasking allows the sword to pass through the walls but hit marbles)
             const CAT_WALL = 0x0001;
             const CAT_MARBLE = 0x0002;
             const CAT_SWORD = 0x0004;
@@ -51,21 +45,18 @@ def render_geometry_area_demo(base_units, height_units):
 
             const render = Render.create({{
                 canvas: document.getElementById('geomCanvas'), engine: engine,
-                options: {{ width: 700, height: 400, wireframes: false, background: 'transparent' }}
+                options: {{ width: 1000, height: 600, wireframes: false, background: 'transparent' }}
             }});
 
-            // --- 2. GRID MATH & SIZING ---
-            const U = 35; // Size of 1 grid cell
+            const U = 35; 
             const W = {base_units} * U;
             const H = {height_units} * U;
-            const cx = 450; const cy = 200;
+            const cx = 650; const cy = 300;
             
-            // User spec: Diameter = Grid cell length - 5px
-            const marbleRadius = (U - 5) / 2;
+            const marbleRadius = (U - 2) / 2;
             const cols = {base_units};
             const rows = {height_units};
             
-            // --- 3. CONSTRUCT RIGID BODIES ---
             const thickness = 40; 
             const wallOpt = {{ 
                 isStatic: true, friction: 0.0, 
@@ -73,34 +64,29 @@ def render_geometry_area_demo(base_units, height_units):
                 collisionFilter: {{ category: CAT_WALL }} 
             }};
             
-            // Outer Walls
             let ground = Bodies.rectangle(cx, cy + H/2 + thickness/2, W + thickness*2, thickness, wallOpt);
             let ceiling = Bodies.rectangle(cx, cy - H/2 - thickness/2, W + thickness*2, thickness, wallOpt);
             let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H + thickness*2, wallOpt);
             let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H + thickness*2, wallOpt);
 
-            // The Splitters (Two overlapping lines to cap the separated triangles)
-            const diagLength = Math.sqrt(W*W + H*H) + 10;
+            const diagLength = Math.sqrt(W*W + H*H) + 40; 
             const splitOpt = {{ 
                 isStatic: true, friction: 0.0, angle: Math.PI/2, 
                 render: {{ fillStyle: '#EF4444' }},
-                collisionFilter: {{ category: CAT_SWORD, mask: CAT_MARBLE }} // Ghost logic
+                collisionFilter: {{ category: CAT_SWORD, mask: CAT_MARBLE }}
             }};
             
-            let splitLeft = Bodies.rectangle(cx, cy - 800, diagLength, 4, splitOpt);
-            let splitRight = Bodies.rectangle(cx, cy - 800, diagLength, 4, splitOpt);
+            let splitLeft = Bodies.rectangle(cx, cy - 1000, diagLength, 4, splitOpt);
+            let splitRight = Bodies.rectangle(cx, cy - 1000, diagLength, 4, splitOpt);
 
             let box = Composite.create();
             Composite.add(box, [ground, ceiling, leftWall, rightWall]);
             Composite.add(engine.world, [box, splitLeft, splitRight]);
 
             let marbles = [];
-            
-            // Calculate rotation to make Top-Right -> Bottom-Left diagonal perfectly vertical
             const diagAngle = Math.atan2(H, -W); 
             const targetTilt = Math.PI/2 - diagAngle; 
 
-            // --- 4. CHOREOGRAPHY STATE MACHINE ---
             let startTime = performance.now();
             let phase = -1;
             let currentRotation = 0;
@@ -112,7 +98,6 @@ def render_geometry_area_demo(base_units, height_units):
                 let t = performance.now() - startTime;
                 let cycle = t % 12000; 
 
-                // PHASE 1: Reset & Grid Fill (0 - 2000ms)
                 if (cycle < 100 && phase !== 1) {{
                     phase = 1; lastPop = 0;
                     
@@ -125,10 +110,9 @@ def render_geometry_area_demo(base_units, height_units):
                     Body.setPosition(ceiling, {{ x: cx, y: cy - H/2 - thickness/2 }});
                     Body.setPosition(leftWall, {{ x: cx - W/2 - thickness/2, y: cy }});
                     Body.setPosition(rightWall, {{ x: cx + W/2 + thickness/2, y: cy }});
-                    Body.setPosition(splitLeft, {{ x: cx, y: cy - 800 }});
-                    Body.setPosition(splitRight, {{ x: cx, y: cy - 800 }});
+                    Body.setPosition(splitLeft, {{ x: cx, y: cy - 1000 }});
+                    Body.setPosition(splitRight, {{ x: cx, y: cy - 1000 }});
 
-                    // Instantly spawn perfect grid of marbles
                     const startX = cx - W/2 + U/2;
                     const startY = cy - H/2 + U/2;
                     for (let i = 0; i < cols; i++) {{
@@ -144,7 +128,6 @@ def render_geometry_area_demo(base_units, height_units):
                     }}
                 }}
                 
-                // PHASE 2: Tip to Diamond (2500 - 4000ms)
                 else if (cycle >= 2500 && cycle < 4000) {{
                     phase = 2;
                     let p = (cycle - 2500) / 1500;
@@ -153,58 +136,51 @@ def render_geometry_area_demo(base_units, height_units):
                     Composite.rotate(box, delta, {{x: cx, y: cy}});
                     currentRotation = desiredRotation;
                     
-                    // Light jitter to settle marbles into the tipped corners
                     if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.0005, y: 0}}));
                 }}
                 
-                // PHASE 3: Drop the Ghost Swords (4500 - 6500ms)
                 else if (cycle >= 4500 && cycle < 6500) {{
                     phase = 3;
                     let p = (cycle - 4500) / 2000;
-                    let dropY = (cy - 800) + (800 * easeInOut(p));
+                    let dropY = (cy - 1000) + (1000 * easeInOut(p));
                     
-                    // The swords drop straight down the vertical axis bisecting the marbles perfectly
                     Body.setPosition(splitLeft, {{ x: cx, y: dropY }});
                     Body.setPosition(splitRight, {{ x: cx, y: dropY }});
                 }}
                 
-                // PHASE 4: Pop Triangles Apart (7000 - 8500ms)
                 else if (cycle >= 7000 && cycle < 8500) {{
                     phase = 4;
                     let p = (cycle - 7000) / 1500;
-                    let pop = easeInOut(p) * (U / 2); // Split width is 1 grid unit total
+                    let pop = easeInOut(p) * 60; // Increased to 60px separation
                     let delta = pop - lastPop;
                     lastPop = pop;
                     
-                    // Triangle 1 (Left Side: Ceiling & Left Wall) + Left Sword
                     Body.translate(ceiling, {{x: -delta, y: 0}});
                     Body.translate(leftWall, {{x: -delta, y: 0}});
                     Body.translate(splitLeft, {{x: -delta, y: 0}});
                     
-                    // Triangle 2 (Right Side: Ground & Right Wall) + Right Sword
                     Body.translate(ground, {{x: delta, y: 0}});
                     Body.translate(rightWall, {{x: delta, y: 0}});
                     Body.translate(splitRight, {{x: delta, y: 0}});
                 }}
             }});
 
-            // --- 5. OVERLAY FORMULA ---
             Events.on(render, 'afterRender', function() {{
                 const context = render.context;
                 let t = (performance.now() - startTime) % 12000;
-                context.font = "bold 32px sans-serif"; context.textAlign = "left";
-                const fx = 30; const fy = 210;
+                context.font = "bold 34px sans-serif"; context.textAlign = "left";
+                const fx = 50; const fy = 310;
 
                 if (t < 7000) {{
                     context.fillStyle = '#475569'; context.fillText("Area = ", fx, fy);
-                    context.fillStyle = '#38BDF8'; context.fillText("b", fx + 110, fy);
-                    context.fillStyle = '#475569'; context.fillText(" × ", fx + 130, fy);
-                    context.fillStyle = '#4ADE80'; context.fillText("h", fx + 180, fy);
+                    context.fillStyle = '#38BDF8'; context.fillText("b", fx + 120, fy);
+                    context.fillStyle = '#475569'; context.fillText(" × ", fx + 145, fy);
+                    context.fillStyle = '#4ADE80'; context.fillText("h", fx + 195, fy);
                 }} else {{
                     context.fillStyle = '#475569'; context.fillText("Area = ½ × ", fx, fy);
-                    context.fillStyle = '#38BDF8'; context.fillText("b", fx + 175, fy);
-                    context.fillStyle = '#475569'; context.fillText(" × ", fx + 195, fy);
-                    context.fillStyle = '#4ADE80'; context.fillText("h", fx + 245, fy);
+                    context.fillStyle = '#38BDF8'; context.fillText("b", fx + 195, fy);
+                    context.fillStyle = '#475569'; context.fillText(" × ", fx + 220, fy);
+                    context.fillStyle = '#4ADE80'; context.fillText("h", fx + 270, fy);
                 }}
             }});
 
@@ -214,4 +190,4 @@ def render_geometry_area_demo(base_units, height_units):
     </body>
     </html>
     """
-    components.html(html_code, height=420)
+    components.html(html_code, height=620)
