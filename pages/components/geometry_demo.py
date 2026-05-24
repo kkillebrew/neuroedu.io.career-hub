@@ -20,7 +20,8 @@ import streamlit.components.v1 as components
 
 def render_geometry_area_demo(base_units, height_units):
     """
-    Renders the physics-based Area transformation.
+    Renders a physics-based geometry transformation.
+    Perfectly packs a grid of marbles, rotates, bisects, and pops apart.
     """
     html_code = f"""
     <!DOCTYPE html>
@@ -35,8 +36,14 @@ def render_geometry_area_demo(base_units, height_units):
     <body>
         <canvas id="geomCanvas" width="700" height="400"></canvas>
         <script>
+            // --- 1. ENGINE & COLLISION SETUP ---
             const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner;
             const Bodies = Matter.Bodies, Body = Matter.Body, Composite = Matter.Composite, Events = Matter.Events;
+
+            // Collision Categories (Bitmasking allows the sword to pass through the walls but hit marbles)
+            const CAT_WALL = 0x0001;
+            const CAT_MARBLE = 0x0002;
+            const CAT_SWORD = 0x0004;
 
             const engine = Engine.create();
             const gravity = engine.gravity || engine.world.gravity;
@@ -47,43 +54,57 @@ def render_geometry_area_demo(base_units, height_units):
                 options: {{ width: 700, height: 400, wireframes: false, background: 'transparent' }}
             }});
 
-            const U = 35; 
+            // --- 2. GRID MATH & SIZING ---
+            const U = 35; // Size of 1 grid cell
             const W = {base_units} * U;
             const H = {height_units} * U;
             const cx = 450; const cy = 200;
             
-            // Calculate exactly 100 marbles to fill ~85% of the space
-            const r = Math.sqrt((W * H * 0.85) / (100 * Math.PI));
-            const thickness = 40; 
-            const wallOpt = {{ isStatic: true, friction: 0.0, render: {{ fillStyle: '#475569' }} }};
+            // User spec: Diameter = Grid cell length - 5px
+            const marbleRadius = (U - 5) / 2;
+            const cols = {base_units};
+            const rows = {height_units};
             
-            // Build the components
+            // --- 3. CONSTRUCT RIGID BODIES ---
+            const thickness = 40; 
+            const wallOpt = {{ 
+                isStatic: true, friction: 0.0, 
+                render: {{ fillStyle: '#475569' }},
+                collisionFilter: {{ category: CAT_WALL }} 
+            }};
+            
+            // Outer Walls
             let ground = Bodies.rectangle(cx, cy + H/2 + thickness/2, W + thickness*2, thickness, wallOpt);
             let ceiling = Bodies.rectangle(cx, cy - H/2 - thickness/2, W + thickness*2, thickness, wallOpt);
             let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H + thickness*2, wallOpt);
             let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H + thickness*2, wallOpt);
 
-            // The Splitters (Two overlapping lines that will form the inner walls of the triangles)
+            // The Splitters (Two overlapping lines to cap the separated triangles)
             const diagLength = Math.sqrt(W*W + H*H) + 10;
-            const diagAngle = Math.atan2(H, -W); // Angle from TR to BL
+            const splitOpt = {{ 
+                isStatic: true, friction: 0.0, angle: Math.PI/2, 
+                render: {{ fillStyle: '#EF4444' }},
+                collisionFilter: {{ category: CAT_SWORD, mask: CAT_MARBLE }} // Ghost logic
+            }};
             
-            const splitOpt = {{ isStatic: true, friction: 0.0, angle: diagAngle, render: {{ fillStyle: '#EF4444' }} }};
-            let splitLeft = Bodies.rectangle(cx, cy - 800, diagLength, 6, splitOpt);
-            let splitRight = Bodies.rectangle(cx, cy - 800, diagLength, 6, splitOpt);
+            let splitLeft = Bodies.rectangle(cx, cy - 800, diagLength, 4, splitOpt);
+            let splitRight = Bodies.rectangle(cx, cy - 800, diagLength, 4, splitOpt);
 
-            // Group them to rotate the box easily
             let box = Composite.create();
-            Composite.add(box, [ground, ceiling, leftWall, rightWall, splitLeft, splitRight]);
-            Composite.add(engine.world, box);
+            Composite.add(box, [ground, ceiling, leftWall, rightWall]);
+            Composite.add(engine.world, [box, splitLeft, splitRight]);
 
             let marbles = [];
             
-            // Target angle to make the TR-BL diagonal perfectly vertical
-            const targetTilt = -Math.PI/2 - diagAngle; 
+            // Calculate rotation to make Top-Right -> Bottom-Left diagonal perfectly vertical
+            const diagAngle = Math.atan2(H, -W); 
+            const targetTilt = Math.PI/2 - diagAngle; 
 
+            // --- 4. CHOREOGRAPHY STATE MACHINE ---
             let startTime = performance.now();
             let phase = -1;
             let currentRotation = 0;
+            let lastPop = 0;
 
             function easeInOut(x) {{ return -(Math.cos(Math.PI * x) - 1) / 2; }}
 
@@ -91,12 +112,13 @@ def render_geometry_area_demo(base_units, height_units):
                 let t = performance.now() - startTime;
                 let cycle = t % 12000; 
 
-                // PHASE 1: Rapid Grid Pour (0 - 2000ms)
+                // PHASE 1: Reset & Grid Fill (0 - 2000ms)
                 if (cycle < 100 && phase !== 1) {{
-                    phase = 1;
+                    phase = 1; lastPop = 0;
+                    
                     marbles.forEach(m => Composite.remove(engine.world, m));
                     marbles = [];
-                    Composite.rotate(box, -currentRotation, {{x: cx, y: cy}}); // Reset rotation
+                    Composite.rotate(box, -currentRotation, {{x: cx, y: cy}}); 
                     currentRotation = 0;
                     
                     Body.setPosition(ground, {{ x: cx, y: cy + H/2 + thickness/2 }});
@@ -106,14 +128,19 @@ def render_geometry_area_demo(base_units, height_units):
                     Body.setPosition(splitLeft, {{ x: cx, y: cy - 800 }});
                     Body.setPosition(splitRight, {{ x: cx, y: cy - 800 }});
 
-                    // Pour 100 marbles
-                    for(let i=0; i<100; i++) {{
-                        let m = Bodies.circle(cx + (Math.random()*(W-r*2)) - W/2 + r, cy - H/2 + r*2 + (i*2), r, {{
-                            restitution: 0.2, friction: 0.05,
-                            render: {{ fillStyle: '#38BDF8', strokeStyle: '#0284C7', lineWidth: 1 }}
-                        }});
-                        marbles.push(m);
-                        Composite.add(engine.world, m);
+                    // Instantly spawn perfect grid of marbles
+                    const startX = cx - W/2 + U/2;
+                    const startY = cy - H/2 + U/2;
+                    for (let i = 0; i < cols; i++) {{
+                        for (let j = 0; j < rows; j++) {{
+                            let m = Bodies.circle(startX + i*U, startY + j*U, marbleRadius, {{
+                                restitution: 0.1, friction: 0.05, density: 0.05,
+                                render: {{ fillStyle: '#38BDF8', strokeStyle: '#0284C7', lineWidth: 1 }},
+                                collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_MARBLE | CAT_SWORD }}
+                            }});
+                            marbles.push(m);
+                            Composite.add(engine.world, m);
+                        }}
                     }}
                 }}
                 
@@ -126,36 +153,38 @@ def render_geometry_area_demo(base_units, height_units):
                     Composite.rotate(box, delta, {{x: cx, y: cy}});
                     currentRotation = desiredRotation;
                     
-                    // Jitter marbles to settle them deeply into the corner
-                    if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.001, y: 0}}));
+                    // Light jitter to settle marbles into the tipped corners
+                    if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.0005, y: 0}}));
                 }}
                 
-                // PHASE 3: Slide Wedge Down (4500 - 6500ms)
+                // PHASE 3: Drop the Ghost Swords (4500 - 6500ms)
                 else if (cycle >= 4500 && cycle < 6500) {{
                     phase = 3;
                     let p = (cycle - 4500) / 2000;
                     let dropY = (cy - 800) + (800 * easeInOut(p));
                     
-                    // The blades slide down the absolute Y axis (which aligns perfectly with the tilted diagonal)
+                    // The swords drop straight down the vertical axis bisecting the marbles perfectly
                     Body.setPosition(splitLeft, {{ x: cx, y: dropY }});
                     Body.setPosition(splitRight, {{ x: cx, y: dropY }});
                 }}
                 
-                // PHASE 4: Pop Apart (7000 - 8500ms)
+                // PHASE 4: Pop Triangles Apart (7000 - 8500ms)
                 else if (cycle >= 7000 && cycle < 8500) {{
                     phase = 4;
                     let p = (cycle - 7000) / 1500;
-                    let pop = easeInOut(p) * 2; // Move 2px per frame outwards
+                    let pop = easeInOut(p) * (U / 2); // Split width is 1 grid unit total
+                    let delta = pop - lastPop;
+                    lastPop = pop;
                     
-                    // Move Left Triangle group (Top, Left, SplitLeft) to the left
-                    Body.translate(ceiling, {{x: -pop, y: 0}});
-                    Body.translate(leftWall, {{x: -pop, y: 0}});
-                    Body.translate(splitLeft, {{x: -pop, y: 0}});
+                    // Triangle 1 (Left Side: Ceiling & Left Wall) + Left Sword
+                    Body.translate(ceiling, {{x: -delta, y: 0}});
+                    Body.translate(leftWall, {{x: -delta, y: 0}});
+                    Body.translate(splitLeft, {{x: -delta, y: 0}});
                     
-                    // Move Right Triangle group (Bottom, Right, SplitRight) to the right
-                    Body.translate(ground, {{x: pop, y: 0}});
-                    Body.translate(rightWall, {{x: pop, y: 0}});
-                    Body.translate(splitRight, {{x: pop, y: 0}});
+                    // Triangle 2 (Right Side: Ground & Right Wall) + Right Sword
+                    Body.translate(ground, {{x: delta, y: 0}});
+                    Body.translate(rightWall, {{x: delta, y: 0}});
+                    Body.translate(splitRight, {{x: delta, y: 0}});
                 }}
             }});
 
