@@ -190,66 +190,56 @@ def render_geometry_area_demo(base_units, height_units):
                 return x + wMax;
             }}
 
-            function drawUprightFadingLabel(context, body, text1, text2, color, alpha2, localNx, localNy, offset) {{
-                let a = body.angle;
-                let worldNx = localNx * Math.cos(a) - localNy * Math.sin(a);
-                let worldNy = localNx * Math.sin(a) + localNy * Math.cos(a);
-                let px = body.position.x + worldNx * offset;
-                let py = body.position.y + worldNy * offset;
-                
-                context.textAlign = "center";
-                context.textBaseline = "middle";
-                context.font = "bold 34px sans-serif";
+            // --- FIXED-WIDTH FADE ENGINE ---
+            function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y, fixedWidth) {{}
+                context.textAlign = "center"; // Center text within the reserved fixedWidth slot
+                let centerX = x + fixedWidth / 2;
 
                 context.globalAlpha = Math.max(0, 1 - alpha2);
-                context.fillStyle = color;
-                context.fillText(text1, px, py);
+                context.fillStyle = color1;
+                context.fillText(text1, centerX, y);
 
                 context.globalAlpha = Math.max(0, alpha2);
-                context.fillText(text2, px, py);
+                context.fillStyle = color2;
+                context.fillText(text2, centerX, y);
 
                 context.globalAlpha = 1.0;
+                return x + fixedWidth;
             }}
 
-            Events.on(render, 'afterRender', function() {{
+            Events.on(render, 'afterRender', function() {{}
                 const context = render.context;
                 let t = (performance.now() - startTime) % 15000;
                 
                 context.font = "bold 40px sans-serif"; 
                 context.textBaseline = "alphabetic";
-                context.textAlign = "left";
                 
-                // Alpha Logic for Crossfades
-                let alphaNum = 0;
-                if (t > 2000 && t < 3500) alphaNum = easeInOut((t - 2000) / 1500);
-                else if (t >= 3500) alphaNum = 1;
+                // --- FORMULA LAYOUT (Anchored to Equals Sign) ---
+                const eqX = 250; // The fixed anchor for the '=' sign
+                const eqWidth = context.measureText(" = ").width;
+                const slotWidth = 120; // Fixed width for terms (Area, b, h)
+                
+                context.textAlign = "center";
+                context.fillStyle = '#475569';
+                context.fillText(" = ", eqX, 120);
 
-                let alphaAreaTri = 0;
-                if (t > 10500 && t < 12000) alphaAreaTri = easeInOut((t - 10500) / 1500);
-                else if (t >= 12000) alphaAreaTri = 1;
+                let alphaNum = t > 2000 ? Math.min(1, (t - 2000) / 1500) : 0;
+                let alphaAreaTri = t > 10500 ? Math.min(1, (t - 10500) / 1500) : 0;
 
-                const fx = 150; 
-                const fy = 120;
-                let px = fx;
-
-                // Render specific formula state based on the current loop phase
-                if (t < 8500) {{
-                    px = drawFadingText(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, px, fy);
-                    context.fillStyle = '#475569'; context.fillText(" = ", px, fy); px += context.measureText(" = ").width;
-                    px = drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', alphaNum, px, fy);
-                    context.fillStyle = '#475569'; context.fillText(" × ", px, fy); px += context.measureText(" × ").width;
-                    px = drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', alphaNum, px, fy);
+                if (t < 7000) {{}
+                    drawFadingText(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, eqX - slotWidth, 120, slotWidth);
+                    drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', alphaNum, eqX + eqWidth, 120, slotWidth);
+                    context.fillText(" × ", eqX + eqWidth + slotWidth + 20, 120);
+                    drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', alphaNum, eqX + eqWidth + slotWidth + 60, 120, slotWidth);
                 }} else {{
-                    px = drawFadingText(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, px, fy);
-                    context.fillStyle = '#475569'; context.fillText(" = ", px, fy); px += context.measureText(" = ").width;
-                    context.fillStyle = '#EF4444'; context.fillText("½", px, fy); px += context.measureText("½").width;
-                    context.fillStyle = '#475569'; context.fillText(" × ", px, fy); px += context.measureText(" × ").width;
-                    px = drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', 1, px, fy);
-                    context.fillStyle = '#475569'; context.fillText(" × ", px, fy); px += context.measureText(" × ").width;
-                    px = drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', 1, px, fy);
+                    drawFadingText(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, eqX - slotWidth, 120, slotWidth);
+                    context.fillStyle = '#EF4444'; context.fillText("½ ×", eqX + 50, 120);
+                    drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', 1, eqX + eqWidth + slotWidth - 40, 120, slotWidth);
+                    context.fillStyle = '#475569'; context.fillText(" × ", eqX + eqWidth + slotWidth*2 - 20, 120);
+                    drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', 1, eqX + eqWidth + slotWidth*2 + 20, 120, slotWidth);
                 }}
-
-                // Render dynamic upright labels orbiting the physical body
+                
+                // Orbiting labels remain as before
                 let off = (thickness / 2) + 30;
                 drawUprightFadingLabel(context, ceiling, "b", cols.toString(), '#38BDF8', alphaNum, 0, -1, off);
                 drawUprightFadingLabel(context, ground, "b", cols.toString(), '#38BDF8', alphaNum, 0, 1, off);
