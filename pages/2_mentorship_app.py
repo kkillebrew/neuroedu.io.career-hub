@@ -128,11 +128,12 @@ st.write("Tracking quantitative student development, milestone testing metrics, 
 # Define Plotly standard configuration to lock the UI per the Style Guide
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
 
-# --- THE PATHING FIX ---
-# Since this script lives inside the 'pages/' subdirectory, navigating exactly 
-# ONE folder up targets the true repository root folder where 'documents/' is located.
-# MATLAB Analogy: Equivalent to fileparts(fileparts(mfilename('fullpath')))
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# --- THE ABSOLUTE REPOSITORY PATH ANCHOR ---
+# __file__ gives us the absolute path to this script: .../pages/2_mentorship_app.py
+# The first os.path.dirname gets us the 'pages/' folder.
+# The second os.path.dirname steps up to the absolute root directory ('.../neuroedu.io.career-hub.git/')
+# MATLAB Analogy: This is identical to using fileparts(fileparts(mfilename('fullpath')))
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 for job in mentorship['career_history']:
     with st.container():
@@ -146,11 +147,10 @@ for job in mentorship['career_history']:
             
         with c_right:
             if job.get('file_path'):
-                # --- THE PORTABLE PATH ANCHOR ---
-                # Using os.getcwd() anchors the path directly to the execution root folder ('/app/' in Docker).
-                # This guarantees that the folder target resolves identically on local machines and cloud servers.
-                # MATLAB Analogy: Equivalent to utilizing standard pwd() as the base folder path.
-                target_csv = os.path.join(os.getcwd(), job['file_path'])
+                # --- THE PORTABLE PATH ANCHOR FIXED ---
+                # We join using the calculated repo_root anchor. This guarantees that your 
+                # datasets are always accurately targeted inside your 'documents/' directory.
+                target_csv = os.path.join(repo_root, job['file_path'])
                 
                 if os.path.exists(target_csv):
                     # ---------------------------------------------------------
@@ -249,13 +249,15 @@ for job in mentorship['career_history']:
 st.markdown("### Credentials & Accreditations")
 res_col1, res_col2 = st.columns(2)
 with res_col1:
-    # Anchor the PDF retrieval using the absolute working path string
-    t_cv = os.path.join(os.getcwd(), "documents/kyle_teaching_cv.pdf")
+    # Anchor the PDF retrieval using our absolute repository root folder path mapping
+    t_cv = os.path.join(repo_root, "documents/kyle_teaching_cv.pdf")
     if os.path.exists(t_cv):
          with open(t_cv, "rb") as f:
             st.download_button("📂 Download Teaching Portfolio Resume (PDF)", f.read(), "kyle_teaching_cv.pdf")
     else:
-        st.button("📂 Teaching Resume File Staged Locally", disabled=True)
+        # High contrast fallback tells you exactly where the app is looking for the missing asset
+        st.button("📂 Teaching Resume Staged on Server", disabled=True)
+        st.caption(f"Targeting: `{t_cv}`")
 
 with res_col2:
     st.markdown("###### Standardized Learner Profiles")
