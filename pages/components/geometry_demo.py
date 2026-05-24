@@ -28,6 +28,8 @@ def render_geometry_area_demo(base_units, height_units):
     <!DOCTYPE html>
     <html>
     <head>
+        <!-- INJECT THE PHYSICS ENGINE -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
         <style>
             body {{ margin: 0; display: flex; justify-content: center; align-items: center; background-color: #F1F5F9; overflow: hidden; font-family: 'Inter', sans-serif; }}
             canvas {{ background-color: #E2E8F0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
@@ -36,120 +38,102 @@ def render_geometry_area_demo(base_units, height_units):
     <body>
         <canvas id="geomCanvas" width="700" height="400"></canvas>
         <script>
+            // --- 1. PHYSICS ENGINE INITIALIZATION ---
+            // MATLAB Bridge: Equivalent to initializing a Simscape Multibody environment
+            const Engine = Matter.Engine,
+                  Render = Matter.Render,
+                  Runner = Matter.Runner,
+                  Bodies = Matter.Bodies,
+                  Composite = Matter.Composite,
+                  Body = Matter.Body;
+
+            const engine = Engine.create();
+            // Lower gravity slightly for a more "floaty" pedagogical aesthetic
+            engine.world.gravity.y = 0.8; 
+
+            // --- 2. CANVAS & RENDERER ---
             const canvas = document.getElementById('geomCanvas');
-            const ctx = canvas.getContext('2d');
-            
+            const render = Render.create({{
+                canvas: canvas,
+                engine: engine,
+                options: {{
+                    width: 700,
+                    height: 400,
+                    wireframes: false, // Set to true for debugging bounding boxes
+                    background: 'transparent'
+                }}
+            }});
+
+            // Grid sizing
             const U = 40;
             const W = {base_units} * U;
             const H = {height_units} * U;
             const cx = 450; 
             const cy = 200;
-            const fx = 50;
-            const fy = 210;
 
-            const colorBase = '#38BDF8';
-            const colorHeight = '#4ADE80';
-            const colorShape = 'rgba(148, 163, 184, 0.3)';
-            const colorLine = '#475569';
+            // --- 3. RECTANGLE BOUNDARIES (The "Container") ---
+            // We build the rectangle out of 4 static walls so the marbles stay inside
+            const wallOptions = {{ isStatic: true, render: {{ fillStyle: '#475569' }} }};
+            const leftWall = Bodies.rectangle(cx - W/2, cy, 10, H, wallOptions);
+            const rightWall = Bodies.rectangle(cx + W/2, cy, 10, H, wallOptions);
+            const bottomWall = Bodies.rectangle(cx, cy + H/2, W, 10, wallOptions);
+            const topWall = Bodies.rectangle(cx, cy - H/2, W, 10, wallOptions);
+            
+            // The diagonal splitting line (Initially hidden off-screen or scaled to 0)
+            const diagonalSplit = Bodies.rectangle(cx, cy, Math.sqrt(W*W + H*H), 10, {{ 
+                isStatic: true, 
+                angle: Math.atan2(H, W),
+                isSensor: true // Marbles ignore it until phase 3
+            }});
 
-            function easeInOutCubic(x) {{
-                return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+            Composite.add(engine.world, [leftWall, rightWall, bottomWall, topWall, diagonalSplit]);
+
+            // --- 4. THE MARBLE GENERATOR ---
+            const marbles = [];
+            function pourMarbles(count) {{
+                for (let i = 0; i < count; i++) {{
+                    // Add slight random jitter to drop positions so they bounce naturally
+                    let startX = cx + (Math.random() * 40 - 20);
+                    let startY = cy - H/2 + 20;
+                    
+                    let marble = Bodies.circle(startX, startY, 8, {{
+                        restitution: 0.6, // Bounciness
+                        friction: 0.05,
+                        render: {{ fillStyle: '#38BDF8' }}
+                    }});
+                    marbles.push(marble);
+                    Composite.add(engine.world, marble);
+                }}
             }}
 
-            function drawLoop(currentTime) {{
-                const t = currentTime % 6000;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // --- 5. THE STATE MACHINE LOOP ---
+            // This replaces the procedural Math.sin loop with a timed logic controller
+            let startTime = performance.now();
+            
+            function stateMachine() {{
+                let t = (performance.now() - startTime) % 8000; // 8 second total loop
                 
-                let diagAlpha = 0;
-                let splitOffset = 0;
-                let showTriangleFormula = false;
-                
-                if (t > 1000 && t < 2000) {{
-                    diagAlpha = (t - 1000) / 1000;
-                }} else if (t >= 2000 && t < 5000) {{
-                    diagAlpha = 1;
-                }} else if (t >= 5000) {{
-                    diagAlpha = 1 - ((t - 5000) / 1000);
+                if (t < 100) {{
+                    // Phase 1: Reset & Pour
+                    if (marbles.length === 0) pourMarbles(40);
+                }} else if (t > 3000 && t < 4000) {{
+                    // Phase 2: Tip the container 45 degrees
+                    // Body.setAngle(container, newAngle);
+                }} else if (t > 4000 && t < 5500) {{
+                    // Phase 3: Activate diagonal split and grow it
+                }} else if (t > 5500 && t < 7000) {{
+                    // Phase 4: Pop the two triangles apart
+                }} else if (t > 7800) {{
+                    // Phase 5: Clear world for restart
                 }}
 
-                if (t >= 2000 && t < 3000) {{
-                    splitOffset = easeInOutCubic((t - 2000) / 1000);
-                }} else if (t >= 3000 && t < 4000) {{
-                    splitOffset = 1;
-                }} else if (t >= 4000 && t < 5000) {{
-                    splitOffset = 1 - easeInOutCubic((t - 4000) / 1000);
-                }}
-                
-                if (t >= 1500 && t <= 5200) showTriangleFormula = true;
-
-                ctx.font = "bold 32px sans-serif";
-                if (!showTriangleFormula) {{
-                    ctx.fillStyle = colorLine; ctx.fillText("Area = ", fx, fy);
-                    ctx.fillStyle = colorBase; ctx.fillText("b", fx + 110, fy);
-                    ctx.fillStyle = colorLine; ctx.fillText(" × ", fx + 130, fy);
-                    ctx.fillStyle = colorHeight; ctx.fillText("h", fx + 180, fy);
-                }} else {{
-                    ctx.fillStyle = colorLine; ctx.fillText("Area = ½ × ", fx, fy);
-                    ctx.fillStyle = colorBase; ctx.fillText("b", fx + 175, fy);
-                    ctx.fillStyle = colorLine; ctx.fillText(" × ", fx + 195, fy);
-                    ctx.fillStyle = colorHeight; ctx.fillText("h", fx + 245, fy);
-                }}
-
-                const ox1 = -splitOffset * 30; 
-                const oy1 = splitOffset * 30;
-                const ox2 = splitOffset * 30; 
-                const oy2 = -splitOffset * 30;
-
-                const left = cx - W/2;
-                const top = cy - H/2;
-                const right = cx + W/2;
-                const bottom = cy + H/2;
-
-                ctx.lineWidth = 4;
-                ctx.lineJoin = 'round';
-
-                ctx.beginPath();
-                ctx.moveTo(left + ox1, top + oy1);
-                ctx.lineTo(left + ox1, bottom + oy1);
-                ctx.lineTo(right + ox1, bottom + oy1);
-                ctx.closePath();
-                ctx.fillStyle = colorShape; ctx.fill();
-                ctx.strokeStyle = colorLine; ctx.stroke();
-                
-                ctx.font = "bold 24px sans-serif";
-                ctx.fillStyle = colorHeight; ctx.fillText("h", left + ox1 - 25, cy + oy1 + 8);
-                ctx.fillStyle = colorBase; ctx.fillText("b", cx + ox1 - 8, bottom + oy1 + 30);
-
-                ctx.beginPath();
-                ctx.moveTo(left + ox2, top + oy2);
-                ctx.lineTo(right + ox2, top + oy2);
-                ctx.lineTo(right + ox2, bottom + oy2);
-                ctx.closePath();
-                ctx.fillStyle = colorShape; ctx.fill();
-                ctx.strokeStyle = colorLine; ctx.stroke();
-
-                if (splitOffset > 0.1) {{
-                    ctx.globalAlpha = splitOffset;
-                    ctx.fillStyle = colorBase; ctx.fillText("b", cx + ox2 - 8, top + oy2 - 15);
-                    ctx.fillStyle = colorHeight; ctx.fillText("h", right + ox2 + 15, cy + oy2 + 8);
-                    ctx.globalAlpha = 1.0;
-                }}
-
-                if (diagAlpha > 0 && splitOffset === 0) {{
-                    ctx.beginPath();
-                    ctx.moveTo(left, top);
-                    ctx.lineTo(right, bottom);
-                    // FIXED: Using ${{diagAlpha}} here prevents the NameError
-                    ctx.strokeStyle = `rgba(239, 68, 68, ${{diagAlpha}})`; 
-                    ctx.setLineDash([10, 10]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }}
-
-                requestAnimationFrame(drawLoop);
+                requestAnimationFrame(stateMachine);
             }}
 
-            requestAnimationFrame(drawLoop);
+            // Start the physics and rendering engines
+            Render.run(render);
+            Runner.run(Runner.create(), engine);
+            requestAnimationFrame(stateMachine);
         </script>
     </body>
     </html>
