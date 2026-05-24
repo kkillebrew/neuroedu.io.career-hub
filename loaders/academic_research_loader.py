@@ -160,7 +160,7 @@ def get_category_colors():
     }
 
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_sfm_data(grouping_mode, metric_mode, apply_qc=True):
     """
     Pure Cloud Architecture: Fetches BOTH the Parquet and CSV dynamically 
@@ -530,7 +530,7 @@ def get_response_counts_data(df):
 #########################################################
 #---    Load In the Rotating Line Behavioral Data    ---#
 #########################################################
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_rotating_line_data():
     """
     Fetches combined Parquet file from GitHub.
@@ -648,7 +648,7 @@ def get_rotating_line_data():
 # =====================================================================
 # VISUAL WORKING MEMORY (VWM) DATA LOADERS
 # =====================================================================
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def _fetch_github_parquet(base_name, columns=None):
     """
     Fetch parquet with proper signature.
@@ -671,11 +671,11 @@ def _fetch_github_parquet(base_name, columns=None):
         print(f"Failed to load {base_name}: {e}")
         return pd.DataFrame()
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_vwm_behavioral_data():
     return _fetch_github_parquet('vwm_behavioral')
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_processed_vwm_vep():
     df = _fetch_github_parquet('vwm_eeg_time_summary')
     if df.empty: return df
@@ -687,7 +687,7 @@ def get_processed_vwm_vep():
     )
     return df.groupby(['Grouping_Condition', 'Time_s'])['Amplitude_uV'].mean().reset_index()
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_processed_vwm_snr():
     # FIX: Added 'Subject_ID' to the columns fetch list to prevent a KeyError.
     df = _fetch_github_parquet('vwm_eeg_trial_power_summary', 
@@ -727,7 +727,7 @@ def get_processed_vwm_snr():
 
     return melted_clean.groupby(['Subject_ID', 'Grouping_Status', 'Signal_Type'])['SNR'].median().reset_index()
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_processed_fft_index():
     """Calculates the Harmonic Stem Plot Index and 1-sample t-tests."""
     # CRITICAL FIX: Added 'columns' argument to prevent OOM server crash (infinite spinner)
@@ -788,7 +788,7 @@ def get_processed_fft_index():
         
     return pd.DataFrame(stats_list)
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_processed_fft_grid():
     df = _fetch_github_parquet('vwm_eeg_full_spectrum')
     if df.empty: return df
@@ -804,7 +804,7 @@ def get_processed_fft_grid():
     df_avg['Pair'] = df_avg['Condition'].str.replace('grpPrb', '').str.replace('noGrp', '')
     return df_avg
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_processed_index_spectra():
     """
     Calculates the Neural Index of Grouping across the FULL frequency spectrum. 
@@ -839,7 +839,7 @@ def get_processed_index_spectra():
 
     return pivoted, df_spectra
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_vwm_role_index():
     pivoted, _ = get_processed_index_spectra()
     if pivoted.empty: return pd.DataFrame()
@@ -880,7 +880,7 @@ def get_vwm_role_index():
     full_df = pd.concat(records, ignore_index=True)
     return full_df.groupby(['Subject_ID', 'Base_Hz', 'Role'])['Index_Value'].mean().reset_index()
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_topoplot_spatial_averages():
     # CRITICAL FIX: Added columns argument. Prevents OOM when drawing Topo maps.
     cols = ['Condition', 'Channel', 'SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
@@ -958,7 +958,7 @@ def generate_topoplot_figure(spatial_index_df, target_hz, show_colorbar=False):
         
     return fig
 
-@st.cache_data
+@st.cache_data(max_entries=2, ttl=3600)
 def get_spatial_index_data():
     """
     Computes the Neural Index using PRE-AGGREGATION to save RAM.

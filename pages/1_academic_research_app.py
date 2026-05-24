@@ -100,17 +100,23 @@ st.divider()
 st.header("Interactive Research Methodologies")
 st.write("A visual summary of methodologies utilized to uncover neural biomarkers and understand visual biases.")
 
-# UPDATE your tabs definition
-tabs = st.tabs([
-    "🧩 1. Biomarkers of Psychosis (SFM)", 
-    "🔄 2. The Rotating Line Illusion",  # <-- Renamed this tab
-    "🧠 3. Encoding Visual Objects Into Memory", 
-    "📊 4. Ensemble Encoding", 
-    "🎯 5. Intraparietal Regions Involvment In Working Memory Encoding"
-])
+# <--- CRITICAL FIX 1: Lazy Loading Router --->
+# Replaces st.tabs() with a conditional radio to prevent background execution
+active_project = st.radio(
+    "Select Methodology to Load:",
+    [
+        "🧩 1. Biomarkers of Psychosis (SFM)", 
+        "🔄 2. The Rotating Line Illusion", 
+        "🧠 3. Encoding Visual Objects Into Memory", 
+        "📊 4. Ensemble Encoding", 
+        "🎯 5. Intraparietal Regions Involvment"
+    ],
+    horizontal=True,
+    label_visibility="collapsed"
+)
 
-# --- TAB 1: STRUCTURE FROM MOTION (SFM) ---
-with tabs[0]:
+# --- PROJECT 1: STRUCTURE FROM MOTION (SFM) ---
+if "Biomarkers" in active_project:
     sfm_text = narratives[0]
     col_text, col_img = st.columns([1.5, 1], gap="large")
     
@@ -126,16 +132,20 @@ with tabs[0]:
             
     st.divider()
 
-    # Create the 5 main tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Control Data Analysis", 
-        "Main Behavioral Analysis", 
-        "Modeling", 
-        "Eyetracking", 
-        "MRS"
-    ])
+    # <--- CRITICAL FIX 2: Sub-Routing --->
+    # Using a selectbox for deep-dives keeps the UI clean and memory light
+    sfm_active_view = st.selectbox(
+        "Select SFM Analysis View:",
+        [
+            "Control Data Analysis", 
+            "Main Behavioral Analysis", 
+            "Modeling", 
+            "Eyetracking", 
+            "MRS"
+        ]
+    )
 
-    with tab1:
+    if sfm_active_view == "Control Data Analysis":
         st.header("Control Data Analysis")
         
         # Safely fetch the REAL baseline data using the required positional arguments
@@ -295,8 +305,8 @@ with tabs[0]:
                 with ref_col2: st.image("documents/pHCP_EPS_Files/PaperFig_AccFULL.png", caption="pHCP Accuracy")
                 with ref_col3: st.image("documents/pHCP_EPS_Files/AveRT.png", caption="pHCP Average RT")
     
-    with tab2:
-        st.subheader("Data Exploration: Switch Rates & Percept Durations")
+    if sfm_active_view == "Data Exploration: Switch Rates & Percept Durations":
+        st.header("Data Exploration: Switch Rates & Percept Durations")
         
         # --- UI CONTROLLERS ---
         ui_c1, ui_c2 = st.columns(2)
@@ -387,20 +397,20 @@ with tabs[0]:
                 elif "Percept Duration" in selected_metric:
                     st.image("documents/pHCP_EPS_Files/AvePercDur.png", caption="pHCP Percept Duration")
 
-    with tab3:
+    if sfm_active_view == "Modeling":
         st.header("Modeling")
         st.info("Modeling pipeline coming soon.")
 
-    with tab4:
+    if sfm_active_view == "Eyetracking":
         st.header("Eyetracking")
         st.info("Eyetracking integration coming soon.")
 
-    with tab5:
+    if sfm_active_view == "MRS":
         st.header("MRS")
         st.info("MRS correlation data coming soon.")
 
 ### 2-Rotating Line ###
-with tabs[1]:
+elif "Rotating Line" in active_project:
         st.header("The Rotating Line Illusion")
         
         # --- MASTHEAD: 2-Column Layout ---
@@ -447,15 +457,17 @@ with tabs[1]:
 
         st.divider()
 
-        # --- SUB-TABS: The Analytical Breakdown ---
-        # MATLAB Bridge: This separates our raw "task" from our data analysis scripts.
-        rl_tabs = st.tabs(["🧪 1. Mini Experiment", "📊 2. Control Data & Analysis", "🧠 3. Main Findings"])
+        # --- SUB-VIEWS: The Analytical Breakdown ---
+        rl_active_view = st.selectbox(
+            "Select Rotating Line View:",
+            ["🧪 1. Mini Experiment", "📊 2. Control Data & Analysis", "🧠 3. Main Findings"]
+        )
         
-        with rl_tabs[0]:
+        if "Mini Experiment" in rl_active_view:
             st.subheader("Find Your PSE (Point of Subjective Equality)")
             st.info("Experiment logic will go here.")
             
-        with rl_tabs[1]:
+        elif "Control Data" in rl_active_view:
             st.subheader("Baseline Psychometric Functions")
             st.markdown("Comparing the Point of Subjective Equality (PSE) between the Control and Experimental conditions.")
             
@@ -557,187 +569,193 @@ with tabs[1]:
             else:
                 st.warning("Fetching secure data from GitHub pipeline... Please wait or verify your connection.")
             
-        with rl_tabs[2]:
-            st.subheader("Main Findings: Visual Size & The Nulling Effect")
+        elif "Main Findings: Visual Size & The Nulling Effect" in rl_active_view:
+            st.subheader("Baseline Psychometric Functions")
             
             import plotly.graph_objects as go
             
             # Fetch the data
             control_pack, exp_pack = get_rotating_line_data()
             
-            c_df, c_ind, c_avg, c_pse_dict = control_pack
-            e_df, e_ind, e_avg, e_pse_dict = exp_pack
+            # <--- CRITICAL FIX: Ensure data exists before unpacking --->
+            if control_pack is not None and exp_pack is not None:
+                c_df, c_ind, c_avg, c_pse_dict = control_pack
+                e_df, e_ind, e_avg, e_pse_dict = exp_pack
 
-            # Group Averages (for the annotation lines)
-            c_pse_long = c_pse_dict.get('Long', 60)
-            c_pse_short = c_pse_dict.get('Short', 50)
-            e_pse = e_pse_dict.get('N/A', 1.5)
+                # Group Averages (for the annotation lines)
+                c_pse_long = c_pse_dict.get('Long', 60)
+                c_pse_short = c_pse_dict.get('Short', 50)
+                e_pse = e_pse_dict.get('N/A', 1.5)
 
-            # Extract Individual PSE lists for the Beeswarm plots
-            ind_pse_long = c_ind[c_ind['Size'] == 'Long'][['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
-            ind_pse_short = c_ind[c_ind['Size'] == 'Short'][['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
-            ind_pse_exp = e_ind[['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
+                # Extract Individual PSE lists for the Beeswarm plots
+                ind_pse_long = c_ind[c_ind['Size'] == 'Long'][['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
+                ind_pse_short = c_ind[c_ind['Size'] == 'Short'][['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
+                ind_pse_exp = e_ind[['Subject_ID', 'PSE']].drop_duplicates()['PSE'].tolist()
 
-            st.divider()
+                st.divider()
 
-            # =========================================================
-            # FIGURE 1: Control (Size-Speed Illusion)
-            # =========================================================
-            st.markdown("### 1. The Size-Speed Illusion (No Aperture)")
-            st.write("Even without an aperture, human vision naturally perceives longer objects as moving slower than shorter objects rotating at the exact same physical speed.")
-            
-            fig1 = go.Figure()
-            
-            # Box 1: Long Line
-            fig1.add_trace(go.Box(
-                y=ind_pse_long, x=[0] * len(ind_pse_long),
-                name='Long Line', marker_color='red',
-                boxpoints='all', jitter=0.3, pointpos=0, # pointpos=0 centers the beeswarm over the box
-                fillcolor='rgba(255,0,0,0.2)', line=dict(width=2)
-            ))
-            
-            # Box 2: Short Line
-            fig1.add_trace(go.Box(
-                y=ind_pse_short, x=[1] * len(ind_pse_short),
-                name='Short Line', marker_color='blue',
-                boxpoints='all', jitter=0.3, pointpos=0,
-                fillcolor='rgba(0,0,255,0.2)', line=dict(width=2)
-            ))
-
-            # --- ANNOTATION: The Vertical Gap Line ---
-            delta = abs(c_pse_long - c_pse_short)
-            higher_val = max(c_pse_long, c_pse_short)
-            lower_val = min(c_pse_long, c_pse_short)
-            
-            # Draw vertical dashed line exactly between the boxes (x=0.5)
-            fig1.add_shape(type="line", x0=0.5, y0=lower_val, x1=0.5, y1=higher_val, line=dict(color="black", width=2, dash="dash"))
-            fig1.add_shape(type="line", x0=0.45, y0=lower_val, x1=0.55, y1=lower_val, line=dict(color="black", width=2))
-            fig1.add_shape(type="line", x0=0.45, y0=higher_val, x1=0.55, y1=higher_val, line=dict(color="black", width=2))
-
-            fig1.add_annotation(
-                x=0.52, y=(higher_val + lower_val)/2,
-                text=f"Gap: {delta:.1f} RPM",
-                showarrow=False, font=dict(size=13, color="black"), align="left", xanchor="left"
-            )
-
-            fig1.update_layout(
-                showlegend=False,
-                yaxis_title="Physical RPM Required for Equality",
-                xaxis=dict(showticklabels=False, range=[-0.5, 1.5]), # Force perfect centering
-                height=350, margin=dict(l=0, r=0, t=20, b=0) # Removed side margins to align with Streamlit columns!
-            )
-            st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CONFIG)
-
-            # --- HTML DEMOS CENTERED UNDER BOXES ---
-            # We add a 15% spacer on the left to perfectly absorb the width of the Plotly Y-Axis!
-            spacer_left, col1, col2, spacer_right = st.columns([0.15, 1, 1, 0.05])
-            
-            with col1: 
-                render_mini_demo('long', speed=c_pse_long, size=50)
-            with col2: 
-                render_mini_demo('short', speed=c_pse_short, size=50)
-
-            st.divider()
-
-            # =========================================================
-            # FIGURE 2: Experimental (The Aperture Nulling Effect)
-            # =========================================================
-            st.markdown("### 2. Nulling the Rotating Line Illusion")
-            st.write("By mapping the speed modulation factor directly to the perceived deformation caused by the aperture, we can completely nullify the illusion.")
-
-            plot_col, demo_col = st.columns([4, 1])
-
-            # Define static plot dimensions to feed into our pixel-tracking math
-            plot_height = 400 
-            top_margin = 20
-            bottom_margin = 20
-
-            with plot_col:
-                fig2 = go.Figure()
-                fig2.add_trace(go.Box(
-                    y=ind_pse_exp, name='Group PSE',
-                    marker_color='green', boxpoints='all', jitter=0.3, pointpos=0,
-                    fillcolor='rgba(0,128,0,0.2)', line=dict(width=2)
+                # =========================================================
+                # FIGURE 1: Control (Size-Speed Illusion)
+                # =========================================================
+                st.markdown("### 1. The Size-Speed Illusion (No Aperture)")
+                st.write("Even without an aperture, human vision naturally perceives longer objects as moving slower than shorter objects rotating at the exact same physical speed.")
+                
+                fig1 = go.Figure()
+                
+                # Box 1: Long Line
+                fig1.add_trace(go.Box(
+                    y=ind_pse_long, x=[0] * len(ind_pse_long),
+                    name='Long Line', marker_color='red',
+                    boxpoints='all', jitter=0.3, pointpos=0, # pointpos=0 centers the beeswarm over the box
+                    fillcolor='rgba(255,0,0,0.2)', line=dict(width=2)
                 ))
                 
-                fig2.add_hline(y=4.0, line_dash="dot", line_color="red", annotation_text="Over-Modulated")
-                fig2.add_hline(y=e_pse, line_dash="dash", line_color="green", annotation_text="Subjective Equality (PSE)")
-                fig2.add_hline(y=0.0, line_dash="solid", line_color="blue", annotation_text="Unmodulated (Max Illusion)")
+                # Box 2: Short Line
+                fig1.add_trace(go.Box(
+                    y=ind_pse_short, x=[1] * len(ind_pse_short),
+                    name='Short Line', marker_color='blue',
+                    boxpoints='all', jitter=0.3, pointpos=0,
+                    fillcolor='rgba(0,0,255,0.2)', line=dict(width=2)
+                ))
 
-                fig2.update_layout(
-                    showlegend=False,
-                    yaxis_title="Speed Modulation Factor",
-                    yaxis_range=[-3, 5], # NEW: Expanded scale
-                    xaxis=dict(showticklabels=False), 
-                    height=plot_height, 
-                    margin=dict(l=0, r=0, t=top_margin, b=bottom_margin)
+                # --- ANNOTATION: The Vertical Gap Line ---
+                delta = abs(c_pse_long - c_pse_short)
+                higher_val = max(c_pse_long, c_pse_short)
+                lower_val = min(c_pse_long, c_pse_short)
+                
+                # Draw vertical dashed line exactly between the boxes (x=0.5)
+                fig1.add_shape(type="line", x0=0.5, y0=lower_val, x1=0.5, y1=higher_val, line=dict(color="black", width=2, dash="dash"))
+                fig1.add_shape(type="line", x0=0.45, y0=lower_val, x1=0.55, y1=lower_val, line=dict(color="black", width=2))
+                fig1.add_shape(type="line", x0=0.45, y0=higher_val, x1=0.55, y1=higher_val, line=dict(color="black", width=2))
+
+                fig1.add_annotation(
+                    x=0.52, y=(higher_val + lower_val)/2,
+                    text=f"Gap: {delta:.1f} RPM",
+                    showarrow=False, font=dict(size=13, color="black"), align="left", xanchor="left"
                 )
-                st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
-            with demo_col:
-                # --- DYNAMIC Y-AXIS TRACKING MATH ---
-                # We calculate the exact pixel spacing needed to perfectly align the centers 
-                # of the 50px HTML canvases with the exact heights of the Plotly Y-Axis lines.
-                plot_area_height = plot_height - top_margin - bottom_margin
-                y_max, y_min = 5.0, -3.0
-                y_range = y_max - y_min
-                px_per_unit = plot_area_height / y_range
-                
-                # Calculate pixel distance from the very top of the Plotly figure to the center of each line
-                center_4 = top_margin + (y_max - 4.0) * px_per_unit
-                center_pse = top_margin + (y_max - e_pse) * px_per_unit
-                center_0 = top_margin + (y_max - 0.0) * px_per_unit
-                
-                # Subtract 25px (half the canvas size) to find the top edge of each canvas,
-                # then calculate the pure empty space needed between them.
-                gap_1 = max(0, center_4 - 25) 
-                gap_2 = max(0, (center_pse - 25) - (center_4 + 25)) 
-                gap_3 = max(0, (center_0 - 25) - (center_pse + 25)) 
+                fig1.update_layout(
+                    showlegend=False,
+                    yaxis_title="Physical RPM Required for Equality",
+                    xaxis=dict(showticklabels=False, range=[-0.5, 1.5]), # Force perfect centering
+                    height=350, margin=dict(l=0, r=0, t=20, b=0) # Removed side margins to align with Streamlit columns!
+                )
+                st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CONFIG)
 
-                # Render the dynamically spaced column using invisible HTML blocks
-                st.markdown(f"<div style='height: {gap_1}px'></div>", unsafe_allow_html=True)
-                render_mini_demo('aperture', modulation=4.0, size=50) 
+                # --- HTML DEMOS CENTERED UNDER BOXES ---
+                # We add a 15% spacer on the left to perfectly absorb the width of the Plotly Y-Axis!
+                spacer_left, col1, col2, spacer_right = st.columns([0.15, 1, 1, 0.05])
                 
-                st.markdown(f"<div style='height: {gap_2}px'></div>", unsafe_allow_html=True)
-                render_mini_demo('aperture', modulation=e_pse, size=50) 
-                
-                st.markdown(f"<div style='height: {gap_3}px'></div>", unsafe_allow_html=True)
-                render_mini_demo('aperture', modulation=0.0, size=50)
+                with col1: 
+                    render_mini_demo('long', speed=c_pse_long, size=50)
+                with col2: 
+                    render_mini_demo('short', speed=c_pse_short, size=50)
 
-            st.divider()
+                st.divider()
 
-            # =========================================================
-            # THEORETICAL MODELING
-            # =========================================================
-            st.markdown("### 3. Theoretical Modeling: Local Motion Signals")
-            st.markdown("""
-            As detailed in **Porter et al. (2011)** regarding rotating ellipses, the human visual system relies heavily on **local orthogonal motion signals** (component vectors) to interpret global object motion. 
-            
-            In the models below, the **green lines** represent the true physical velocity vectors ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis. By applying the mathematical PSE Modulation, we dynamically alter $\omega$ to perfectly counteract the shrinking $r$, keeping the tip vectors constant and neutralizing the visual distortion!
-            """)
+                # =========================================================
+                # FIGURE 2: Experimental (The Aperture Nulling Effect)
+                # =========================================================
+                st.markdown("### 2. Nulling the Rotating Line Illusion")
+                st.write("By mapping the speed modulation factor directly to the perceived deformation caused by the aperture, we can completely nullify the illusion.")
 
-            mod_col1, mod_col2, mod_col3, mod_col4 = st.columns(4)
-            
-            with mod_col1:
-                render_vector_demo('short', speed=50)
-                st.markdown("<p style='text-align: center; margin-top: 5px;'><b>1. Short Line</b></p>", unsafe_allow_html=True)
+                plot_col, demo_col = st.columns([4, 1])
+
+                # Define static plot dimensions to feed into our pixel-tracking math
+                plot_height = 400 
+                top_margin = 20
+                bottom_margin = 20
+
+                with plot_col:
+                    fig2 = go.Figure()
+                    fig2.add_trace(go.Box(
+                        y=ind_pse_exp, name='Group PSE',
+                        marker_color='green', boxpoints='all', jitter=0.3, pointpos=0,
+                        fillcolor='rgba(0,128,0,0.2)', line=dict(width=2)
+                    ))
+                    
+                    fig2.add_hline(y=4.0, line_dash="dot", line_color="red", annotation_text="Over-Modulated")
+                    fig2.add_hline(y=e_pse, line_dash="dash", line_color="green", annotation_text="Subjective Equality (PSE)")
+                    fig2.add_hline(y=0.0, line_dash="solid", line_color="blue", annotation_text="Unmodulated (Max Illusion)")
+
+                    fig2.update_layout(
+                        showlegend=False,
+                        yaxis_title="Speed Modulation Factor",
+                        yaxis_range=[-3, 5], # NEW: Expanded scale
+                        xaxis=dict(showticklabels=False), 
+                        height=plot_height, 
+                        margin=dict(l=0, r=0, t=top_margin, b=bottom_margin)
+                    )
+                    st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
+
+                with demo_col:
+                    # --- DYNAMIC Y-AXIS TRACKING MATH ---
+                    # We calculate the exact pixel spacing needed to perfectly align the centers 
+                    # of the 50px HTML canvases with the exact heights of the Plotly Y-Axis lines.
+                    plot_area_height = plot_height - top_margin - bottom_margin
+                    y_max, y_min = 5.0, -3.0
+                    y_range = y_max - y_min
+                    px_per_unit = plot_area_height / y_range
+                    
+                    # Calculate pixel distance from the very top of the Plotly figure to the center of each line
+                    center_4 = top_margin + (y_max - 4.0) * px_per_unit
+                    center_pse = top_margin + (y_max - e_pse) * px_per_unit
+                    center_0 = top_margin + (y_max - 0.0) * px_per_unit
+                    
+                    # Subtract 25px (half the canvas size) to find the top edge of each canvas,
+                    # then calculate the pure empty space needed between them.
+                    gap_1 = max(0, center_4 - 25) 
+                    gap_2 = max(0, (center_pse - 25) - (center_4 + 25)) 
+                    gap_3 = max(0, (center_0 - 25) - (center_pse + 25)) 
+
+                    # Render the dynamically spaced column using invisible HTML blocks
+                    st.markdown(f"<div style='height: {gap_1}px'></div>", unsafe_allow_html=True)
+                    render_mini_demo('aperture', modulation=4.0, size=50) 
+                    
+                    st.markdown(f"<div style='height: {gap_2}px'></div>", unsafe_allow_html=True)
+                    render_mini_demo('aperture', modulation=e_pse, size=50) 
+                    
+                    st.markdown(f"<div style='height: {gap_3}px'></div>", unsafe_allow_html=True)
+                    render_mini_demo('aperture', modulation=0.0, size=50)
+
+                st.divider()
+
+                # =========================================================
+                # THEORETICAL MODELING
+                # =========================================================
+                st.markdown("### 3. Theoretical Modeling: Local Motion Signals")
+                st.markdown("""
+                As detailed in **Porter et al. (2011)** regarding rotating ellipses, the human visual system relies heavily on **local orthogonal motion signals** (component vectors) to interpret global object motion. 
                 
-            with mod_col2:
-                render_vector_demo('long', speed=50)
-                st.markdown("<p style='text-align: center; margin-top: 5px;'><b>2. Long Line</b></p>", unsafe_allow_html=True)
+                In the models below, the **green lines** represent the true physical velocity vectors ($v = \omega \cdot r$). Notice how the tip vectors in the *Unmodulated Aperture* shrink drastically as the line approaches the vertical axis. By applying the mathematical PSE Modulation, we dynamically alter $\omega$ to perfectly counteract the shrinking $r$, keeping the tip vectors constant and neutralizing the visual distortion!
+                """)
+
+                mod_col1, mod_col2, mod_col3, mod_col4 = st.columns(4)
                 
-            with mod_col3:
-                render_vector_demo('aperture', modulation=0.0, speed=50)
-                st.markdown("<p style='text-align: center; margin-top: 5px;'><b>3. Aperture (0.0 Mod)</b></p>", unsafe_allow_html=True)
-                
-            with mod_col4:
-                render_vector_demo('aperture', modulation=e_pse, speed=50)
-                st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
+                with mod_col1:
+                    render_vector_demo('short', speed=50)
+                    st.markdown("<p style='text-align: center; margin-top: 5px;'><b>1. Short Line</b></p>", unsafe_allow_html=True)
+                    
+                with mod_col2:
+                    render_vector_demo('long', speed=50)
+                    st.markdown("<p style='text-align: center; margin-top: 5px;'><b>2. Long Line</b></p>", unsafe_allow_html=True)
+                    
+                with mod_col3:
+                    render_vector_demo('aperture', modulation=0.0, speed=50)
+                    st.markdown("<p style='text-align: center; margin-top: 5px;'><b>3. Aperture (0.0 Mod)</b></p>", unsafe_allow_html=True)
+                    
+                with mod_col4:
+                    render_vector_demo('aperture', modulation=e_pse, speed=50)
+                    st.markdown(f"<p style='text-align: center; margin-top: 5px;'><b>4. Aperture (Nullified)</b></p>", unsafe_allow_html=True)
+
+            # <--- CRITICAL FIX: Safe fallback if loader returns None --->
+            else:
+                st.warning("Fetching secure data from GitHub pipeline... Please wait or verify your connection.")
 
 # =====================================================================
-# TAB 3: VISUAL WORKING MEMORY
+# PROJECT 3: VISUAL WORKING MEMORY
 # =====================================================================
-with tabs[2]:
+elif "Encoding Visual Objects" in active_project:
     # --- RESTORED MASTHEAD & DEMO ---
     vwm_text = narratives[2]
     st.subheader(vwm_text["header"])
@@ -748,24 +766,30 @@ with tabs[2]:
     
     st.divider()
     
-    # --- OUTER PROJECT TABS ---
-    project_tabs = st.tabs([
-        "🧠 Project 1: Grouping by Color", 
-        "⏱️ Project 2: Task Type (Simultaneous vs. Sequential)"
-    ])
+    # --- OUTER PROJECT ROUTING (Lazy Loading) ---
+    vwm_project = st.radio(
+        "Select VWM Sub-Project:",
+        ["🧠 Project 1: Grouping by Color", "⏱️ Project 2: Task Type (Simultaneous vs. Sequential)"],
+        horizontal=True
+    )
     
     # ---------------------------------------------------------------------
     # PROJECT 1: GROUPING BY COLOR
     # ---------------------------------------------------------------------
-    with project_tabs[0]:
+    if "Grouping by Color" in vwm_project:
         st.markdown("### Neural Correlates of Gestalt Grouping in VWM")
-        grouping_tabs = st.tabs([
-            "1. Behavioral Findings", 
-            "2. EEG Data Initial Preprocessing and Visualization", 
-            "3. EEG Frequency Tagging Analysis"
-        ])
         
-        with grouping_tabs[0]:
+        # Sub-Routing for specific EEG analyses
+        vwm_grouping_view = st.selectbox(
+            "Select Analysis View:",
+            [
+                "1. Behavioral Findings", 
+                "2. EEG Data Initial Preprocessing and Visualization", 
+                "3. EEG Frequency Tagging Analysis"
+            ]
+        )
+        
+        if "Behavioral Findings" in vwm_grouping_view:
             st.markdown("#### Behavioral Findings: Accuracy and Capacity (Cowan's K)")
             df_beh = get_vwm_behavioral_data()
             
@@ -836,7 +860,7 @@ with tabs[2]:
             else:
                 st.info("Loading Grouping Behavioral Data...")
 
-        with grouping_tabs[1]:
+        elif "Initial Preprocessing" in vwm_grouping_view:
                 st.markdown("#### EEG Data Initial Preprocessing and Visualization")
                 st.write("Visual Evoked Potentials (VEP) locked to the stimulus array onset. The data has been collapsed across frequencies to compare the three core behavioral conditions.")
                 
@@ -890,7 +914,7 @@ with tabs[2]:
                     else:
                         st.info("Loading Full Spectrum FFT Data...")
 
-        with grouping_tabs[2]:
+        elif "Frequency Tagging" in vwm_grouping_view:
                 st.markdown("#### EEG Frequency Tagging: Neural Index of Grouping")
                 st.write("We isolate grouping mechanisms using an Index: `(Grouped - Not Grouped) / (Grouped + Not Grouped)`. This removes baseline noise, perfectly isolating the frequency-specific variance driven by visual binding.")
 
@@ -1050,35 +1074,46 @@ with tabs[2]:
     # ---------------------------------------------------------------------
     # PROJECT 2: TASK TYPE (SIMULTANEOUS VS SEQUENTIAL)
     # ---------------------------------------------------------------------
-    with project_tabs[1]:
+    elif "Task Type" in vwm_project:
         st.markdown("### The Impact of Recall Task on VWM Encoding")
         st.write("This project isolates the neural correlates of encoding processes during Simultaneous vs. Sequential full-report tasks.")
         
-        task_tabs = st.tabs([
-            "1. Behavioral Findings", 
-            "2. EEG Data Initial Preprocessing and Visualization", 
-            "3. EEG Frequency Tagging Analysis"
-        ])
+        vwm_task_view = st.selectbox(
+            "Select Task Type Analysis View:",
+            [
+                "1. Behavioral Findings", 
+                "2. EEG Data Initial Preprocessing and Visualization", 
+                "3. EEG Frequency Tagging Analysis"
+            ]
+        )
         
-        with task_tabs[0]:
+        if "Behavioral Findings" in vwm_task_view:
             st.info("Data pending upload. Visualizations for Simultaneous vs. Sequential accuracy slopes will populate here.")
-        with task_tabs[1]:
+        elif "Initial Preprocessing" in vwm_task_view:
             st.info("Data pending upload. Grand Average VEPs for Task Types will populate here.")
-        with task_tabs[2]:
+        elif "Frequency Tagging" in vwm_task_view:
             st.info("Data pending upload. Figure 3 Topographic Heat Maps will populate here.")
 
-# --- PLACEHOLDERS FOR REMAINING TABS ---
-for i in range(3, 5):
-    with tabs[i]:
-        st.subheader(narratives[i]["header"])
-        st.write(narratives[i]["blurb"])
-        
-        # Load static images as placeholders for now
-        img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "documents", narratives[i]["image_file"])
-        if os.path.exists(img_path):
-            st.image(img_path, width=400)
-        
-        st.warning("Interactive Python pipeline currently under construction.")
+# --- PLACEHOLDERS FOR REMAINING PROJECTS ---
+elif "Ensemble Encoding" in active_project:
+    idx = 3
+    st.subheader(narratives[idx]["header"])
+    st.write(narratives[idx]["blurb"])
+    
+    img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "documents", narratives[idx]["image_file"])
+    if os.path.exists(img_path):
+        st.image(img_path, width=400)
+    st.warning("Interactive Python pipeline currently under construction.")
+
+elif "Intraparietal Regions" in active_project:
+    idx = 4
+    st.subheader(narratives[idx]["header"])
+    st.write(narratives[idx]["blurb"])
+    
+    img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "documents", narratives[idx]["image_file"])
+    if os.path.exists(img_path):
+        st.image(img_path, width=400)
+    st.warning("Interactive Python pipeline currently under construction.")
 
 st.divider()
 
