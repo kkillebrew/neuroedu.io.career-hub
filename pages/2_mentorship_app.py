@@ -17,16 +17,13 @@ import numpy as np
 # This tells the script to look one folder up to find the 'loaders' directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# --- IMPORT DATA ---
+# --- IMPORT DATA & COMPONENTS ---
 from loaders.mentorship_loader import get_mentorship_data
+from career_hub_loader import get_biographic_metadata, get_portfolio_metadata
+from career_hub_sidebar import apply_global_settings, render_sidebar
 
-# Because we added the root to sys.path, we import from the package 'pages.components'
+# This import now works because the circular reference is broken in the component file
 from pages.components.geometry_demo import render_geometry_area_demo
-
-from career_hub_loader import (
-    get_biographic_metadata,
-    get_portfolio_metadata
-)
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
