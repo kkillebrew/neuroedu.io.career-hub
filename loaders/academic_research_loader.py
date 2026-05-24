@@ -895,7 +895,7 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     if col_name not in spatial_index_df.columns:
         return None
 
-    # 1. Initialize and Extract
+    # 1. Extraction with explicit integer casting
     full_data = np.zeros(257)
     for _, row in spatial_index_df.iterrows():
         try:
@@ -905,13 +905,7 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
         except (ValueError, TypeError):
             continue
             
-    # 2. THE FIX: Neutralize NaN Poisoning
-    # This catches the 0/0 division errors from reference/dead channels
-    # and forces them to 0.0 so they don't corrupt NumPy's scaling logic.
-    full_data = np.nan_to_num(full_data, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    # 3. Dynamic Scaling 
-    # Because NaNs are gone, this will now correctly find your true Min/Max
+    # 2. Dynamic Scaling 
     abs_max = np.max(np.abs(full_data))
     v_limit = max(abs_max, 0.001) 
     
@@ -922,27 +916,21 @@ def generate_topoplot_figure(spatial_index_df, target_hz):
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_alpha(0.0)
     
-    # 4. PLOTTING
+    # 3. PLOTTING
     mne.viz.plot_topomap(
         full_data, info, axes=ax, cmap='RdBu_r', 
         vlim=(-v_limit, v_limit), 
         show=False, contours=0, extrapolate='head'
     )
     
-    # 5. ROI Overlay
+    # 4. ROI Overlay
     roi_mask = np.zeros(257, dtype=bool)
     for ch in ALL_ROI_CHANNELS:
         if ch-1 < 257: roi_mask[ch-1] = True
-        
-    mne.viz.plot_topomap(
-        np.zeros(257), info, axes=ax, mask=roi_mask,
-        mask_params={'marker': 'o', 'markerfacecolor': 'none', 
-                     'markeredgecolor': 'gray', 'markersize': 2},
-        show=False, contours=0, extrapolate='head'
-    )
-    
-    # Memory Cleanup
-    plt.close(fig) 
+    mne.viz.plot_topomap(np.zeros(257), info, axes=ax, mask=roi_mask,
+                         mask_params={'marker': 'o', 'markerfacecolor': 'none', 
+                                      'markeredgecolor': 'gray', 'markersize': 2},
+                         show=False, contours=0, extrapolate='head')
     
     return fig
 
@@ -956,7 +944,6 @@ def get_spatial_index_data():
     if df.empty: return pd.DataFrame()
 
     # 1. AGGREGATE FIRST (The Memory Saver)
-    # MATLAB Analogy: Use 'groupsummary' to reduce the matrix size before doing any math.
     snr_cols = ['SNR_3Hz', 'SNR_5Hz', 'SNR_12Hz', 'SNR_20Hz']
     df_agg = df.groupby(['Subject_ID', 'Channel', 'Condition'])[snr_cols].mean().reset_index()
     
@@ -966,20 +953,21 @@ def get_spatial_index_data():
         'Grouped', 'Not Grouped'
     )
     
-    # 3. Pivot (Now working on a tiny aggregated table, not the raw trial data)
-    # We pivot to get Grouped/Not Grouped side-by-side
+    # 3. Pivot
     pivoted = df_agg.pivot_table(
         index=['Subject_ID', 'Channel', 'Grouping'], 
         values=snr_cols
-    ).unstack(level='Grouping') # This puts Grouped/Not Grouped in columns
+    ).unstack(level='Grouping') 
     
-    # 4. Calculate Index: (G - N) / (G + N)
-    # We iterate over frequencies to keep the code clean and vectorized
+    # 4. Calculate Index: (G - N) / (G + N) safely!
     results = pd.DataFrame(index=pivoted.index)
     for hz in snr_cols:
         G = pivoted[(hz, 'Grouped')]
         N = pivoted[(hz, 'Not Grouped')]
-        results[f'Index_{hz}'] = (G - N) / (G + N)
+        denom = G + N
+        
+        # CRITICAL FIX: Safe division to prevent 0/0 NaN poisoning from reference channels
+        results[f'Index_{hz}'] = np.where(denom != 0, (G - N) / denom, 0.0)
     
     # 5. Final aggregate across subjects
     return results.groupby(['Channel']).mean().reset_index()
