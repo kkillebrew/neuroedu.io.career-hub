@@ -211,13 +211,12 @@ def render_geometry_area_demo(base_units, height_units):
                 context.font = "bold 40px sans-serif"; 
                 context.textBaseline = "middle";
                 
-                // Alpha Logic for Crossfades
                 let alphaNum = t > 2000 ? Math.min(1, (t - 2000) / 1500) : 0;
                 let alphaAreaTri = t > 10500 ? Math.min(1, (t - 10500) / 1500) : 0;
 
-                // Exact Spatial Coordinates
-                const eqX = 160; 
-                const fy = 80; // Shifted up to clear the rotating rectangle corner
+                // Shifted exactly 240px to the right (20% of 1200 canvas width)
+                const eqX = 400; 
+                const fy = 80; 
                 
                 const sp = context.measureText(" ").width;
                 const eqW = context.measureText("=").width;
@@ -227,16 +226,13 @@ def render_geometry_area_demo(base_units, height_units):
                 let wB = Math.max(context.measureText("b").width, context.measureText(cols.toString()).width);
                 let wH = Math.max(context.measureText("h").width, context.measureText(rows.toString()).width);
 
-                // Draw the perfectly stationary equals sign
                 context.textAlign = "center";
                 context.fillStyle = '#475569';
                 context.fillText("=", eqX, fy);
 
                 if (t < 7000) {{
-                    // Area/Value precisely right-aligned 1 space away from the = sign
                     drawFadingTextAlign(context, "Area", valAreaRect.toString(), '#475569', '#475569', alphaNum, eqX - eqW/2 - sp, fy, "right");
                     
-                    // Center anchors calculated exactly 1 space apart based on max term width
                     let cx_b = eqX + eqW/2 + sp + wB/2;
                     let cx_mult = cx_b + wB/2 + sp + multW/2;
                     let cx_h = cx_mult + multW/2 + sp + wH/2;
@@ -250,7 +246,6 @@ def render_geometry_area_demo(base_units, height_units):
                 }} else {{
                     drawFadingTextAlign(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, eqX - eqW/2 - sp, fy, "right");
 
-                    // Expanded center anchors for Triangle Formula
                     let cx_half = eqX + eqW/2 + sp + halfW/2;
                     let cx_mult1 = cx_half + halfW/2 + sp + multW/2;
                     let cx_b = cx_mult1 + multW/2 + sp + wB/2;
