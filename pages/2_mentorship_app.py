@@ -120,18 +120,23 @@ with lesson_tab2:
 st.divider()
 
 # =============================================================================
-# SECTION 2: EDUCATION (Teaching Career History & MAP Performance Metrics)
+# SECTION 2: EDUCATION (Teaching Career History & Performance Analytics)
 # =============================================================================
 st.header("2. Education & Professional History")
-st.write("Tracking quantitative student development, baseline testing improvements, and certified instruction.")
+st.write("Tracking quantitative student development, milestone testing metrics, and higher-education instruction.")
 
 # Define Plotly standard configuration to lock the UI per the Style Guide
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
-# Get the absolute path to the root directory (career_hub) to reliably find the 'documents' folder
+
+# --- THE PATHING FIX ---
+# Since this script lives inside the 'pages/' subdirectory, navigating exactly 
+# ONE folder up targets the true repository root folder where 'documents/' is located.
+# MATLAB Analogy: Equivalent to fileparts(fileparts(mfilename('fullpath')))
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 for job in mentorship['career_history']:
     with st.container():
+        # Decouple text logs from the data visualizations using a clean 1:2 column layout
         c_left, c_right = st.columns([1, 2], gap="medium")
         with c_left:
             st.markdown(f"#### **{job['school']}**")
@@ -140,117 +145,106 @@ for job in mentorship['career_history']:
             st.write(job['metrics'])
             
         with c_right:
-            if job.get('file_path'):
+            # ---------------------------------------------------------
+            # DATA PIPELINE TYPE 1: LONGITUDINAL MAPS PERCENTILES
+            # ---------------------------------------------------------
+            if job.get('dataset_type') == 'maps' and job.get('file_path'):
                 target_csv = os.path.join(root_dir, job['file_path'])
                 
                 if os.path.exists(target_csv):
-                    # ---------------------------------------------------------
-                    # PIPELINE A: 6TH GRADE MAPS DATA
-                    # ---------------------------------------------------------
-                    if job['dataset_type'] == 'maps':
-                        # RAM-First: Explicitly load both scores and percentiles
-                        cols_to_load = [
-                            "Last Name", "First Name", 
-                            "Fall '25", "Fall '25%", 
-                            "Winter '25", "Winter '25%", 
-                            "Spring '25", "Spring '25%"
-                        ]
+                    cols_to_load = ["Last Name", "First Name", "Fall '25%", "Winter '25%", "Spring '25%"]
+                    try:
+                        df_maps = pd.read_csv(target_csv, usecols=cols_to_load)
                         
-                        try:
-                            df_maps = pd.read_csv(target_csv, usecols=cols_to_load)
-                            
-                            # MATLAB Analogy: This is equivalent to 'stack' to convert 
-                            # wide-format matrices into long-format for grouped Plotly grouping.
-                            # We will isolate just the percentiles for the visual distribution.
-                            df_melted = df_maps.melt(
-                                id_vars=["Last Name", "First Name"], 
-                                value_vars=["Fall '25%", "Winter '25%", "Spring '25%"],
-                                var_name="Testing Term", 
-                                value_name="Percentile"
-                            )
-                            
-                            # Clean the string names for a cleaner x-axis
-                            df_melted['Testing Term'] = df_melted['Testing Term'].str.replace("%", "")
-                            
-                            fig = px.box(
-                                df_melted, x="Testing Term", y="Percentile", points="all",
-                                title="Longitudinal MAP Percentile Growth",
-                                color="Testing Term",
-                                color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80'] # Slate to Blue to Green
-                            )
-                            fig.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                                margin=dict(l=10, r=10, t=40, b=10), height=300, showlegend=False,
-                                yaxis=dict(title="National Percentile", gridcolor="rgba(148, 163, 184, 0.15)")
-                            )
-                            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
-                            
-                        except Exception as e:
-                            st.error(f"Error processing MAPs data: {e}")
-
-                    # ---------------------------------------------------------
-                    # PIPELINE B: 7TH GRADE ELA STANDARDS
-                    # ---------------------------------------------------------
-                    elif job['dataset_type'] == 'ela':
-                        # Explicitly map the exact strings from your gradebook
-                        myth_components = ['Sequence', 'Techniques', 'Transitions', 'Details', 'Conclusion']
-                        core_standards = [
-                            'Article Analysis - Citing Evidence (RI.7.1.)', 
-                            'Article Analysis - Central Idea (RI.7.1)', 
-                            'RI.7.5: Quiz (Text Structure)', 
-                            'SLG #3', 
-                            'RI.7.6 Transportation', 
-                            'Unit Test: Percy Jackson'
-                        ]
-                        cols_to_load = ["Last Name", "First Name"] + core_standards + myth_components
+                        # Reshape wide data to long data format for clear Plotly box plotting
+                        df_melted = df_maps.melt(
+                            id_vars=["Last Name", "First Name"], 
+                            value_vars=["Fall '25%", "Winter '25%", "Spring '25%"],
+                            var_name="Testing Term", 
+                            value_name="Percentile"
+                        )
+                        df_melted['Testing Term'] = df_melted['Testing Term'].str.replace("%", "")
                         
-                        try:
-                            df_ela = pd.read_csv(target_csv, usecols=cols_to_load)
-                            
-                            # Data Cleaning: Convert 'M' (Missing) to np.nan (MATLAB's NaN)
-                            df_ela = df_ela.replace({'M': np.nan})
-                            
-                            # Ensure all assessment columns are floats to allow for mathematical averaging
-                            assess_cols = core_standards + myth_components
-                            df_ela[assess_cols] = df_ela[assess_cols].apply(pd.to_numeric, errors='coerce')
-                            
-                            # Calculate the composite "Create Your Own Myth" score
-                            # skipna=True mimics 'omitnan' in MATLAB, ensuring an 'M' doesn't tank the average
-                            df_ela['Create Your Own Myth'] = df_ela[myth_components].mean(axis=1, skipna=True)
-                            
-                            # Prepare data for plotting
-                            plot_cols = core_standards + ['Create Your Own Myth']
-                            df_plot = df_ela[["Last Name", "First Name"] + plot_cols].copy()
-                            
-                            df_melted_ela = df_plot.melt(
-                                id_vars=["Last Name", "First Name"],
-                                value_vars=plot_cols,
-                                var_name="Standard / Assessment",
-                                value_name="Score (0-4)"
-                            )
-                            
-                            # Clean up long standard names for the x-axis visual
-                            df_melted_ela['Standard / Assessment'] = df_melted_ela['Standard / Assessment'].apply(
-                                lambda x: x[:15] + "..." if len(x) > 15 else x
-                            )
-                            
-                            fig = px.box(
-                                df_melted_ela, x="Standard / Assessment", y="Score (0-4)",
-                                title="Standards-Based Assessment Distributions",
-                                color_discrete_sequence=['#6366F1'] # Indigo Theme
-                            )
-                            fig.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                                margin=dict(l=10, r=10, t=40, b=10), height=300,
-                                yaxis=dict(title="Score (0-4)", range=[-0.2, 4.2], gridcolor="rgba(148, 163, 184, 0.15)"),
-                                xaxis=dict(title="")
-                            )
-                            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
-
-                        except Exception as e:
-                            st.error(f"Error processing ELA data: {e}")
+                        fig = px.box(
+                            df_melted, x="Testing Term", y="Percentile", points="all",
+                            title="Longitudinal MAP Percentile Distributions",
+                            color="Testing Term",
+                            color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            margin=dict(l=10, r=10, t=40, b=10), height=280, showlegend=False,
+                            yaxis=dict(title="National Percentile Scale", gridcolor="rgba(148, 163, 184, 0.12)")
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                    except Exception as e:
+                        st.error(f"Error executing MAPs data parse: {e}")
                 else:
-                    st.warning(f"Data file not found at: `{target_csv}`")
+                    st.warning(f"File target missing during directory search: `{job['file_path']}`")
+
+            # ---------------------------------------------------------
+            # DATA PIPELINE TYPE 2: STANDARDS-BASED ELA METRICS
+            # ---------------------------------------------------------
+            elif job.get('dataset_type') == 'ela' and job.get('file_path'):
+                target_csv = os.path.join(root_dir, job['file_path'])
+                
+                if os.path.exists(target_csv):
+                    myth_components = ['Sequence', 'Techniques', 'Transitions', 'Details', 'Conclusion']
+                    core_standards = [
+                        'Article Analysis - Citing Evidence (RI.7.1.)', 
+                        'Article Analysis - Central Idea (RI.7.1)', 
+                        'RI.7.5: Quiz (Text Structure)', 'SLG #3', 
+                        'RI.7.6 Transportation', 'Unit Test: Percy Jackson'
+                    ]
+                    cols_to_load = ["Last Name", "First Name"] + core_standards + myth_components
+                    
+                    try:
+                        df_ela = pd.read_csv(target_csv, usecols=cols_to_load)
+                        
+                        # Strip standard 'M' characters and coerce arrays to uniform floating metrics
+                        df_ela = df_ela.replace({'M': np.nan})
+                        assess_cols = core_standards + myth_components
+                        df_ela[assess_cols] = df_ela[assess_cols].apply(pd.to_numeric, errors='coerce')
+                        
+                        # Generate the custom horizontal mean row vector
+                        df_ela['Create Your Own Myth'] = df_ela[myth_components].mean(axis=1, skipna=True)
+                        
+                        plot_cols = core_standards + ['Create Your Own Myth']
+                        df_plot = df_ela[["Last Name", "First Name"] + plot_cols].copy()
+                        
+                        df_melted_ela = df_plot.melt(
+                            id_vars=["Last Name", "First Name"], value_vars=plot_cols,
+                            var_name="Standard / Assessment", value_name="Score (0-4)"
+                        )
+                        df_melted_ela['Standard / Assessment'] = df_melted_ela['Standard / Assessment'].apply(
+                            lambda x: x[:15] + "..." if len(x) > 15 else x
+                        )
+                        
+                        fig = px.box(
+                            df_melted_ela, x="Standard / Assessment", y="Score (0-4)",
+                            title="Standards Mastery Distributions (0-4 Scale)", color_discrete_sequence=['#6366F1']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            margin=dict(l=10, r=10, t=40, b=10), height=280,
+                            yaxis=dict(title="Proficiency Score", range=[-0.2, 4.2], gridcolor="rgba(148, 163, 184, 0.12)"),
+                            xaxis=dict(title="")
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                    except Exception as e:
+                        st.error(f"Error executing ELA standards parse: {e}")
+                else:
+                    st.warning(f"File target missing during directory search: `{job['file_path']}`")
+
+            # ---------------------------------------------------------
+            # DATA PIPELINE TYPE 3: UNIVERSITY COURSE MATRIX DISPLAY
+            # ---------------------------------------------------------
+            elif job.get('dataset_type') == 'university':
+                st.markdown("###### 🎓 Lectured Undergraduate Curricula:")
+                # Display each class from your UNR history array as a clean, high-contrast visual badge
+                for course in job.get('courses_taught', []):
+                    st.markdown(f"`{course}`")
+            
             else:
                 st.caption("ℹ️ No statistical data repository attached to this record.")
         
