@@ -172,27 +172,9 @@ def render_geometry_area_demo(base_units, height_units):
 
             // --- 5. OVERLAY FORMULA & TRACKING LABELS ---
             
-            // Text crossfade engine prevents layout jumping by centering text within the max width of both strings
-            function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y) {{
-                let w1 = context.measureText(text1).width;
-                let w2 = context.measureText(text2).width;
-                let wMax = Math.max(w1, w2);
-
-                context.globalAlpha = Math.max(0, 1 - alpha2);
-                context.fillStyle = color1;
-                context.fillText(text1, x + (wMax - w1)/2, y);
-
-                context.globalAlpha = Math.max(0, alpha2);
-                context.fillStyle = color2;
-                context.fillText(text2, x + (wMax - w2)/2, y);
-
-                context.globalAlpha = 1.0;
-                return x + wMax;
-            }}
-
             // --- FIXED-WIDTH FADE ENGINE ---
             function drawFadingText(context, text1, text2, color1, color2, alpha2, x, y, fixedWidth) {{
-                context.textAlign = "center"; // Center text within the reserved fixedWidth slot
+                context.textAlign = "center"; 
                 let centerX = x + fixedWidth / 2;
 
                 context.globalAlpha = Math.max(0, 1 - alpha2);
@@ -205,6 +187,27 @@ def render_geometry_area_demo(base_units, height_units):
 
                 context.globalAlpha = 1.0;
                 return x + fixedWidth;
+            }}
+
+            function drawUprightFadingLabel(context, body, text1, text2, color, alpha2, localNx, localNy, offset) {{
+                let a = body.angle;
+                let worldNx = localNx * Math.cos(a) - localNy * Math.sin(a);
+                let worldNy = localNx * Math.sin(a) + localNy * Math.cos(a);
+                let px = body.position.x + worldNx * offset;
+                let py = body.position.y + worldNy * offset;
+                
+                context.textAlign = "center";
+                context.textBaseline = "middle";
+                context.font = "bold 34px sans-serif";
+
+                context.globalAlpha = Math.max(0, 1 - alpha2);
+                context.fillStyle = color;
+                context.fillText(text1, px, py);
+
+                context.globalAlpha = Math.max(0, alpha2);
+                context.fillText(text2, px, py);
+
+                context.globalAlpha = 1.0;
             }}
 
             Events.on(render, 'afterRender', function() {{
@@ -233,7 +236,8 @@ def render_geometry_area_demo(base_units, height_units):
                     drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', alphaNum, eqX + eqWidth + slotWidth + 60, 120, slotWidth);
                 }} else {{
                     drawFadingText(context, "Area", valAreaTri.toString(), '#475569', '#475569', alphaAreaTri, eqX - slotWidth, 120, slotWidth);
-                    context.fillStyle = '#EF4444'; context.fillText("½ ×", eqX + 50, 120);
+                    context.fillStyle = '#EF4444'; context.fillText("½", eqX + 35, 120);
+                    context.fillStyle = '#475569'; context.fillText(" × ", eqX + 75, 120);
                     drawFadingText(context, "b", cols.toString(), '#38BDF8', '#38BDF8', 1, eqX + eqWidth + slotWidth - 40, 120, slotWidth);
                     context.fillStyle = '#475569'; context.fillText(" × ", eqX + eqWidth + slotWidth*2 - 20, 120);
                     drawFadingText(context, "h", rows.toString(), '#4ADE80', '#4ADE80', 1, eqX + eqWidth + slotWidth*2 + 20, 120, slotWidth);
