@@ -18,6 +18,9 @@ DESCRIPTION:
 
 import streamlit.components.v1 as components
 
+# --- IMPORT CUSTOM COMPONENTS ---
+from pages.components.geometry_demo import render_geometry_area_demo
+
 def render_rotating_line_demo(base_speed, modulation, shape, show_dots=True):
     """
     Generates and embeds the interactive illusion.

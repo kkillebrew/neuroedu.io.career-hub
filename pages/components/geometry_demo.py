@@ -17,6 +17,9 @@ DESCRIPTION:
 
 import streamlit.components.v1 as components
 
+# --- IMPORT CUSTOM COMPONENTS ---
+from pages.components.geometry_demo import render_geometry_area_demo
+
 def render_geometry_area_demo(base_units, height_units):
     """
     Renders the continuous 6-second mathematical transformation loop.
