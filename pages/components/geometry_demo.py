@@ -21,7 +21,7 @@ import streamlit.components.v1 as components
 def render_geometry_area_demo(base_units, height_units):
     """
     Renders a physics-based geometry transformation.
-    Perfectly packs a grid of marbles, rotates, bisects, and pops apart.
+    Perfectly packs a grid of marbles, rotates, bisects, and pops apart horizontally.
     """
     html_code = f"""
     <!DOCTYPE html>
@@ -40,14 +40,14 @@ def render_geometry_area_demo(base_units, height_units):
             const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner;
             const Bodies = Matter.Bodies, Body = Matter.Body, Composite = Matter.Composite, Events = Matter.Events;
 
-            // Collision Bitmasks (Allows the swords to pass through walls but block marbles)
             const CAT_WALL = 0x0001;
             const CAT_MARBLE = 0x0002;
             const CAT_SWORD = 0x0004;
 
             const engine = Engine.create();
-            engine.positionIterations = 8; // Increased for stability with thin walls
-            engine.velocityIterations = 8;
+            // Increased solver iterations to prevent tunneling through the newly thinned walls
+            engine.positionIterations = 16; 
+            engine.velocityIterations = 16;
             const gravity = engine.gravity || engine.world.gravity;
             gravity.y = 1; gravity.x = 0;
 
@@ -57,19 +57,20 @@ def render_geometry_area_demo(base_units, height_units):
             }});
 
             // --- 2. GRID MATH & SIZING ---
-            const U = 35; // Size of 1 grid cell
+            const U = 42; // Increased by 20% (from 35) to scale up marbles safely
             const W = {base_units} * U;
             const H = {height_units} * U;
-            // Center box to the left so formula has the entire upper-right space
-            const cx = 500; const cy = 350; 
             
-            // Marble Diameter = Grid Cell - 2px for dense packing
+            // Shifted right to leave the left side completely empty for the formula
+            const cx = 750; const cy = 350; 
+            
+            // Diameter = U - 2px
             const marbleRadius = (U - 2) / 2;
             const cols = {base_units};
             const rows = {height_units};
             
             // --- 3. CONSTRUCT RIGID BODIES ---
-            const thickness = 12; // Shrunk walls, expanded swords so they match
+            const thickness = 6; // Halved the line thickness
             const wallOpt = {{ 
                 isStatic: true, friction: 0.0, 
                 render: {{ fillStyle: '#475569' }},
@@ -81,7 +82,6 @@ def render_geometry_area_demo(base_units, height_units):
             let leftWall = Bodies.rectangle(cx - W/2 - thickness/2, cy, thickness, H + thickness*2, wallOpt);
             let rightWall = Bodies.rectangle(cx + W/2 + thickness/2, cy, thickness, H + thickness*2, wallOpt);
 
-            // Two overlapping swords that will cap the separated triangles perfectly
             const diagLength = Math.sqrt(W*W + H*H) + 30;
             const splitOpt = {{ 
                 isStatic: true, friction: 0.0, angle: Math.PI/2, 
@@ -98,7 +98,6 @@ def render_geometry_area_demo(base_units, height_units):
 
             let marbles = [];
             
-            // Rotation math to make Top-Right -> Bottom-Left diagonal perfectly vertical
             const diagAngle = Math.atan2(H, -W); 
             const targetTilt = Math.PI/2 - diagAngle; 
 
@@ -114,7 +113,6 @@ def render_geometry_area_demo(base_units, height_units):
                 let t = performance.now() - startTime;
                 let cycle = t % 12000; 
 
-                // PHASE 1: Reset & Grid Fill
                 if (cycle < 100 && phase !== 1) {{
                     phase = 1; lastPop = 0;
                     
@@ -130,7 +128,6 @@ def render_geometry_area_demo(base_units, height_units):
                     Body.setPosition(splitLeft, {{ x: cx, y: cy - 1200 }});
                     Body.setPosition(splitRight, {{ x: cx, y: cy - 1200 }});
 
-                    // Instantly spawn perfect grid of 50/50 marbles
                     const startX = cx - W/2 + U/2;
                     const startY = cy - H/2 + U/2;
                     for (let i = 0; i < cols; i++) {{
@@ -146,7 +143,6 @@ def render_geometry_area_demo(base_units, height_units):
                     }}
                 }}
                 
-                // PHASE 2: Tip to Diamond
                 else if (cycle >= 2500 && cycle < 4000) {{
                     phase = 2;
                     let p = (cycle - 2500) / 1500;
@@ -155,10 +151,9 @@ def render_geometry_area_demo(base_units, height_units):
                     Composite.rotate(box, delta, {{x: cx, y: cy}});
                     currentRotation = desiredRotation;
                     
-                    if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.0005, y: 0}}));
+                    if (Math.random() < 0.2) marbles.forEach(m => Body.applyForce(m, m.position, {{x: (Math.random()-0.5)*0.001, y: 0}}));
                 }}
                 
-                // PHASE 3: Drop the Ghost Swords
                 else if (cycle >= 4500 && cycle < 6500) {{
                     phase = 3;
                     let p = (cycle - 4500) / 2000;
@@ -168,39 +163,27 @@ def render_geometry_area_demo(base_units, height_units):
                     Body.setPosition(splitRight, {{ x: cx, y: dropY }});
                 }}
                 
-                // PHASE 4: Pop Triangles Apart (Synchronized normal tracking)
                 else if (cycle >= 7000 && cycle < 8500) {{
                     phase = 4;
                     let p = (cycle - 7000) / 1500;
-                    
-                    // Total separation target matches your requested 1 full grid unit (~U pixels)
                     let pop = easeInOut(p) * U; 
                     let delta = pop - lastPop;
                     lastPop = pop;
                     
-                    // Compute the exact normal vector perpendicular to your diagonal slice trajectory
-                    // This ensures the custom corners match edge-to-edge as they decouple
-                    let perpAngle = diagAngle + Math.PI / 2;
-                    let moveX = Math.cos(perpAngle) * delta;
-                    let moveY = Math.sin(perpAngle) * delta;
+                    // Fixed Pop Logic: Pure horizontal translation decouples them cleanly.
+                    Body.translate(ceiling, {{x: -delta, y: 0}});
+                    Body.translate(leftWall, {{x: -delta, y: 0}});
+                    Body.translate(splitLeft, {{x: -delta, y: 0}});
                     
-                    // Triangle group 1 (Left Side Assembly + Left Sword Cap) slides away
-                    Body.translate(ceiling, {{x: -moveX, y: -moveY}});
-                    Body.translate(leftWall, {{x: -moveX, y: -moveY}});
-                    Body.translate(splitLeft, {{x: -moveX, y: -moveY}});
-                    
-                    // Triangle group 2 (Right Side Assembly + Right Sword Cap) slides away opposite
-                    Body.translate(ground, {{x: moveX, y: moveY}});
-                    Body.translate(rightWall, {{x: moveX, y: moveY}});
-                    Body.translate(splitRight, {{x: moveX, y: moveY}});
+                    Body.translate(ground, {{x: delta, y: 0}});
+                    Body.translate(rightWall, {{x: delta, y: 0}});
+                    Body.translate(splitRight, {{x: delta, y: 0}});
                 }}
             }});
 
             // --- 5. OVERLAY FORMULA & TRACKING LABELS ---
-            // Helper function to orbit labels while keeping them upright
             function drawUprightLabel(context, body, text, color, localNx, localNy, offset) {{
                 let a = body.angle;
-                // Rotate local normal by body angle to get world space offset
                 let worldNx = localNx * Math.cos(a) - localNy * Math.sin(a);
                 let worldNy = localNx * Math.sin(a) + localNy * Math.cos(a);
                 let px = body.position.x + worldNx * offset;
@@ -217,13 +200,12 @@ def render_geometry_area_demo(base_units, height_units):
                 const context = render.context;
                 let t = (performance.now() - startTime) % 12000;
                 
-                // 1. Draw perfectly spaced formula in the Upper Left (shifted slightly right)
                 context.font = "bold 40px sans-serif"; 
                 context.textBaseline = "alphabetic";
                 context.textAlign = "left";
                 
-                // Adjusted coordinates: Upper-Left, shifted right from the edge
-                const fx = 120; 
+                // Formula shifted to Upper Left quadrant, slightly offset from the exact edge
+                const fx = 80; 
                 const fy = 120;
                 let currentX = fx;
                 
@@ -241,7 +223,6 @@ def render_geometry_area_demo(base_units, height_units):
                     drawText(" × ", '#475569'); drawText("b", '#38BDF8'); drawText(" × ", '#475569'); drawText("h", '#4ADE80');
                 }}
 
-                // 2. Draw Orbiting Upright Side Labels
                 let off = (thickness / 2) + 30;
                 drawUprightLabel(context, ceiling, "b", '#38BDF8', 0, -1, off);
                 drawUprightLabel(context, ground, "b", '#38BDF8', 0, 1, off);
