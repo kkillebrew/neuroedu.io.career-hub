@@ -53,21 +53,31 @@ My methodology relies on **cognitive grounding**—showing students how mathemat
 conceptually, rather than demanding blind memorization. This maximizes attention capture and structural encoding.
 """)
 
-# Create sub-tabs for the interactive child-level lessons
-lesson_tab1, lesson_tab2 = st.tabs(["📐 Geometry: Area Generation", "🎲 Probability: Visualizing Chance"])
+# --- CRITICAL FIX: LAZY LOADING ROUTER ---
+# Replaces st.tabs() with a conditional radio to prevent background canvas execution
+active_lesson = st.radio(
+    "Select Interactive Lesson Demo to Load:",
+    [
+        "📐 Lesson 1: Geometry & Area Generation", 
+        "🎲 Lesson 2: Probability & Chance Space"
+    ],
+    horizontal=True,
+    label_visibility="collapsed"
+)
 
-with lesson_tab1:
+# --- LESSON 1: GEOMETRY ---
+if "Geometry" in active_lesson:
     st.subheader("How an Area Function is Born")
     st.write("We teach kids that a triangle's area is derived directly by dissecting a bounded coordinate plane.")
     
     # Construct the 3-column layout requested (Animation & Formula | Gap | Inputs)
-    # MATLAB Analogy: Equivalent to utilizing a uigridlayout with weighted column widths
     anim_col, gap_col, input_col = st.columns([3, 0.2, 1])
     
     with input_col:
         st.markdown("<br><br>", unsafe_allow_html=True) # Vertical spacer
         st.info("💡 **Adjust Dimensions**\n\nWatch how the space transforms in real-time.")
-        # Sliders represent the number of 10% grid units
+        
+        # Sliders represent dimensions bounded safely between 2 and 10
         b_units = st.slider("Base (b) Units", min_value=2, max_value=10, value=6, step=1)
         h_units = st.slider("Height (h) Units", min_value=2, max_value=10, value=5, step=1)
         
@@ -77,14 +87,14 @@ with lesson_tab1:
         # Inject the hardware-accelerated HTML5/JS animation loop
         render_geometry_area_demo(base_units=b_units, height_units=h_units)
 
-with lesson_tab2:
+# --- LESSON 2: PROBABILITY ---
+elif "Probability" in active_lesson:
     st.subheader("Visualizing Probability Space")
     st.write("Instead of tracking abstract formulas, children learn better by seeing outcomes populate a frequency plane.")
     
     # Simulating rolling dice or choosing chips
     num_samples = st.selectbox("Select Number of Empirical Trials to Run:", [10, 50, 200, 500])
     
-    # Generate uniform synthetic sample points to ensure data consistency without class imbalances
     import numpy as np
     import pandas as pd
     import plotly.express as px
@@ -95,7 +105,7 @@ with lesson_tab2:
     df_prob = pd.DataFrame({'Die 1': x_outcomes, 'Die 2': y_outcomes})
     df_prob['Sum'] = df_prob['Die 1'] + df_prob['Die 2']
     
-    # Group results for distribution layout (MATLAB equivalent: groupsummary)
+    # Group results for distribution layout
     df_dist = df_prob['Sum'].value_counts().reset_index().sort_values('Sum')
     
     fig_prob = px.bar(df_dist, x='Sum', y='count', labels={'count': 'Times Rolled', 'Sum': 'Sum of Two Dice'}, title=f"Empirical Frequency Distribution Across {num_samples} Matrix Points")
