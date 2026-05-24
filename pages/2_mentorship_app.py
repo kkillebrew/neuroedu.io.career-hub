@@ -129,10 +129,9 @@ st.write("Tracking quantitative student development, milestone testing metrics, 
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
 
 # --- THE ABSOLUTE REPOSITORY PATH ANCHOR ---
-# __file__ gives us the absolute path to this script: .../pages/2_mentorship_app.py
-# The first os.path.dirname gets us the 'pages/' folder.
-# The second os.path.dirname steps up to the absolute root directory ('.../neuroedu.io.career-hub.git/')
-# MATLAB Analogy: This is identical to using fileparts(fileparts(mfilename('fullpath')))
+# __file__ evaluates to the absolute path of this file (.../pages/2_mentorship_app.py).
+# Stepping up two folder layers targets the repository base path (.../neuroedu.io.career-hub.git/).
+# MATLAB Analogy: Equivalent to fileparts(fileparts(mfilename('fullpath')))
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 for job in mentorship['career_history']:
@@ -147,9 +146,8 @@ for job in mentorship['career_history']:
             
         with c_right:
             if job.get('file_path'):
-                # --- THE PORTABLE PATH ANCHOR FIXED ---
-                # We join using the calculated repo_root anchor. This guarantees that your 
-                # datasets are always accurately targeted inside your 'documents/' directory.
+                # --- THE ABSOLUTE PATH ASSEMBLY ---
+                # We combine the immutable repo_root anchor with the sub-path from the loader.
                 target_csv = os.path.join(repo_root, job['file_path'])
                 
                 if os.path.exists(target_csv):
@@ -249,15 +247,15 @@ for job in mentorship['career_history']:
 st.markdown("### Credentials & Accreditations")
 res_col1, res_col2 = st.columns(2)
 with res_col1:
-    # Anchor the PDF retrieval using our absolute repository root folder path mapping
+    # Anchor the PDF retrieval securely to the root level documents folder
     t_cv = os.path.join(repo_root, "documents/kyle_teaching_cv.pdf")
     if os.path.exists(t_cv):
          with open(t_cv, "rb") as f:
             st.download_button("📂 Download Teaching Portfolio Resume (PDF)", f.read(), "kyle_teaching_cv.pdf")
     else:
-        # High contrast fallback tells you exactly where the app is looking for the missing asset
+        # High contrast fallback displays the exact path being queried on the container
         st.button("📂 Teaching Resume Staged on Server", disabled=True)
-        st.caption(f"Targeting: `{t_cv}`")
+        st.caption(f"Debug Target: `{t_cv}`")
 
 with res_col2:
     st.markdown("###### Standardized Learner Profiles")
