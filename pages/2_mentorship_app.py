@@ -58,35 +58,24 @@ lesson_tab1, lesson_tab2 = st.tabs(["📐 Geometry: Area Generation", "🎲 Prob
 
 with lesson_tab1:
     st.subheader("How an Area Function is Born")
-    st.write("We teach kids that a triangle's area is $\\frac{1}{2}b \\times h$ by physically derivation from a rectangle.")
+    st.write("We teach kids that a triangle's area is derived directly by dissecting a bounded coordinate plane.")
     
-    # Interactive sliders for dimensions
-    # MATLAB Analogy: These act as real-time uisliders that trigger callback updates
-    width = st.slider("Adjust Rectangle Width (Base)", min_value=2, max_value=20, value=10, step=1)
-    height = st.slider("Adjust Rectangle Height (Height)", min_value=2, max_value=20, value=6, step=1)
+    # Construct the 3-column layout requested (Animation & Formula | Gap | Inputs)
+    # MATLAB Analogy: Equivalent to utilizing a uigridlayout with weighted column widths
+    anim_col, gap_col, input_col = st.columns([3, 0.2, 1])
     
-    # Calculate Areas using standard scalars
-    rect_area = width * height
-    tri_area = 0.5 * rect_area
-    
-    # Render interactive visuals using Plotly Express (Exclusive stack preference)
-    # This visual demonstrates the exact spatial division rule of shapes
-    import plotly.graph_objects as go
-    
-    fig_geom = go.Figure()
-    # Left Triangle half (Blue)
-    fig_geom.add_trace(go.Scatter(x=[0, 0, width, 0], y=[0, height, 0, 0], fill="toself", fillcolor="rgba(56, 189, 248, 0.5)", line=dict(color="#38BDF8"), name="Triangle (Half)"))
-    # Right complementary half (Muted Grey to complete the rectangle)
-    fig_geom.add_trace(go.Scatter(x=[0, width, width, 0], y=[height, height, 0, height], fill="toself", fillcolor="rgba(148, 163, 184, 0.2)", line=dict(color="#94A3B8", dash="dash"), name="Complementary Space"))
-    
-    fig_geom.update_layout(
-        title=f"Visual Proof: Rectangle Area ({rect_area}) vs. Triangle Area ({tri_area})",
-        xaxis=dict(range=[-1, width + 1], showgrid=False, zeroline=False, visible=False),
-        yaxis=dict(range=[-1, height + 1], showgrid=False, zeroline=False, visible=False),
-        height=300, margin=dict(l=20, r=20, t=40, b=20), showlegend=False
-    )
-    st.plotly_chart(fig_geom, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
-    st.caption("Notice how the base triangle naturally cuts the bounded coordinate plane exactly in half: $Area = \\frac{1}{2} \\times b \\times h$.")
+    with input_col:
+        st.markdown("<br><br>", unsafe_allow_html=True) # Vertical spacer
+        st.info("💡 **Adjust Dimensions**\n\nWatch how the space transforms in real-time.")
+        # Sliders represent the number of 10% grid units
+        b_units = st.slider("Base (b) Units", min_value=2, max_value=12, value=8, step=1)
+        h_units = st.slider("Height (h) Units", min_value=2, max_value=8, value=5, step=1)
+        
+        st.caption(f"**Total Area (Rect):** {b_units * h_units} units²\n\n**Total Area (Tri):** {(b_units * h_units)/2} units²")
+        
+    with anim_col:
+        # Inject the hardware-accelerated HTML5/JS animation loop
+        render_geometry_area_demo(base_units=b_units, height_units=h_units)
 
 with lesson_tab2:
     st.subheader("Visualizing Probability Space")
