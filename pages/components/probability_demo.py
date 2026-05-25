@@ -70,11 +70,11 @@ def render_probability_demo(sample_count=200):
                     bodiesToLoad.push(Bodies.rectangle(width, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
 
                     // --- 2. THE HOPPER (V-Funnel) ---
-                    // Angled to form a perfect point at X=400, Y=140
-                    const doorL = Bodies.rectangle(268, 65, 300, 4, {{ 
+                    // Moved inward (271 and 529) to seal the 4.2px gap and prevent marble leakage
+                    const doorL = Bodies.rectangle(271, 65, 300, 4, {{ 
                         isStatic: true, angle: Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
                     }});
-                    const doorR = Bodies.rectangle(532, 65, 300, 4, {{ 
+                    const doorR = Bodies.rectangle(529, 65, 300, 4, {{ 
                         isStatic: true, angle: -Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
                     }});
                     bodiesToLoad.push(doorL, doorR);
@@ -94,9 +94,9 @@ def render_probability_demo(sample_count=200):
                     bodiesToLoad.push(Bodies.rectangle(width/2, height + 10, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_WALL }} }}));
 
                     // --- 4. PERFECTLY ALIGNED QUINCUNX (Triangle Peg Array) ---
-                    // 29 rows ensures the bottom row has 29 pegs, aligning EXACTLY with the 29 bin dividers
                     const rows = 29;
-                    for (let r = 0; r < rows; r++) {{
+                    // Starting at r = 1 removes the single top peg, leaving a 2-peg gap at X=400
+                    for (let r = 1; r < rows; r++) {{
                         for (let c = 0; c <= r; c++) {{
                             // Math magic: ties horizontal peg spacing explicitly to binWidth
                             let px = (width / 2) + (c - r / 2) * binWidth;
@@ -122,14 +122,12 @@ def render_probability_demo(sample_count=200):
                         let elapsed = performance.now() - startTime;
                         
                         // PHASE 1: Spawning Pool (0 to 3 seconds)
-                        // Uses a dynamic catch-up loop so frame drops don't result in missing marbles
                         let expectedMarbles = Math.min(targetMarbles, Math.floor((elapsed / 3000) * targetMarbles));
                         
                         while(marblesSpawned < expectedMarbles) {{
-                            // Spawn spread out across the top of the hopper
                             let spawnX = (width / 2) + (Math.random() * 80 - 40);
-                            let marble = Bodies.circle(spawnX, -10, 5, {{ // Shrunk radius to 5 to prevent jamming
-                                restitution: 0.5, // slightly bouncier
+                            let marble = Bodies.circle(spawnX, -10, 5, {{
+                                restitution: 0.5, 
                                 friction: 0.001,
                                 render: {{ fillStyle: '#38BDF8' }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_PEG | CAT_MARBLE }}
@@ -141,9 +139,9 @@ def render_probability_demo(sample_count=200):
                         // PHASE 2: Sliding Gate (Opens at 3.5 seconds)
                         if (elapsed > 3500 && gateOffset < 20) {{
                             gateOffset += 0.3; // Sliding velocity
-                            // Translates the rectangles horizontally apart
-                            Body.setPosition(doorL, {{ x: 268 - gateOffset, y: 65 }});
-                            Body.setPosition(doorR, {{ x: 532 + gateOffset, y: 65 }});
+                            // Updates to the sealed positions
+                            Body.setPosition(doorL, {{ x: 271 - gateOffset, y: 65 }});
+                            Body.setPosition(doorR, {{ x: 529 + gateOffset, y: 65 }});
                         }}
                     }});
 
@@ -157,9 +155,8 @@ def render_probability_demo(sample_count=200):
                         context.setLineDash([5, 5]);
                         
                         // The Mathematical Expected Distribution Curve
-                        // Adjusted StdDev (sigma) and Amplitude to perfectly match the 30-bin spread
                         for (let x = 0; x <= width; x += 5) {{
-                            let z = (x - 400) / 72; // Sigma perfectly mapped to physical variance
+                            let z = (x - 400) / 72;
                             let y = 780 - (350 * Math.exp(-0.5 * z * z)); 
                             if (x === 0) context.moveTo(x, y);
                             else context.lineTo(x, y);
