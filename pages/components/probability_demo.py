@@ -5,7 +5,8 @@ AUTHOR: Kyle W. Killebrew, PhD
 DESCRIPTION: 
     A structurally refined Matter.js Galton Board.
     Fixes mesh-grid bias by perfectly aligning the peg array with bin dividers.
-    Implements a pooling "hopper" and sliding gate mechanics.
+    Implements a pooling "hopper" with granular arching prevention (vibration)
+    and single-file trickle mechanics.
 =============================================================================
 """
 
@@ -48,7 +49,6 @@ def render_probability_demo(sample_count=200):
                     const engine = Engine.create({{ positionIterations: 16, velocityIterations: 16 }});
                     engine.gravity.y = 1.2;
 
-                    // Expanded Canvas to hold 29 rows of pegs + 30 taller bins
                     const width = 800;
                     const height = 800;
 
@@ -65,42 +65,38 @@ def render_probability_demo(sample_count=200):
                     const bodiesToLoad = [];
                     
                     // --- 1. INVISIBLE BOUNDARY WALLS ---
-                    // Prevents marbles from bouncing out of the screen
                     bodiesToLoad.push(Bodies.rectangle(0, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
                     bodiesToLoad.push(Bodies.rectangle(width, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
 
                     // --- 2. THE HOPPER (V-Funnel) ---
-                    // Moved inward (271 and 529) to seal the 4.2px gap and prevent marble leakage
-                    const doorL = Bodies.rectangle(271, 65, 300, 4, {{ 
+                    // LOWERED: Moved Y from 65 to 85. 
+                    // TIP: Forms a tight seal (1.8px overlap) at exactly Y=160.
+                    const doorL = Bodies.rectangle(271, 85, 300, 4, {{ 
                         isStatic: true, angle: Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
                     }});
-                    const doorR = Bodies.rectangle(529, 65, 300, 4, {{ 
+                    const doorR = Bodies.rectangle(529, 85, 300, 4, {{ 
                         isStatic: true, angle: -Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
                     }});
                     bodiesToLoad.push(doorL, doorR);
 
-                    // --- 3. DYNAMIC BINS (Double the bins, 30% taller) ---
+                    // --- 3. DYNAMIC BINS ---
                     const numBins = 30;
-                    const binWidth = width / numBins; // ~26.66px
+                    const binWidth = width / numBins; 
                     const binHeight = 200;
                     
-                    // Internal dividers only (edges handled by invisible walls)
                     for (let i = 1; i < numBins; i++) {{
                         bodiesToLoad.push(Bodies.rectangle(i * binWidth, height - (binHeight/2), 2, binHeight, {{
                             isStatic: true, render: {{ fillStyle: '#475569' }}, collisionFilter: {{ category: CAT_WALL }}
                         }}));
                     }}
-                    // Solid Floor
                     bodiesToLoad.push(Bodies.rectangle(width/2, height + 10, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_WALL }} }}));
 
-                    // --- 4. PERFECTLY ALIGNED QUINCUNX (Triangle Peg Array) ---
+                    // --- 4. PERFECTLY ALIGNED QUINCUNX ---
                     const rows = 29;
-                    // Starting at r = 1 removes the single top peg, leaving a 2-peg gap at X=400
+                    // Starts at r=1 (Y=175). Gap between hopper tip (160) and first pegs (175) is perfectly tight.
                     for (let r = 1; r < rows; r++) {{
                         for (let c = 0; c <= r; c++) {{
-                            // Math magic: ties horizontal peg spacing explicitly to binWidth
                             let px = (width / 2) + (c - r / 2) * binWidth;
-                            // Start below hopper (Y=160), space down by 15px. Bottom row hits Y=580 (just above bins!)
                             let py = 160 + r * 15; 
                             
                             bodiesToLoad.push(Bodies.circle(px, py, 3, {{
@@ -115,20 +111,20 @@ def render_probability_demo(sample_count=200):
                     // --- 5. CHOREOGRAPHY STATE MACHINE ---
                     let startTime = performance.now();
                     let marblesSpawned = 0;
-                    let gateOffset = 0; // Tracks how far the doors have slid
+                    let gateOffset = 0; 
                     const targetMarbles = {sample_count};
                     
                     Events.on(engine, 'beforeUpdate', function() {{
                         let elapsed = performance.now() - startTime;
                         
-                        // PHASE 1: Spawning Pool (0 to 3 seconds)
+                        // PHASE 1: Spawning Pool
                         let expectedMarbles = Math.min(targetMarbles, Math.floor((elapsed / 3000) * targetMarbles));
                         
                         while(marblesSpawned < expectedMarbles) {{
                             let spawnX = (width / 2) + (Math.random() * 80 - 40);
-                            let marble = Bodies.circle(spawnX, -10, 5, {{
-                                restitution: 0.5, 
-                                friction: 0.001,
+                            let marble = Bodies.circle(spawnX, -15, 5, {{
+                                restitution: 0.3, // Lowered bounciness to prevent exploding scattering
+                                friction: 0.001,  // Extremely low friction to slide easily
                                 render: {{ fillStyle: '#38BDF8' }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_PEG | CAT_MARBLE }}
                             }});
@@ -136,12 +132,18 @@ def render_probability_demo(sample_count=200):
                             marblesSpawned++;
                         }}
 
-                        // PHASE 2: Sliding Gate (Opens at 3.5 seconds)
-                        if (elapsed > 3500 && gateOffset < 20) {{
-                            gateOffset += 0.3; // Sliding velocity
-                            // Updates to the sealed positions
-                            Body.setPosition(doorL, {{ x: 271 - gateOffset, y: 65 }});
-                            Body.setPosition(doorR, {{ x: 529 + gateOffset, y: 65 }});
+                        // PHASE 2: Sliding Gate & Anti-Arching Vibration
+                        // RESTRICTED: Max offset is now 7. Creates a 12px gap (Marbles are 10px).
+                        if (elapsed > 3500) {{
+                            if (gateOffset < 7) {{
+                                gateOffset += 0.1; // Opens slower
+                            }}
+                            
+                            // HACK: Microscopic lateral vibration to prevent granular arching (clogs)
+                            let jiggle = Math.sin(elapsed / 30) * 0.3; 
+                            
+                            Body.setPosition(doorL, {{ x: 271 - gateOffset + jiggle, y: 85 }});
+                            Body.setPosition(doorR, {{ x: 529 + gateOffset - jiggle, y: 85 }});
                         }}
                     }});
 
@@ -154,7 +156,6 @@ def render_probability_demo(sample_count=200):
                         context.lineWidth = 2;
                         context.setLineDash([5, 5]);
                         
-                        // The Mathematical Expected Distribution Curve
                         for (let x = 0; x <= width; x += 5) {{
                             let z = (x - 400) / 72;
                             let y = 780 - (350 * Math.exp(-0.5 * z * z)); 
@@ -164,7 +165,6 @@ def render_probability_demo(sample_count=200):
                         context.stroke();
                         context.setLineDash([]);
                         
-                        // Text Layout
                         context.font = "16px sans-serif";
                         context.fillStyle = "#F8FAFC";
                         context.textAlign = "left";
