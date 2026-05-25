@@ -25,6 +25,7 @@ from career_hub_sidebar import apply_global_settings, render_sidebar
 # This import now works because the circular reference is broken in the component file
 from pages.components.geometry_demo import render_geometry_area_demo
 from pages.components.probability_demo import render_probability_demo  # <-- NEW: Import Galton Board
+from pages.components.pythagorean_demo import render_pythagorean_demo
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -60,7 +61,8 @@ active_lesson = st.radio(
     "Select Interactive Lesson Demo to Load:",
     [
         "📐 Lesson 1: Geometry & Area Generation", 
-        "🎲 Lesson 2: Probability & Chance Space"
+        "🎲 Lesson 2: Probability & Chance Space",
+        "📐 Lesson 3: Pythagorean Theorem Matrix" # <-- NEW Spoke Entry
     ],
     horizontal=True,
     label_visibility="collapsed"
@@ -101,6 +103,31 @@ elif "Probability" in active_lesson:
     # to the browser to handle the Plinko state machine.
     st.info("💡 **Watch the Distribution Form**\n\nNotice how the random binary choices at each peg naturally assemble into a Gaussian distribution.")
     render_probability_demo(sample_count=num_samples)
+
+# 3. Handle the dynamic input control matrix and render the Canvas view
+elif "Pythagorean" in active_lesson:
+    st.subheader("Geometric Visualization of $A^2 + B^2 = C^2$")
+    
+    # Establish a clean layout split for variables vs execution canvas
+    anim_col, gap_col, input_col = st.columns([3, 0.2, 1])
+    
+    with input_col:
+        st.info("💡 **Triangle Vectors**\n\nEnter the boundaries below to see the square structures transform.")
+        input_mode = st.selectbox("Define Dimensions By:", ["Side Lengths", "Internal Angles"])
+        
+        if input_mode == "Side Lengths":
+            side_a = st.slider("Base Dimension (A)", min_value=3, max_value=8, value=4, step=1)
+            side_b = st.slider("Height Dimension (B)", min_value=3, max_value=8, value=3, step=1)
+        else:
+            # Mathematical fallback conversion logic for angle mapping
+            angle_theta = st.slider("Internal Angle (Θ°)", min_value=15, max_value=75, value=45, step=5)
+            # Extrapolate relative sides using trigonometry scales
+            side_a = 5.0
+            side_b = 5.0 * np.tan(np.radians(angle_theta))
+            
+    with anim_col:
+        # Launch browser GPU-accelerated Matter.js simulation frame
+        render_pythagorean_demo(a_units=side_a, b_units=side_b)
 
 st.divider()
 
