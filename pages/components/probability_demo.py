@@ -123,7 +123,7 @@ def render_probability_demo(sample_count=200):
                         while(marblesSpawned < expectedMarbles) {{
                             let spawnX = (width / 2) + (Math.random() * 80 - 40);
                             let marble = Bodies.circle(spawnX, -15, 5, {{
-                                restitution: 0.3, // Lowered bounciness to prevent exploding scattering
+                                restitution: 0.25, // Lowered bounciness to prevent exploding scattering
                                 friction: 0.001,  // Extremely low friction to slide easily
                                 render: {{ fillStyle: '#38BDF8' }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_PEG | CAT_MARBLE }}
@@ -140,7 +140,7 @@ def render_probability_demo(sample_count=200):
                             }}
                             
                             // HACK: Microscopic lateral vibration to prevent granular arching (clogs)
-                            let jiggle = Math.sin(elapsed / 30) * 0.3; 
+                            let jiggle = Math.sin(elapsed / 30) * 0.35; 
                             
                             Body.setPosition(doorL, {{ x: 271 - gateOffset + jiggle, y: 85 }});
                             Body.setPosition(doorR, {{ x: 529 + gateOffset - jiggle, y: 85 }});
