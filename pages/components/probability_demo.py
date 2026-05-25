@@ -3,8 +3,13 @@
 MODULE: pages/components/probability_demo.py
 AUTHOR: Kyle W. Killebrew, PhD
 DESCRIPTION: 
-    A Matter.js Galton Board utilizing a full staggered rectangular matrix.
-    Eliminates the pooling hopper in favor of a dynamic trickle spawn.
+    A Matter.js Galton Board utilizing a staggered rectangular matrix.
+    Dynamically calculates empirical vs theoretical statistical moments (Mean & SD) 
+    and fades the results into the Canvas HUD upon simulation completion.
+    
+    MATLAB Analogy: This is equivalent to running mean(X) and std(X) on a 
+    result vector after an ode45 simulation finishes, and updating an 
+    App Designer uilabel with dynamic alpha transparency.
 =============================================================================
 """
 
@@ -79,20 +84,14 @@ def render_probability_demo(sample_count=200):
                     bodiesToLoad.push(Bodies.rectangle(width/2, height + 10, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_WALL }} }}));
 
                     // --- 3. STAGGERED RECTANGULAR MATRIX ---
-                    const rows = 30; // 30 rows ensures the final row aligns with bin dividers
+                    const rows = 30; 
                     
                     for (let r = 0; r < rows; r++) {{
-                        // Modulo logic to stagger rows. 
-                        // Even rows (r=0, 2, 4...) have a gap at X=400.
-                        // Odd rows (r=1, 3, 5...) have a peg at X=400.
-                        // Row 29 is odd, meaning its pegs align PERFECTLY with the bin dividers!
                         let offset = (r % 2 === 0) ? (binWidth / 2) : 0;
-                        
                         for (let c = -1; c <= numBins; c++) {{
                             let px = c * binWidth + offset;
                             let py = 100 + r * 16; 
                             
-                            // Only draw pegs that are visibly inside the bounds
                             if (px > 5 && px < width - 5) {{
                                 bodiesToLoad.push(Bodies.circle(px, py, 3, {{
                                     isStatic: true, render: {{ fillStyle: '#64748B' }},
@@ -104,45 +103,81 @@ def render_probability_demo(sample_count=200):
 
                     Composite.add(engine.world, bodiesToLoad);
 
-                    // --- 4. CHOREOGRAPHY STATE MACHINE ---
+                    // --- 4. CHOREOGRAPHY & CALCULATION STATE MACHINE ---
                     let startTime = performance.now();
+                    let lastSpawnTime = 0; // Tracks when the final marble dropped
                     let marblesSpawned = 0;
                     const targetMarbles = {sample_count};
+                    
+                    // Statistical Tracking Variables
+                    let simulationComplete = false;
+                    let empiricalMean = 0;
+                    let empiricalStdDev = 0;
+                    let fadeOpacity = 0.0;
                     
                     Events.on(engine, 'beforeUpdate', function() {{
                         let elapsed = performance.now() - startTime;
                         
-                        // SPAWNING TRICKLE: Dictates flow rate (1 marble every 15ms)
-                        // This prevents pillar-stacking and physics explosions at the top gap.
+                        // SPAWNING TRICKLE
                         let expectedMarbles = Math.min(targetMarbles, Math.floor(elapsed / 15));
                         
                         while(marblesSpawned < expectedMarbles) {{
-                            // Drops directly over the center gap (X=400).
-                            // A microscopic variance (+/- 4px) prevents mathematically perfect 
-                            // vertical stacking while easily fitting through the 26px top gap.
                             let spawnX = (width / 2) + (Math.random() * 8 - 4);
                             let marble = Bodies.circle(spawnX, -15, 5, {{
-                                restitution: 0.4, // Slight bounce
+                                restitution: 0.4, 
                                 friction: 0.001,
                                 render: {{ fillStyle: '#38BDF8' }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_PEG | CAT_MARBLE }}
                             }});
                             Composite.add(engine.world, marble);
                             marblesSpawned++;
+                            lastSpawnTime = elapsed; // Log the timestamp of the latest spawn
+                        }}
+
+                        // TERMINATION & CALCULATION CHECK
+                        // If all marbles have spawned AND 4 seconds have passed to let them fall to the bottom
+                        if (marblesSpawned >= targetMarbles && !simulationComplete) {{
+                            if (elapsed - lastSpawnTime > 4000) {{
+                                simulationComplete = true;
+                                
+                                // Extract all marbles from the physics engine matrix
+                                let allBodies = Composite.allBodies(engine.world);
+                                let marblesArray = [];
+                                for (let i = 0; i < allBodies.length; i++) {{
+                                    if (allBodies[i].collisionFilter.category === CAT_MARBLE) {{
+                                        marblesArray.push(allBodies[i]);
+                                    }}
+                                }}
+                                
+                                // Calculate Empirical Mean (Center of Mass X)
+                                let sumX = 0;
+                                for (let i = 0; i < marblesArray.length; i++) {{
+                                    sumX += marblesArray[i].position.x;
+                                }}
+                                empiricalMean = sumX / marblesArray.length;
+                                
+                                // Calculate Empirical Standard Deviation (Spread)
+                                let sumSq = 0;
+                                for (let i = 0; i < marblesArray.length; i++) {{
+                                    sumSq += Math.pow(marblesArray[i].position.x - empiricalMean, 2);
+                                }}
+                                empiricalStdDev = Math.sqrt(sumSq / marblesArray.length);
+                            }}
                         }}
                     }});
 
-                    // --- 5. CANVAS HUD & BELL CURVE OVERLAY ---
+                    // --- 5. CANVAS HUD & OVERLAYS ---
                     Events.on(render, 'afterRender', function() {{
                         const context = render.context;
                         
+                        // Draw Ghost Bell Curve Overlay
                         context.beginPath();
                         context.strokeStyle = "rgba(74, 222, 128, 0.4)";
                         context.lineWidth = 2;
                         context.setLineDash([5, 5]);
                         
                         for (let x = 0; x <= width; x += 5) {{
-                            let z = (x - 400) / 72;
+                            let z = (x - 400) / 72; // Theoretical Sigma = 72
                             let y = 780 - (350 * Math.exp(-0.5 * z * z)); 
                             if (x === 0) context.moveTo(x, y);
                             else context.lineTo(x, y);
@@ -150,12 +185,28 @@ def render_probability_demo(sample_count=200):
                         context.stroke();
                         context.setLineDash([]);
                         
+                        // Main Titles
                         context.font = "16px sans-serif";
                         context.fillStyle = "#F8FAFC";
                         context.textAlign = "left";
                         context.fillText("Expected Normal Distribution", 20, 30);
                         context.fillStyle = "#38BDF8";
                         context.fillText("N = " + marblesSpawned + " / " + targetMarbles, 20, 55);
+                        
+                        // Theoretical Stats (Always Visible)
+                        context.fillStyle = "#94A3B8"; // Slate Gray
+                        context.fillText("Theoretical μ: 400.0px | σ: 72.0px", 20, 80);
+                        
+                        // Empirical Stats (Fades in once calculation is complete)
+                        if (simulationComplete) {{
+                            if (fadeOpacity < 1.0) {{
+                                fadeOpacity += 0.01; // Increase alpha channel each frame
+                            }}
+                            // We use string concatenation here instead of JS template literals 
+                            // to ensure Python's f-string parser doesn't break.
+                            context.fillStyle = "rgba(74, 222, 128, " + fadeOpacity + ")"; // Soft Green
+                            context.fillText("Empirical μ: " + empiricalMean.toFixed(1) + "px | σ: " + empiricalStdDev.toFixed(1) + "px", 20, 105);
+                        }}
                     }});
 
                     Render.run(render);
