@@ -94,7 +94,7 @@ elif "Probability" in active_lesson:
     st.write("Instead of tracking abstract formulas, children learn better by seeing outcomes populate a frequency plane.")
     
     # 1. Parameter Input
-    num_samples = st.selectbox("Select Number of Empirical Trials to Run:", [10, 50, 200, 500])
+    num_samples = st.selectbox("Select Number of Empirical Trials to Run:", [50, 100, 250, 500, 750, 1000])
     
     # 2. Render the Matter.js Physics Component
     # We no longer process Pandas/NumPy arrays here. We pass the parameter directly 
