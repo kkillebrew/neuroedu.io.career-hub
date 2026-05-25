@@ -3,9 +3,9 @@
 MODULE: pages/components/probability_demo.py
 AUTHOR: Kyle W. Killebrew, PhD
 DESCRIPTION: 
-    A fully robust Matter.js simulation for the Probability Spoke.
-    Features a Plinko board with collision masking, gate mechanics, 
-    real-time Bell Curve HUD overlay, and comprehensive error handling.
+    A structurally refined Matter.js Galton Board.
+    Fixes mesh-grid bias by perfectly aligning the peg array with bin dividers.
+    Implements a pooling "hopper" and sliding gate mechanics.
 =============================================================================
 """
 
@@ -13,9 +13,7 @@ import streamlit.components.v1 as components
 
 def render_probability_demo(sample_count=200):
     """
-    Renders the Matter.js Plinko Board. 
-    This component uses a self-contained HTML5/JS lifecycle to ensure 
-    the engine only executes after the DOM is fully loaded.
+    Renders the expanded 800x800 Matter.js Plinko Board.
     """
     
     html_code = f"""
@@ -33,15 +31,12 @@ def render_probability_demo(sample_count=200):
         <div id="debug-console"></div>
         
         <script>
-            // 0. DOM Lifecycle Management
             window.addEventListener('DOMContentLoaded', function() {{
                 try {{
-                    // Dependency verification
                     if (typeof Matter === 'undefined') {{
                         throw new Error("Matter.js library failed to load via CDN.");
                     }}
 
-                    // 1. ENGINE & RENDER SETUP
                     const Engine = Matter.Engine,
                           Render = Matter.Render,
                           Runner = Matter.Runner,
@@ -50,104 +45,91 @@ def render_probability_demo(sample_count=200):
                           Events = Matter.Events,
                           Body = Matter.Body;
 
-                    // Initialize physics engine with high iteration counts to prevent tunneling
-                    const engine = Engine.create({{ 
-                        positionIterations: 16, 
-                        velocityIterations: 16 
-                    }});
-                    
-                    // Standard Earth gravity for natural drop behavior
+                    const engine = Engine.create({{ positionIterations: 16, velocityIterations: 16 }});
                     engine.gravity.y = 1.2;
 
+                    // Expanded Canvas to hold 29 rows of pegs + 30 taller bins
                     const width = 800;
-                    const height = 600;
+                    const height = 800;
 
                     const render = Render.create({{
                         element: document.body,
                         engine: engine,
-                        options: {{ 
-                            width: width, 
-                            height: height, 
-                            wireframes: false, 
-                            background: '#0F172A' 
-                        }}
+                        options: {{ width: width, height: height, wireframes: false, background: '#0F172A' }}
                     }});
 
-                    // 2. BITMASK COLLISION CATEGORIES (Ensures efficient physics calculation)
                     const CAT_WALL = 0x0001;
                     const CAT_PEG = 0x0002;
                     const CAT_MARBLE = 0x0004;
 
-                    // 3. ENVIRONMENT GENERATION
                     const bodiesToLoad = [];
                     
-                    // Funnel Gates (Slimmed lines: Height 4)
-                    const doorL = Bodies.rectangle(250, 50, 400, 4, {{ 
-                        isStatic: true, angle: Math.PI / 6, render: {{ fillStyle: '#94A3B8' }},
-                        collisionFilter: {{ category: CAT_WALL }}
+                    // --- 1. INVISIBLE BOUNDARY WALLS ---
+                    // Prevents marbles from bouncing out of the screen
+                    bodiesToLoad.push(Bodies.rectangle(0, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
+                    bodiesToLoad.push(Bodies.rectangle(width, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
+
+                    // --- 2. THE HOPPER (V-Funnel) ---
+                    // Angled to form a perfect point at X=400, Y=140
+                    const doorL = Bodies.rectangle(268, 65, 300, 4, {{ 
+                        isStatic: true, angle: Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
                     }});
-                    const doorR = Bodies.rectangle(550, 50, 400, 4, {{ 
-                        isStatic: true, angle: -Math.PI / 6, render: {{ fillStyle: '#94A3B8' }},
-                        collisionFilter: {{ category: CAT_WALL }}
+                    const doorR = Bodies.rectangle(532, 65, 300, 4, {{ 
+                        isStatic: true, angle: -Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
                     }});
                     bodiesToLoad.push(doorL, doorR);
 
-                    // Quincunx Peg Array
-                    const rows = 9;
-                    const pegSpacing = 45;
+                    // --- 3. DYNAMIC BINS (Double the bins, 30% taller) ---
+                    const numBins = 30;
+                    const binWidth = width / numBins; // ~26.66px
+                    const binHeight = 200;
+                    
+                    // Internal dividers only (edges handled by invisible walls)
+                    for (let i = 1; i < numBins; i++) {{
+                        bodiesToLoad.push(Bodies.rectangle(i * binWidth, height - (binHeight/2), 2, binHeight, {{
+                            isStatic: true, render: {{ fillStyle: '#475569' }}, collisionFilter: {{ category: CAT_WALL }}
+                        }}));
+                    }}
+                    // Solid Floor
+                    bodiesToLoad.push(Bodies.rectangle(width/2, height + 10, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_WALL }} }}));
+
+                    // --- 4. PERFECTLY ALIGNED QUINCUNX (Triangle Peg Array) ---
+                    // 29 rows ensures the bottom row has 29 pegs, aligning EXACTLY with the 29 bin dividers
+                    const rows = 29;
                     for (let r = 0; r < rows; r++) {{
                         for (let c = 0; c <= r; c++) {{
-                            let px = (width / 2) + (c - r / 2) * pegSpacing;
-                            let py = 150 + r * pegSpacing;
-                            bodiesToLoad.push(Bodies.circle(px, py, 4, {{
-                                isStatic: true,
-                                render: {{ fillStyle: '#475569' }},
+                            // Math magic: ties horizontal peg spacing explicitly to binWidth
+                            let px = (width / 2) + (c - r / 2) * binWidth;
+                            // Start below hopper (Y=160), space down by 15px. Bottom row hits Y=580 (just above bins!)
+                            let py = 160 + r * 15; 
+                            
+                            bodiesToLoad.push(Bodies.circle(px, py, 3, {{
+                                isStatic: true, render: {{ fillStyle: '#64748B' }},
                                 collisionFilter: {{ category: CAT_PEG, mask: CAT_MARBLE }}
                             }}));
                         }}
                     }}
 
-                    // Bins (Slimmed lines: Width 2)
-                    const numBins = 15;
-                    const binWidth = width / numBins;
-                    for (let i = 0; i <= numBins; i++) {{
-                        bodiesToLoad.push(Bodies.rectangle(i * binWidth, height - 75, 2, 150, {{
-                            isStatic: true,
-                            render: {{ fillStyle: '#475569' }},
-                            collisionFilter: {{ category: CAT_WALL }}
-                        }}));
-                    }}
-                    
-                    // Floor
-                    bodiesToLoad.push(Bodies.rectangle(width/2, height + 10, width, 40, {{ 
-                        isStatic: true,
-                        collisionFilter: {{ category: CAT_WALL }}
-                    }}));
-
                     Composite.add(engine.world, bodiesToLoad);
 
-                    // 4. THE STATE MACHINE (Choreography)
+                    // --- 5. CHOREOGRAPHY STATE MACHINE ---
                     let startTime = performance.now();
                     let marblesSpawned = 0;
-                    let gateOpened = false;
-                    const targetMarbles = {sample_count}; // Passed from Python
+                    let gateOffset = 0; // Tracks how far the doors have slid
+                    const targetMarbles = {sample_count};
                     
                     Events.on(engine, 'beforeUpdate', function() {{
                         let elapsed = performance.now() - startTime;
                         
-                        // GATE LOGIC: Open hatch at exactly 2 seconds
-                        if (elapsed > 2000 && !gateOpened) {{
-                            gateOpened = true;
-                            // Teleport the gate doors off-screen
-                            Body.setPosition(doorL, {{ x: -200, y: 50 }});
-                            Body.setPosition(doorR, {{ x: width + 200, y: 50 }});
-                        }}
-
-                        // SPAWN LOGIC: Drop marbles only after gate opens, staggered
-                        if (gateOpened && marblesSpawned < targetMarbles && Math.floor(elapsed) % 50 < 15) {{
-                            let spawnX = (width / 2) + (Math.random() * 20 - 10);
-                            let marble = Bodies.circle(spawnX, 10, 6, {{
-                                restitution: 0.4, 
+                        // PHASE 1: Spawning Pool (0 to 3 seconds)
+                        // Uses a dynamic catch-up loop so frame drops don't result in missing marbles
+                        let expectedMarbles = Math.min(targetMarbles, Math.floor((elapsed / 3000) * targetMarbles));
+                        
+                        while(marblesSpawned < expectedMarbles) {{
+                            // Spawn spread out across the top of the hopper
+                            let spawnX = (width / 2) + (Math.random() * 80 - 40);
+                            let marble = Bodies.circle(spawnX, -10, 5, {{ // Shrunk radius to 5 to prevent jamming
+                                restitution: 0.5, // slightly bouncier
                                 friction: 0.001,
                                 render: {{ fillStyle: '#38BDF8' }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_PEG | CAT_MARBLE }}
@@ -155,42 +137,50 @@ def render_probability_demo(sample_count=200):
                             Composite.add(engine.world, marble);
                             marblesSpawned++;
                         }}
+
+                        // PHASE 2: Sliding Gate (Opens at 3.5 seconds)
+                        if (elapsed > 3500 && gateOffset < 20) {{
+                            gateOffset += 0.3; // Sliding velocity
+                            // Translates the rectangles horizontally apart
+                            Body.setPosition(doorL, {{ x: 268 - gateOffset, y: 65 }});
+                            Body.setPosition(doorR, {{ x: 532 + gateOffset, y: 65 }});
+                        }}
                     }});
 
-                    // 5. CANVAS HUD & OVERLAYS
+                    // --- 6. CANVAS HUD & BELL CURVE OVERLAY ---
                     Events.on(render, 'afterRender', function() {{
                         const context = render.context;
                         
-                        // Draw Ghost Bell Curve Overlay
                         context.beginPath();
                         context.strokeStyle = "rgba(74, 222, 128, 0.4)";
                         context.lineWidth = 2;
                         context.setLineDash([5, 5]);
-                        for (let x = 0; x <= width; x += 10) {{
-                            let z = (x - (width/2)) / 120;
-                            let y = 520 - (300 * Math.exp(-0.5 * z * z)); 
+                        
+                        // The Mathematical Expected Distribution Curve
+                        // Adjusted StdDev (sigma) and Amplitude to perfectly match the 30-bin spread
+                        for (let x = 0; x <= width; x += 5) {{
+                            let z = (x - 400) / 72; // Sigma perfectly mapped to physical variance
+                            let y = 780 - (350 * Math.exp(-0.5 * z * z)); 
                             if (x === 0) context.moveTo(x, y);
                             else context.lineTo(x, y);
                         }}
                         context.stroke();
                         context.setLineDash([]);
                         
-                        // HUD Text
+                        // Text Layout
                         context.font = "16px sans-serif";
                         context.fillStyle = "#F8FAFC";
                         context.textAlign = "left";
-                        context.fillText("Expected Distribution", 20, 30);
+                        context.fillText("Expected Normal Distribution", 20, 30);
                         context.fillStyle = "#38BDF8";
                         context.fillText("N = " + marblesSpawned + " / " + targetMarbles, 20, 55);
                     }});
 
-                    // 6. EXECUTION
                     Render.run(render);
                     const runner = Runner.create();
                     Runner.run(runner, engine);
 
                 }} catch (error) {{
-                    // Fallback for JS runtime errors
                     document.getElementById('debug-console').innerHTML = "<strong>CRITICAL FAILURE:</strong> " + error.message;
                 }}
             }});
@@ -199,4 +189,5 @@ def render_probability_demo(sample_count=200):
     </html>
     """
     
-    components.html(html_code, height=620)
+    // We increase the Streamlit IFrame height to accommodate the 800px physics canvas
+    components.html(html_code, height=820)
