@@ -189,5 +189,5 @@ def render_probability_demo(sample_count=200):
     </html>
     """
     
-    // We increase the Streamlit IFrame height to accommodate the 800px physics canvas
+    # We increase the Streamlit IFrame height to accommodate the 800px physics canvas
     components.html(html_code, height=820)
