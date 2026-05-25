@@ -135,8 +135,8 @@ def render_probability_demo(sample_count=200):
                         // PHASE 2: Sliding Gate & Anti-Arching Vibration
                         // RESTRICTED: Max offset is now 7. Creates a 12px gap (Marbles are 10px).
                         if (elapsed > 3500) {{
-                            if (gateOffset < 7) {{
-                                gateOffset += 0.1; // Opens slower
+                            if (gateOffset < 8) {{
+                                gateOffset += 0.15; // Opens slower
                             }}
                             
                             // HACK: Microscopic lateral vibration to prevent granular arching (clogs)
