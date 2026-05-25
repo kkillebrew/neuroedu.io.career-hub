@@ -89,7 +89,7 @@ def render_pythagorean_demo(a_units, b_units):
                     // Standard outer viewport bounds
                     const ground = Bodies.rectangle(width/2, height + 20, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_BOUNDS }} }});
                     const leftWall = Bodies.rectangle(-20, height/2, 40, height, {{ isStatic: true, collisionFilter: {{ category: CAT_BOUNDS }} }});
-                    const rightWall = Bodies.rectangle(width + 20, height/2, 40, height, {{ isStatic: true, collisionFilter: {{ category: CAT_BOUNDS }} }}));
+                    const rightWall = Bodies.rectangle(width + 20, height/2, 40, height, {{ isStatic: true, collisionFilter: {{ category: CAT_BOUNDS }} }});
                     const ceiling = Bodies.rectangle(width/2, -20, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_BOUNDS }} }});
                     Composite.add(engine.world, [ground, leftWall, rightWall, ceiling]);
 
@@ -317,24 +317,24 @@ def render_pythagorean_demo(a_units, b_units):
                             context.fillStyle = "rgba(56, 189, 248, " + labelsOpacity + ")";
                             context.fillText("Side A²", 180, 75);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + ({{a_val}} * {{a_val}}) + " units²", 180, 95);
+                            context.fillText("Vol = " + ({{a_units}} * {{a_units}}) + " units²", 180, 95);
 
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(244, 63, 94, " + labelsOpacity + ")";
                             context.fillText("Side B²", 400, 75);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + ({{b_val}} * {{b_val}}) + " units²", 400, 95);
+                            context.fillText("Vol = " + ({{a_units}} * {{a_units}}) + " units²", 180, 95);
 
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(16, 185, 129, " + labelsOpacity + ")";
                             context.fillText("Hypotenuse C²", 620, 75);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + Math.round({{a_val}}*{{a_val}} + {{b_val}}*{{b_val}}) + " units²", 620, 95);
+                            context.fillText("Vol = " + ({{b_units}} * {{b_units}}) + " units²", 400, 95);
                             
                             // Empirical conservation confirmation reading
                             context.font = "italic 18px sans-serif";
                             context.fillStyle = "rgba(148, 163, 184, " + labelsOpacity + ")";
-                            context.fillText("Empirical Marble Density Count Match: " + {{countA}} + " + " + {{countB}} + " = " + {{countC}}, width / 2, 320);
+                            context.fillText("Vol = " + Math.round({{a_units}}*{{a_units}} + {{b_units}}*{{b_units}}) + " units²", 620, 95);
                         }}
 
                         context.restore();
