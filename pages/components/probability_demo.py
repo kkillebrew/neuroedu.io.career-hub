@@ -3,10 +3,8 @@
 MODULE: pages/components/probability_demo.py
 AUTHOR: Kyle W. Killebrew, PhD
 DESCRIPTION: 
-    A structurally refined Matter.js Galton Board.
-    Fixes mesh-grid bias by perfectly aligning the peg array with bin dividers.
-    Implements a pooling "hopper" with granular arching prevention (vibration)
-    and single-file trickle mechanics.
+    A Matter.js Galton Board utilizing a full staggered rectangular matrix.
+    Eliminates the pooling hopper in favor of a dynamic trickle spawn.
 =============================================================================
 """
 
@@ -68,18 +66,7 @@ def render_probability_demo(sample_count=200):
                     bodiesToLoad.push(Bodies.rectangle(0, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
                     bodiesToLoad.push(Bodies.rectangle(width, height/2, 10, height, {{ isStatic: true, render: {{ visible: false }}, collisionFilter: {{ category: CAT_WALL }} }}));
 
-                    // --- 2. THE HOPPER (V-Funnel) ---
-                    // LOWERED: Moved Y from 65 to 85. 
-                    // TIP: Forms a tight seal (1.8px overlap) at exactly Y=160.
-                    const doorL = Bodies.rectangle(271, 85, 300, 4, {{ 
-                        isStatic: true, angle: Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
-                    }});
-                    const doorR = Bodies.rectangle(529, 85, 300, 4, {{ 
-                        isStatic: true, angle: -Math.PI / 6, render: {{ fillStyle: '#94A3B8' }}, collisionFilter: {{ category: CAT_WALL }}
-                    }});
-                    bodiesToLoad.push(doorL, doorR);
-
-                    // --- 3. DYNAMIC BINS ---
+                    // --- 2. DYNAMIC BINS ---
                     const numBins = 30;
                     const binWidth = width / numBins; 
                     const binHeight = 200;
@@ -91,63 +78,61 @@ def render_probability_demo(sample_count=200):
                     }}
                     bodiesToLoad.push(Bodies.rectangle(width/2, height + 10, width, 40, {{ isStatic: true, collisionFilter: {{ category: CAT_WALL }} }}));
 
-                    // --- 4. PERFECTLY ALIGNED QUINCUNX ---
-                    const rows = 29;
-                    // Starts at r=1 (Y=175). Gap between hopper tip (160) and first pegs (175) is perfectly tight.
-                    for (let r = 1; r < rows; r++) {{
-                        for (let c = 0; c <= r; c++) {{
-                            let px = (width / 2) + (c - r / 2) * binWidth;
-                            let py = 160 + r * 15; 
+                    // --- 3. STAGGERED RECTANGULAR MATRIX ---
+                    const rows = 30; // 30 rows ensures the final row aligns with bin dividers
+                    
+                    for (let r = 0; r < rows; r++) {{
+                        // Modulo logic to stagger rows. 
+                        // Even rows (r=0, 2, 4...) have a gap at X=400.
+                        // Odd rows (r=1, 3, 5...) have a peg at X=400.
+                        // Row 29 is odd, meaning its pegs align PERFECTLY with the bin dividers!
+                        let offset = (r % 2 === 0) ? (binWidth / 2) : 0;
+                        
+                        for (let c = -1; c <= numBins; c++) {{
+                            let px = c * binWidth + offset;
+                            let py = 100 + r * 16; 
                             
-                            bodiesToLoad.push(Bodies.circle(px, py, 3, {{
-                                isStatic: true, render: {{ fillStyle: '#64748B' }},
-                                collisionFilter: {{ category: CAT_PEG, mask: CAT_MARBLE }}
-                            }}));
+                            // Only draw pegs that are visibly inside the bounds
+                            if (px > 5 && px < width - 5) {{
+                                bodiesToLoad.push(Bodies.circle(px, py, 3, {{
+                                    isStatic: true, render: {{ fillStyle: '#64748B' }},
+                                    collisionFilter: {{ category: CAT_PEG, mask: CAT_MARBLE }}
+                                }}));
+                            }}
                         }}
                     }}
 
                     Composite.add(engine.world, bodiesToLoad);
 
-                    // --- 5. CHOREOGRAPHY STATE MACHINE ---
+                    // --- 4. CHOREOGRAPHY STATE MACHINE ---
                     let startTime = performance.now();
                     let marblesSpawned = 0;
-                    let gateOffset = 0; 
                     const targetMarbles = {sample_count};
                     
                     Events.on(engine, 'beforeUpdate', function() {{
                         let elapsed = performance.now() - startTime;
                         
-                        // PHASE 1: Spawning Pool
-                        let expectedMarbles = Math.min(targetMarbles, Math.floor((elapsed / 3000) * targetMarbles));
+                        // SPAWNING TRICKLE: Dictates flow rate (1 marble every 15ms)
+                        // This prevents pillar-stacking and physics explosions at the top gap.
+                        let expectedMarbles = Math.min(targetMarbles, Math.floor(elapsed / 15));
                         
                         while(marblesSpawned < expectedMarbles) {{
-                            let spawnX = (width / 2) + (Math.random() * 80 - 40);
+                            // Drops directly over the center gap (X=400).
+                            // A microscopic variance (+/- 4px) prevents mathematically perfect 
+                            // vertical stacking while easily fitting through the 26px top gap.
+                            let spawnX = (width / 2) + (Math.random() * 8 - 4);
                             let marble = Bodies.circle(spawnX, -15, 5, {{
-                                restitution: 0.25, // Lowered bounciness to prevent exploding scattering
-                                friction: 0.001,  // Extremely low friction to slide easily
+                                restitution: 0.4, // Slight bounce
+                                friction: 0.001,
                                 render: {{ fillStyle: '#38BDF8' }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_WALL | CAT_PEG | CAT_MARBLE }}
                             }});
                             Composite.add(engine.world, marble);
                             marblesSpawned++;
                         }}
-
-                        // PHASE 2: Sliding Gate & Anti-Arching Vibration
-                        // RESTRICTED: Max offset is now 7. Creates a 12px gap (Marbles are 10px).
-                        if (elapsed > 3500) {{
-                            if (gateOffset < 8.5) {{
-                                gateOffset += 0.15; // Opens slower
-                            }}
-                            
-                            // HACK: Microscopic lateral vibration to prevent granular arching (clogs)
-                            let jiggle = Math.sin(elapsed / 30) * 0.35; 
-                            
-                            Body.setPosition(doorL, {{ x: 271 - gateOffset + jiggle, y: 85 }});
-                            Body.setPosition(doorR, {{ x: 529 + gateOffset - jiggle, y: 85 }});
-                        }}
                     }});
 
-                    // --- 6. CANVAS HUD & BELL CURVE OVERLAY ---
+                    // --- 5. CANVAS HUD & BELL CURVE OVERLAY ---
                     Events.on(render, 'afterRender', function() {{
                         const context = render.context;
                         
