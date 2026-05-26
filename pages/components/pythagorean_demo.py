@@ -180,6 +180,7 @@ def render_pythagorean_demo(a_units, b_units):
                     const startTime = performance.now();
                     let marblesSpawned = false;
                     let labelsOpacity = 0;
+                    let anglesNormalized = false;
 
                     Events.on(engine, 'beforeUpdate', function() {{
                         let elapsed = performance.now() - startTime;
@@ -237,8 +238,19 @@ def render_pythagorean_demo(a_units, b_units):
 
                         // Phase 4A: Radial Expansion / Visual Separation (9000ms -> 10000ms)
                         else if (elapsed > 9000 && elapsed <= 10000) {{
+                            // THE PHASE WRAP FIX: Silently remove the 360-degree rotation wrap 
+                            // from Phase 3 so the boxes don't violently snap/spin during Phase 4B.
+                            if (!anglesNormalized) {{
+                                [triangleBody, boxA, boxB, boxC].forEach(b => {{
+                                    Body.setAngle(b, b.angle - 2 * Math.PI);
+                                }});
+                                anglesNormalized = true;
+                            }}
+
                             let p = (elapsed - 9000) / 1000;
-                            let easeP = Math.sin(p * Math.PI / 2);
+                            // THE KINEMATIC JERK FIX: A smooth S-Curve starts velocity at 0, 
+                            // preventing the walls from instantly hammering the marbles.
+                            let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
 
                             let targets = [
                                 {{ b: triangleBody, tx: globalCX, ty: globalCY + 150 * easeP }},
