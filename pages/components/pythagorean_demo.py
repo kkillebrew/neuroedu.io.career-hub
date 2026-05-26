@@ -112,8 +112,8 @@ def render_pythagorean_demo(a_units, b_units):
                         const parts = [
                             Bodies.rectangle(0, -h, w, thick, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }}),
                             Bodies.rectangle(0, h, w, thick, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }}),
-                            Bodies.rectangle(-h, 0, thick, size, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }}),
-                            Bodies.rectangle(h, 0, thick, size, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }})
+                            Bodies.rectangle(-h, 0, thick, w, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }}),
+                            Bodies.rectangle(h, 0, thick, w, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }})
                         ];
                         
                         // THE BROADPHASE FIX: We explicitly pass the collision filters 
@@ -240,18 +240,28 @@ def render_pythagorean_demo(a_units, b_units):
                             let p = (elapsed - 9000) / 1000;
                             let easeP = Math.sin(p * Math.PI / 2);
 
-                            expTri = {{ x: globalCX, y: globalCY + 150 * easeP }};
-                            expA = {{ x: globalCX + locBoxA.x, y: globalCY + locBoxA.y + 150 * easeP }};
-                            expB = {{ x: globalCX + locBoxB.x - 150 * easeP, y: globalCY + locBoxB.y - 100 * easeP }};
-                            expC = {{ x: globalCX + locBoxC.x + 150 * easeP, y: globalCY + locBoxC.y - 100 * easeP }};
+                            let targets = [
+                                {{ b: triangleBody, tx: globalCX, ty: globalCY + 150 * easeP }},
+                                {{ b: boxA, tx: globalCX + locBoxA.x, ty: globalCY + locBoxA.y + 150 * easeP }},
+                                {{ b: boxB, tx: globalCX + locBoxB.x - 150 * easeP, ty: globalCY + locBoxB.y - 100 * easeP }},
+                                {{ b: boxC, tx: globalCX + locBoxC.x + 150 * easeP, ty: globalCY + locBoxC.y - 100 * easeP }}
+                            ];
 
-                            Body.setPosition(triangleBody, expTri);
-                            Body.setPosition(boxA, expA);
-                            Body.setPosition(boxB, expB);
-                            Body.setPosition(boxC, expC);
+                            targets.forEach(item => {{
+                                let oldX = item.b.position.x;
+                                let oldY = item.b.position.y;
+                                Body.setPosition(item.b, {{ x: item.tx, y: item.ty }});
+                                Body.setVelocity(item.b, {{ x: item.tx - oldX, y: item.ty - oldY }});
+                            }});
+
+                            // Save bounds for Phase 4B origin targets
+                            expTri = {{ x: targets[0].tx, y: targets[0].ty }};
+                            expA = {{ x: targets[1].tx, y: targets[1].ty }};
+                            expB = {{ x: targets[2].tx, y: targets[2].ty }};
+                            expC = {{ x: targets[3].tx, y: targets[3].ty }};
                         }}
 
-                        // Phase 4B: Staggered Target Translation (10000ms -> 13000ms)
+                        // Phase 4B: Staggered Target Translation w/ Velocity (10000ms -> 13000ms)
                         else if (elapsed > 10000 && elapsed <= 13000) {{
                             if (!expA) {{
                                 expTri = {{x: globalCX, y: globalCY + 150}};
@@ -263,16 +273,23 @@ def render_pythagorean_demo(a_units, b_units):
                             let p = (elapsed - 10000) / 3000;
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
 
-                            Body.setPosition(triangleBody, {{ x: expTri.x, y: expTri.y + (targetTriY - expTri.y) * easeP }});
-                            
-                            Body.setPosition(boxA, {{ x: expA.x + (targetAX - expA.x) * easeP, y: expA.y + (targetAY - expA.y) * easeP }});
-                            Body.setAngle(boxA, locBoxA.angle * (1 - easeP)); 
-                            
-                            Body.setPosition(boxB, {{ x: expB.x + (targetBX - expB.x) * easeP, y: expB.y + (targetBY - expB.y) * easeP }});
-                            Body.setAngle(boxB, locBoxB.angle * (1 - easeP));
-                            
-                            Body.setPosition(boxC, {{ x: expC.x + (targetCX - expC.x) * easeP, y: expC.y + (targetCY - expC.y) * easeP }});
-                            Body.setAngle(boxC, locBoxC.angle * (1 - easeP));
+                            [
+                                {{ b: triangleBody, tx: expTri.x, ty: expTri.y + (targetTriY - expTri.y) * easeP, tAng: 0 }},
+                                {{ b: boxA, tx: expA.x + (targetAX - expA.x) * easeP, ty: expA.y + (targetAY - expA.y) * easeP, tAng: locBoxA.angle * (1 - easeP) }},
+                                {{ b: boxB, tx: expB.x + (targetBX - expB.x) * easeP, ty: expB.y + (targetBY - expB.y) * easeP, tAng: locBoxB.angle * (1 - easeP) }},
+                                {{ b: boxC, tx: expC.x + (targetCX - expC.x) * easeP, ty: expC.y + (targetCY - expC.y) * easeP, tAng: locBoxC.angle * (1 - easeP) }}
+                            ].forEach(item => {{
+                                let oldX = item.b.position.x;
+                                let oldY = item.b.position.y;
+                                let oldAngle = item.b.angle;
+
+                                Body.setPosition(item.b, {{ x: item.tx, y: item.ty }});
+                                Body.setAngle(item.b, item.tAng);
+                                
+                                // Kinematic velocity injection prevents teleportation squeezing!
+                                Body.setVelocity(item.b, {{ x: item.tx - oldX, y: item.ty - oldY }});
+                                Body.setAngularVelocity(item.b, item.tAng - oldAngle);
+                            }});
                         }}
 
                         if (elapsed > 12500 && labelsOpacity < 1.0) {{
