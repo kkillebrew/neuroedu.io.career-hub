@@ -105,6 +105,9 @@ elif "Probability" in active_lesson:
     render_probability_demo(sample_count=num_samples)
 
 # 3. Handle the dynamic input control matrix and render the Canvas view
+# =============================================================================
+# SPOKE LAYER ROUTING CONTROL MATRIX: LESSON 3 - PYTHAGOREAN THEOREM MATRIX
+# =============================================================================
 elif "Pythagorean" in active_lesson:
     st.subheader("Geometric Visualization of $A^2 + B^2 = C^2$")
     
@@ -116,17 +119,36 @@ elif "Pythagorean" in active_lesson:
         input_mode = st.selectbox("Define Dimensions By:", ["Side Lengths", "Internal Angles"])
         
         if input_mode == "Side Lengths":
-            side_a = st.slider("Base Dimension (A)", min_value=3, max_value=8, value=4, step=1)
-            side_b = st.slider("Height Dimension (B)", min_value=3, max_value=8, value=3, step=1)
+            # Bounded between 3 and 8 to prevent physics viewport out-of-bounds clipping
+            side_a = st.slider("Base Dimension (Side A)", min_value=3, max_value=8, value=4, step=1)
+            side_b = st.slider("Height Dimension (Side B)", min_value=3, max_value=8, value=3, step=1)
         else:
-            # Mathematical fallback conversion logic for angle mapping
-            angle_theta = st.slider("Internal Angle (Θ°)", min_value=15, max_value=75, value=45, step=5)
-            # Extrapolate relative sides using trigonometry scales
-            side_a = 5.0
-            side_b = 5.0 * np.tan(np.radians(angle_theta))
+            # Mathematical fallback conversion logic for dynamic angle mapping
+            angle_theta = st.slider("Internal Angle (Θ°)", min_value=15, max_value=75, value=36, step=1)
+            
+            # Extrapolate relative sides using trigonometry scale transformations
+            # Locking the hypotenuse to a stable scale value keeps the simulation frames bounded
+            hypotenuse_reference = 6.5
+            side_a = hypotenuse_reference * np.cos(np.radians(angle_theta))
+            side_b = hypotenuse_reference * np.sin(np.radians(angle_theta))
+            
+        # Display instant mathematical feedback inside the control container sidebar
+        area_a = side_a ** 2
+        area_b = side_b ** 2
+        area_c = area_a + area_b
+        st.markdown(f"""
+        <div style="background-color: rgba(30, 41, 59, 0.5); padding: 12px; border-radius: 6px; border-left: 3px solid #10B981;">
+            <p style="margin:0; font-size:0.85rem; color:#94A3B8;"><b>Area Verification Layer:</b></p>
+            <p style="margin:4px 0 0 0; font-family:monospace; font-size:0.9rem;">
+                A² ({area_a:.1f}) + B² ({area_b:.1f})<br>
+                <b>= C² ({area_c:.1f})</b>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
             
     with anim_col:
         # Launch browser GPU-accelerated Matter.js simulation frame
+        # Routing the slider arguments directly into the synchronized view component parameters
         render_pythagorean_demo(a_units=side_a, b_units=side_b)
 
 st.divider()
