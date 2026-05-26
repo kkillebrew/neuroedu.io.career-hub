@@ -68,7 +68,7 @@ def render_pythagorean_demo(a_units, b_units):
                           Events = Matter.Events,
                           Body = Matter.Body;
 
-                    const engine = Engine.create({{ positionIterations: 12, velocityIterations: 12 }});
+                    const engine = Engine.create({ positionIterations: 16, velocityIterations: 16 });
                     engine.gravity.y = 1.0;
 
                     const width = 800;
@@ -99,7 +99,7 @@ def render_pythagorean_demo(a_units, b_units):
                     Body.setPosition(triangleBody, {{ x: globalCX, y: globalCY }});
 
                     // --- 2. 4-WALL BOX ARCHITECTURE ---
-                    const thick = 8;
+                    const thick = 15;
                     const wallColor = '#475569';
 
                     function createSquareContainer(localX, localY, size, angle) {{
@@ -154,7 +154,7 @@ def render_pythagorean_demo(a_units, b_units):
                             let rx = box.position.x + (lx * cos - ly * sin);
                             let ry = box.position.y + (lx * sin + ly * cos);
                             
-                            let marble = Bodies.circle(rx, ry, 4.5, {{
+                            let marble = Bodies.circle(rx, ry, 5.5, {{
                                 restitution: 0.2, friction: 0.02,
                                 render: {{ fillStyle: color }},
                                 collisionFilter: {{ category: CAT_MARBLE, mask: CAT_BOX | CAT_MARBLE }}
@@ -197,6 +197,11 @@ def render_pythagorean_demo(a_units, b_units):
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
                             let angle = easeP * Math.PI * 2; 
 
+                            // OVERRIDE: Sync gravity to the rotation so marbles stay pinned to the floor
+                            // instead of violently tumbling and clipping through the moving walls!
+                            engine.gravity.x = Math.sin(angle) * 1.0;
+                            engine.gravity.y = Math.cos(angle) * 1.0;
+
                             // Apply rigid transformation matrix mathematically
                             [ {{b: triangleBody, loc: {{x:0, y:0, angle:0}}}}, 
                               {{b: boxA, loc: locBoxA}}, 
@@ -215,6 +220,10 @@ def render_pythagorean_demo(a_units, b_units):
                         else if (elapsed > 10000 && elapsed <= 13000) {{
                             let p = (elapsed - 10000) / 3000;
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+                            // OVERRIDE: Reset global gravity vector to pull straight down
+                            engine.gravity.x = 0;
+                            engine.gravity.y = 1.0;
 
                             // Interpolate Triangle to Bottom
                             Body.setPosition(triangleBody, {{ x: globalCX, y: globalCY + (600 - globalCY) * easeP }});
