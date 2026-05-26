@@ -81,8 +81,8 @@ if "Geometry" in active_lesson:
         st.info("💡 **Adjust Dimensions**\n\nWatch how the space transforms in real-time.")
         
         # Sliders represent dimensions bounded safely between 2 and 10
-        b_units = st.slider("Base (b) Units", min_value=2, max_value=10, value=6, step=1)
-        h_units = st.slider("Height (h) Units", min_value=2, max_value=10, value=5, step=1)
+        b_units = st.slider("Base (b) Units", min_value=2, max_value=6, value=3, step=1)
+        h_units = st.slider("Height (h) Units", min_value=2, max_value=6, value=4, step=1)
         
         st.caption(f"**Total Area (Rect):** {b_units * h_units} units²\n\n**Total Area (Tri):** {(b_units * h_units)/2} units²")
         
