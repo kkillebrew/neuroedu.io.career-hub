@@ -115,9 +115,10 @@ def render_pythagorean_demo(a_units, b_units):
                             Bodies.rectangle(-h, 0, thick, size, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }}),
                             Bodies.rectangle(h, 0, thick, size, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }})
                         ];
-                        // Explicitly assign the collision matrix to the parent hull 
-                        // so the engine doesn't skip the Narrowphase wall checks!
-                        const box = Body.create({{
+                        
+                        // THE BROADPHASE FIX: We explicitly pass the collision filters 
+                        // to the parent constructor so the engine maps the auto-generated hull!
+                        const box = Body.create({{ 
                             parts: parts, 
                             isStatic: true,
                             collisionFilter: {{ category: catBox, mask: maskBox }} 
@@ -187,7 +188,7 @@ def render_pythagorean_demo(a_units, b_units):
                         if (elapsed > 1000 && elapsed <= 3000) {{
                             let p = (elapsed - 1000) / 2000;
                             [boxA, boxB, boxC].forEach(box => {{
-                                // Skip index 0 (the solid convex hull) to prevent visual occlusion
+                                // THE OCCLUSION FIX: Iterator starts at i=1 to skip the invisible parent hull (index 0)
                                 for (let i = 1; i < box.parts.length; i++) {{
                                     box.parts[i].render.opacity = p;
                                 }}
@@ -196,11 +197,16 @@ def render_pythagorean_demo(a_units, b_units):
                         
                         // Phase 2: Spawn Marbles (3100ms)
                         else if (elapsed > 3100 && !marblesSpawned) {{
-                            [boxA, boxB, boxC].forEach(box => {{
+                            [boxA, boxB, boxC].forEach(box => {{ 
                                 for (let i = 1; i < box.parts.length; i++) {{
                                     box.parts[i].render.opacity = 1; 
                                 }}
                             }});
+                            spawnMarbles(boxA, countA, '#38BDF8', sideA, CAT_MARBLE_A, CAT_BOX_A | CAT_MARBLE_A); 
+                            spawnMarbles(boxB, countB, '#F43F5E', sideB, CAT_MARBLE_B, CAT_BOX_B | CAT_MARBLE_B); 
+                            spawnMarbles(boxC, countC, '#10B981', sideC, CAT_MARBLE_C, CAT_BOX_C | CAT_MARBLE_C); 
+                            marblesSpawned = true;
+                        }}
 
                         // Phase 3: Orbital Kinematics (4000ms -> 8000ms)
                         else if (elapsed > 4000 && elapsed <= 8000) {{
@@ -224,7 +230,6 @@ def render_pythagorean_demo(a_units, b_units):
                                 Body.setPosition(item.b, {{ x: gx, y: gy }});
                                 Body.setAngle(item.b, gAngle);
 
-                                // THE CCD FIX: Inject velocity derivates to push marbles!
                                 Body.setVelocity(item.b, {{ x: gx - oldX, y: gy - oldY }});
                                 Body.setAngularVelocity(item.b, gAngle - oldAngle);
                             }});
@@ -248,7 +253,6 @@ def render_pythagorean_demo(a_units, b_units):
 
                         // Phase 4B: Staggered Target Translation (10000ms -> 13000ms)
                         else if (elapsed > 10000 && elapsed <= 13000) {{
-                            // Safety catch in case browser tab lagged during expansion
                             if (!expA) {{
                                 expTri = {{x: globalCX, y: globalCY + 150}};
                                 expA = {{x: globalCX + locBoxA.x, y: globalCY + locBoxA.y + 150}};
