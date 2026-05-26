@@ -5,16 +5,12 @@ AUTHOR: Kyle W. Killebrew, PhD & Data Science Mentorship Engine
 STATUS: Active Specification Profile for Lesson 3 Component
 DESCRIPTION: 
     A GPU-accelerated Matter.js simulation visualizing the Pythagorean Theorem.
-    Orchestrates a 4-Phase Chronological Framework directly on HTML5 Canvas:
-      - Phase 1: Spawning & Gravitational Settlement (t = 0 -> 3000ms)
-      - Phase 2: Orbital Angular Rotation (t = 3000 -> 8000ms)
-      - Phase 3: Structural Detachment & Disassembly (t = 8000 -> 12000ms)
-      - Phase 4: Equation Linearization HUD (t > 12000ms)
+    Orchestrates a 4-Phase Chronological Framework directly on HTML5 Canvas.
 
     --- MATLAB BRIDGE ---
     Shifts standard execution loops from static matrix plots to a dynamic web UI
     wrapper. This routes inputs to a local rigid-body kinematic solver executed
-    directly via the user's browser canvas (similar to ode45/rigid-body app panels).
+    directly via the user's browser canvas.
 =============================================================================
 """
 
@@ -37,6 +33,7 @@ def render_pythagorean_demo(a_units, b_units):
     countB = int(b_units**2 * 3)
     countC = countA + countB
 
+    # Note the 'f' prefix here! This is crucial for injecting the variables below.
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -53,6 +50,18 @@ def render_pythagorean_demo(a_units, b_units):
         <script>
             window.addEventListener('DOMContentLoaded', function() {{
                 try {{
+                    // --- PYTHON TO JAVASCRIPT DATA BRIDGE ---
+                    // This explicitly locks Python variables into JS memory
+                    // so any custom logic from your PDF guide works perfectly.
+                    const sideA = {sideA};
+                    const sideB = {sideB};
+                    const sideC = {sideC};
+                    const countA = {countA};
+                    const countB = {countB};
+                    const countC = {countC};
+                    const a_units = {a_units};
+                    const b_units = {b_units};
+
                     if (typeof Matter === 'undefined') {{
                         throw new Error("Matter.js engine failed to load via CDN.");
                     }}
@@ -97,8 +106,8 @@ def render_pythagorean_demo(a_units, b_units):
                     // Base right-angled triangle mapping vectors
                     const triX = centerX;
                     const triY = centerY;
-                    const baseWidth = {{sideA}};
-                    const heightVert = {{sideB}};
+                    const baseWidth = sideA;
+                    const heightVert = sideB;
 
                     const triangleBody = Bodies.fromVertices(triX, triY, [
                         {{ x: 0, y: 0 }},
@@ -106,7 +115,6 @@ def render_pythagorean_demo(a_units, b_units):
                         {{ x: 0, y: heightVert }}
                     ], {{ isStatic: true, collisionFilter: {{ category: CAT_TRIANGLE }} }}, true);
 
-                    // Re-anchor to geometric centroid position values safely
                     const centroidX = triangleBody.position.x;
                     const centroidY = triangleBody.position.y;
 
@@ -117,11 +125,8 @@ def render_pythagorean_demo(a_units, b_units):
                     function createSquareContainer(x, y, size, angle, label) {{
                         const half = size / 2;
                         const parts = [
-                            // Bottom floor
                             Bodies.rectangle(0, half, size, thick, {{ render: {{ fillStyle: wallColor }} }}),
-                            // Left wing
                             Bodies.rectangle(-half, 0, thick, size, {{ render: {{ fillStyle: wallColor }} }}),
-                            // Right wing
                             Bodies.rectangle(half, 0, thick, size, {{ render: {{ fillStyle: wallColor }} }})
                         ];
                         const compoundBox = Body.create({{
@@ -133,25 +138,24 @@ def render_pythagorean_demo(a_units, b_units):
                         return compoundBox;
                     }}
 
-                    // Right angle alignments
                     const angleA = 0;
                     const angleB = Math.PI / 2;
                     const angleC = Math.atan2(heightVert, baseWidth) + Math.PI;
 
-                    const boxA = createSquareContainer(centroidX, centroidY - {{sideB}}/2 - thick, {{sideA}}, angleA, 'A');
-                    const boxB = createSquareContainer(centroidX - {{sideA}}/2 - thick, centroidY, {{sideB}}, angleB, 'B');
+                    const boxA = createSquareContainer(centroidX, centroidY - sideB/2 - thick, sideA, angleA, 'A');
+                    const boxB = createSquareContainer(centroidX - sideA/2 - thick, centroidY, sideB, angleB, 'B');
                     
-                    const hypOffsetX = (Math.cos(angleC + Math.PI/2) * ({{sideC}}/2 + thick));
-                    const hypOffsetY = (Math.sin(angleC + Math.PI/2) * ({{sideC}}/2 + thick));
-                    const boxC = createSquareContainer(centroidX + {{sideA}}/2, centroidY + {{sideB}}/2, {{sideC}}, angleC, 'C');
+                    const hypOffsetX = (Math.cos(angleC + Math.PI/2) * (sideC/2 + thick));
+                    const hypOffsetY = (Math.sin(angleC + Math.PI/2) * (sideC/2 + thick));
+                    const boxC = createSquareContainer(centroidX + sideA/2, centroidY + sideB/2, sideC, angleC, 'C');
 
                     Composite.add(engine.world, [triangleBody, boxA, boxB, boxC]);
 
                     // Rigid structural weld constraints linking boxes to anchor triangle
                     let constraints = [
-                        Constraint.create({{ bodyA: triangleBody, bodyB: boxA, pointA: {{ x: 0, y: -{{sideB}}/2 }}, length: 0, stiffness: 1 }}),
-                        Constraint.create({{ bodyA: triangleBody, bodyB: boxB, pointA: {{ x: -{{sideA}}/2, y: 0 }}, length: 0, stiffness: 1 }}),
-                        Constraint.create({{ bodyA: triangleBody, bodyB: boxC, pointA: {{ x: {{sideA}}/2, y: {{sideB}}/2 }}, length: 0, stiffness: 1 }})
+                        Constraint.create({{ bodyA: triangleBody, bodyB: boxA, pointA: {{ x: 0, y: -sideB/2 }}, length: 0, stiffness: 1 }}),
+                        Constraint.create({{ bodyA: triangleBody, bodyB: boxB, pointA: {{ x: -sideA/2, y: 0 }}, length: 0, stiffness: 1 }}),
+                        Constraint.create({{ bodyA: triangleBody, bodyB: boxC, pointA: {{ x: sideA/2, y: sideB/2 }}, length: 0, stiffness: 1 }})
                     ];
                     Composite.add(engine.world, constraints);
 
@@ -173,9 +177,9 @@ def render_pythagorean_demo(a_units, b_units):
                         }}
                     }}
 
-                    spawnMarblesInContainer(boxA, {{countA}}, '#38BDF8'); // Sky Blue
-                    spawnMarblesInContainer(boxB, {{countB}}, '#F43F5E'); // Coral Rose
-                    spawnMarblesInContainer(boxC, {{countC}}, '#10B981'); // Emerald
+                    spawnMarblesInContainer(boxA, countA, '#38BDF8'); 
+                    spawnMarblesInContainer(boxB, countB, '#F43F5E'); 
+                    spawnMarblesInContainer(boxC, countC, '#10B981'); 
 
                     // --- CHOREOGRAPHY CORE STATE MACHINE MOTOR ---
                     const startTime = performance.now();
@@ -186,24 +190,18 @@ def render_pythagorean_demo(a_units, b_units):
                     Events.on(engine, 'beforeUpdate', function() {{
                         let elapsed = performance.now() - startTime;
 
-                        // Phase 1: Gravitational Settlement (t = 0 -> 3000ms)
                         if (elapsed <= 3000) {{
-                            // Keep elements strictly anchored in place during initial load tracking
                             Body.setVelocity(boxA, {{ x: 0, y: 0 }});
                             Body.setVelocity(boxB, {{ x: 0, y: 0 }});
                             Body.setVelocity(boxC, {{ x: 0, y: 0 }});
                         }}
-                        
-                        // Phase 2: Orbital Invariance Transformation Matrix (t = 3000 -> 8000ms)
                         else if (elapsed > 3000 && elapsed <= 8000) {{
                             let progress = (elapsed - 3000) / 5000;
-                            let currentAngle = progress * Math.PI * 2; // Exact full 360-degree rotation loop
+                            let currentAngle = progress * Math.PI * 2; 
                             
-                            // Transform global gravity vector over time to pull assets realistically within shifting frames
                             engine.gravity.x = Math.sin(currentAngle) * 1.0;
                             engine.gravity.y = Math.cos(currentAngle) * 1.0;
 
-                            // Apply spatial position paths mapping around geometric barycenter
                             let radius = 10;
                             let targetX = centerX + radius * Math.sin(currentAngle);
                             let targetY = centerY + radius * (Math.cos(currentAngle) - 1);
@@ -213,11 +211,8 @@ def render_pythagorean_demo(a_units, b_units):
                             Body.setAngle(triangleBody, currentAngle);
                             Body.setStatic(triangleBody, true);
                         }}
-                        
-                        // Phase 3: Structural Detachment & Disassembly (t = 8000 -> 12000ms)
                         else if (elapsed > 8000) {{
                             if (!phase3Triggered) {{
-                                // Dissolve constraints tracking to foundational block completely
                                 constraints.forEach(c => Composite.remove(engine.world, c));
                                 
                                 Body.setStatic(triangleBody, false);
@@ -225,7 +220,6 @@ def render_pythagorean_demo(a_units, b_units):
                                 Body.setStatic(boxB, false);
                                 Body.setStatic(boxC, false);
 
-                                // Isolate collision filters so boxes no longer tangle with outer environment elements
                                 boxA.collisionFilter.mask = CAT_MARBLE;
                                 boxB.collisionFilter.mask = CAT_MARBLE;
                                 boxC.collisionFilter.mask = CAT_MARBLE;
@@ -233,14 +227,9 @@ def render_pythagorean_demo(a_units, b_units):
                                 phase3Triggered = true;
                             }}
 
-                            // Re-orient gravity coordinates to direct down profile
                             engine.gravity.x = 0;
                             engine.gravity.y = 1.3;
-
-                            // Linearize coordinates smoothly using standard differential target interpolation loops
-                            let tProgress = Math.min(1, (elapsed - 8000) / 3000);
                             
-                            // Triangle moves down to rest space smoothly
                             let targetTriX = centerX;
                             let targetTriY = height - 120;
                             Body.setPosition(triangleBody, {{
@@ -249,26 +238,22 @@ def render_pythagorean_demo(a_units, b_units):
                             }});
                             Body.setAngle(triangleBody, triangleBody.angle + (0 - triangleBody.angle) * 0.08);
 
-                            // Linearize Box A profile horizontally
                             let targetAX = 180;
                             let targetAY = 180;
                             Body.setPosition(boxA, {{ x: boxA.position.x + (targetAX - boxA.position.x) * 0.06, y: boxA.position.y + (targetAY - boxA.position.y) * 0.06 }});
                             Body.setAngle(boxA, boxA.angle + (0 - boxA.angle) * 0.06);
 
-                            // Linearize Box B profile horizontally
                             let targetBX = 400;
                             let targetBY = 180;
                             Body.setPosition(boxB, {{ x: boxB.position.x + (targetBX - boxB.position.x) * 0.06, y: boxB.position.y + (targetBY - boxB.position.y) * 0.06 }});
                             Body.setAngle(boxB, boxB.angle + (0 - boxB.angle) * 0.06);
 
-                            // Linearize Box C profile horizontally
                             let targetCX = 620;
                             let targetCY = 180;
                             Body.setPosition(boxC, {{ x: boxC.position.x + (targetCX - boxC.position.x) * 0.06, y: boxC.position.y + (targetCY - boxC.position.y) * 0.06 }});
                             Body.setAngle(boxC, boxC.angle + (0 - boxC.angle) * 0.06);
                         }}
 
-                        // Phase 4: Equation Linearization HUD (t > 12000ms)
                         if (elapsed > 11500) {{
                             phase4Triggered = true;
                             if (labelsOpacity < 1.0) {{
@@ -284,7 +269,6 @@ def render_pythagorean_demo(a_units, b_units):
 
                         context.save();
                         
-                        // Active runtime diagnostic telemetry readouts
                         context.font = "bold 15px sans-serif";
                         context.fillStyle = "#64748B";
                         context.fillText("Active State Engine Metrics", 25, 40);
@@ -302,39 +286,35 @@ def render_pythagorean_demo(a_units, b_units):
                         context.fillStyle = phase4Triggered ? "#10B981" : "#475569";
                         context.fillText("Phase 4: Equation Equilibrium Verified", 25, 134);
 
-                        // High contrast equation HUD mapping sequence
                         if (phase4Triggered) {{
                             context.fillStyle = "rgba(248, 250, 252, " + labelsOpacity + ")";
                             context.font = "bold 36px sans-serif";
                             context.textAlign = "center";
                             
-                            // High contrast operators between mathematical sets
                             context.fillText("+", 290, 190);
                             context.fillText("=", 510, 190);
 
-                            // Structured label markers for tracking dimensions
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(56, 189, 248, " + labelsOpacity + ")";
                             context.fillText("Side A²", 180, 75);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + ({{a_units}} * {{a_units}}) + " units²", 180, 95);
+                            context.fillText("Vol = " + (a_units * a_units) + " units²", 180, 95);
 
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(244, 63, 94, " + labelsOpacity + ")";
                             context.fillText("Side B²", 400, 75);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + ({{a_units}} * {{a_units}}) + " units²", 180, 95);
+                            context.fillText("Vol = " + (b_units * b_units) + " units²", 400, 95);
 
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(16, 185, 129, " + labelsOpacity + ")";
                             context.fillText("Hypotenuse C²", 620, 75);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + ({{b_units}} * {{b_units}}) + " units²", 400, 95);
+                            context.fillText("Vol = " + Math.round(a_units*a_units + b_units*b_units) + " units²", 620, 95);
                             
-                            // Empirical conservation confirmation reading
                             context.font = "italic 18px sans-serif";
                             context.fillStyle = "rgba(148, 163, 184, " + labelsOpacity + ")";
-                            context.fillText("Vol = " + Math.round({{a_units}}*{{a_units}} + {{b_units}}*{{b_units}}) + " units²", 620, 95);
+                            context.fillText("Empirical Marble Density Count Match: " + countA + " + " + countB + " = " + countC, width / 2, 320);
                         }}
 
                         context.restore();
@@ -353,5 +333,4 @@ def render_pythagorean_demo(a_units, b_units):
     </html>
     """
     
-    # Render with structural viewport clearance bounds
     components.html(html_code, height=820)
