@@ -26,6 +26,8 @@ from career_hub_sidebar import apply_global_settings, render_sidebar
 from pages.components.geometry_demo import render_geometry_area_demo
 from pages.components.probability_demo import render_probability_demo  # <-- NEW: Import Galton Board
 from pages.components.pythagorean_demo import render_pythagorean_demo
+from pages.components.fittslaw_demo import render_fittslaw_demo
+from loaders.fittslaw_loader import process_cohort_fitts_regression
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -60,9 +62,10 @@ conceptually, rather than demanding blind memorization. This maximizes attention
 active_lesson = st.radio(
     "Select Interactive Lesson Demo to Load:",
     [
-        "📐 Lesson 1: Geometry & Area Generation", 
+        "📐 Lesson 1: Geometry & Area Generation",
         "🎲 Lesson 2: Probability & Chance Space",
-        "📐 Lesson 3: Pythagorean Theorem Matrix" # <-- NEW Spoke Entry
+        "📐 Lesson 3: Pythagorean Theorem Matrix",
+        "🧠 Lesson 4: Neuro-Motor Reaction Experiment" # <- ADD THIS LINE
     ],
     horizontal=True,
     label_visibility="collapsed"
@@ -104,7 +107,7 @@ elif "Probability" in active_lesson:
     st.info("💡 **Watch the Distribution Form**\n\nNotice how the random binary choices at each peg naturally assemble into a Gaussian distribution.")
     render_probability_demo(sample_count=num_samples)
 
-# 3. Handle the dynamic input control matrix and render the Canvas view
+# --- LESSON 3: PYTHAGORUS ---
 elif "Pythagorean" in active_lesson:
     st.subheader("Geometric Visualization of $A^2 + B^2 = C^2$")
     
@@ -147,6 +150,55 @@ elif "Pythagorean" in active_lesson:
         # Launch browser GPU-accelerated Matter.js simulation frame
         # Routing the slider arguments directly into the synchronized view component parameters
         render_pythagorean_demo(a_units=side_a, b_units=side_b)
+
+# --- LESSON 4: FITT'S LAW ---
+elif "Neuro-Motor" in active_lesson:
+st.subheader("Fitts's Law: Quantitative Neuro-Motor Profiling")
+st.write("""
+Explore sensory-motor bandwidth limits by clicking home triggers and targets as quickly as possible.
+Your results are aggregated against our global cohort database in real time.
+""")
+
+experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
+
+# App ID mapping for strict Firestore pathing (Rule 1 Compliance)
+app_id = "neuroedu-career-hub"
+firebase_config = "{}" # Hydrate with your actual Streamlit Secrets dict
+user_uid = "anonymous_guest" # Or fetch dynamically if you implement standard auth
+
+with experiment_col:
+    st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
+    render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config, user_uid=user_uid)
+
+with analytics_col:
+    st.info("📈 **Cohort Performance Analysis**")
+    
+    try:
+        # Note: Replace this placeholder with your actual Firestore fetch logic
+        raw_fitts_data = [] 
+        
+        fig_regression, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
+        
+        if fig_regression:
+            st.plotly_chart(fig_regression, use_container_width=True, config=PLOTLY_CONFIG)
+            
+            # Educational LaTeX OLS Readout
+            st.markdown(f"""
+            <div style="background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 8px; border-left: 4px solid #10B981;">
+                <p style="margin: 0; font-size: 0.9rem; color: #94A3B8;"><b>OLS Statistical Formula Model:</b></p>
+                <p style="margin: 5px 0; font-size: 1.1rem; font-family: monospace; color:#10B981;">
+                    MT = {stats['intercept_a']} + {stats['slope_b']} &middot; ID
+                </p>
+                <p style="margin: 0; font-size: 0.8rem; color: #64748B;">
+                    Variance R²: <b>{stats['r_squared']}</b> | Model Significance p: <b>{stats['p_val']}</b>
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.warning(stats)
+    except Exception as err:
+        st.error(f"Failed to compile regression chart: {err}")
+
 
 st.divider()
 
