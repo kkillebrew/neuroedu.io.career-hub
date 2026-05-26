@@ -342,17 +342,20 @@ def render_pythagorean_demo(a_units, b_units):
                         context.lineCap = "square";
                         context.globalAlpha = 1.0; // Always visible
 
-                        // Side B (Height) - Coral Rose
+                        // NOTE: Matter.js reorders vertices clockwise starting from the top-most point.
+                        // verts[0] = Top Left, verts[1] = Bottom Right, verts[2] = Bottom Left.
+
+                        // Side B (Height: Top Left -> Bottom Left) - Coral Rose
                         context.beginPath(); context.moveTo(verts[0].x, verts[0].y); context.lineTo(verts[2].x, verts[2].y);
                         context.strokeStyle = "#F43F5E"; context.stroke();
 
-                        // Side A (Base) - Sky Blue
+                        // Side C (Hypotenuse: Top Left -> Bottom Right) - Emerald Green
                         context.beginPath(); context.moveTo(verts[0].x, verts[0].y); context.lineTo(verts[1].x, verts[1].y);
-                        context.strokeStyle = "#38BDF8"; context.stroke();
-
-                        // Side C (Hypotenuse) - Emerald Green
-                        context.beginPath(); context.moveTo(verts[1].x, verts[1].y); context.lineTo(verts[2].x, verts[2].y);
                         context.strokeStyle = "#10B981"; context.stroke();
+
+                        // Side A (Base: Bottom Right -> Bottom Left) - Sky Blue
+                        context.beginPath(); context.moveTo(verts[1].x, verts[1].y); context.lineTo(verts[2].x, verts[2].y);
+                        context.strokeStyle = "#38BDF8"; context.stroke();
 
                         if (elapsed > 12500) {{
                             context.fillStyle = "rgba(248, 250, 252, " + labelsOpacity + ")";
