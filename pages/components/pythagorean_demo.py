@@ -99,9 +99,10 @@ def render_pythagorean_demo(a_units, b_units):
                     const v2 = {{ x: sideA/2, y: sideB/2 }};   // Bottom Right
                     const v3 = {{ x: -sideA/2, y: -sideB/2 }}; // Top Left
 
-                    const triangleBody = Bodies.fromVertices(globalCX, globalCY, [v1, v2, v3], {{ 
+                    const triangleBody = Bodies.fromVertices(globalCX, globalCY, [v1, v2, v3], {{
                         isStatic: true, 
-                        collisionFilter: {{ category: CAT_TRIANGLE }} 
+                        collisionFilter: {{ category: CAT_TRIANGLE }},
+                        render: {{ visible: false }} // THE GHOST FIX: Hide default grey fill
                     }}, true);
 
                     const thick = 16; 
@@ -183,7 +184,10 @@ def render_pythagorean_demo(a_units, b_units):
                     // Box C automatically balances to line up perfectly across from the left stack
                     const targetCX = 580;
                     const targetCY = (targetBY + targetAY) / 2; 
-                    const targetTriY = height - 80;
+                    
+                    // Phase 4B Triangle Target (Bottom Right Quadrant)
+                    const targetTriX = width - 200;
+                    const targetTriY = height - 200;
 
                     // State Machine Expansion Vectors
                     let expTri, expA, expB, expC;
@@ -227,10 +231,12 @@ def render_pythagorean_demo(a_units, b_units):
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
                             let angle = easeP * Math.PI * 2; 
 
-                            [ {{b: triangleBody, loc: {{x:0, y:0, angle:0}}}}, 
-                              {{b: boxA, loc: locBoxA}}, 
-                              {{b: boxB, loc: locBoxB}}, 
-                              {{b: boxC, loc: locBoxC}} ].forEach(item => {{
+                            [
+                                // Redirect Triangle to the bottom right quadrant
+                                {{ b: triangleBody, tx: expTri.x + (targetTriX - expTri.x) * easeP, ty: expTri.y + (targetTriY - expTri.y) * easeP, tAng: 0 }},
+                                {{ b: boxA, tx: expA.x + (targetAX - expA.x) * easeP, ty: expA.y + (targetAY - expA.y) * easeP, tAng: locBoxA.angle * (1 - easeP) }}, 
+                                {{b: boxB, loc: locBoxB}}, 
+                                {{b: boxC, loc: locBoxC}} ].forEach(item => {{
                                 
                                 let oldX = item.b.position.x;
                                 let oldY = item.b.position.y;
@@ -327,15 +333,32 @@ def render_pythagorean_demo(a_units, b_units):
                         let elapsed = performance.now() - startTime;
                         context.save();
                         
-                        // Active runtime diagnostics completely scrubbed for production view.
+                        // --- THE GHOST OVERLAY (PAINTER'S ALGORITHM) ---
+                        // Because this executes after Render.run, it paints strictly ON TOP of the squares.
+                        let verts = triangleBody.vertices;
+                        context.lineWidth = 16;
+                        context.lineCap = "square";
+                        context.globalAlpha = 1.0; // Always visible
+
+                        // Side B (Height) - Coral Rose
+                        context.beginPath(); context.moveTo(verts[0].x, verts[0].y); context.lineTo(verts[2].x, verts[2].y);
+                        context.strokeStyle = "#F43F5E"; context.stroke();
+
+                        // Side A (Base) - Sky Blue
+                        context.beginPath(); context.moveTo(verts[0].x, verts[0].y); context.lineTo(verts[1].x, verts[1].y);
+                        context.strokeStyle = "#38BDF8"; context.stroke();
+
+                        // Side C (Hypotenuse) - Emerald Green
+                        context.beginPath(); context.moveTo(verts[1].x, verts[1].y); context.lineTo(verts[2].x, verts[2].y);
+                        context.strokeStyle = "#10B981"; context.stroke();
 
                         if (elapsed > 12500) {{
                             context.fillStyle = "rgba(248, 250, 252, " + labelsOpacity + ")";
                             context.font = "bold 48px sans-serif";
                             context.textAlign = "center";
                             
-                            // Align Plus Sign exactly in the vertical gap between Box A and B
-                            let plusY = (targetBY + sideB/2 + targetAY - sideA/2) / 2;
+                            // Explicit Algebraic Spacing for Operators
+                            let plusY = targetBY + sideB/2 + 40;
                             context.fillText("+", 200, plusY + 16);
                             context.fillText("=", 400, targetCY + 16);
 
