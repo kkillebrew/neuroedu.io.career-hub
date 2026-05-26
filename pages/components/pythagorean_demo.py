@@ -26,8 +26,9 @@ def render_pythagorean_demo(a_units, b_units):
     sideB = b_units * scale
     sideC = float((sideA**2 + sideB**2)**0.5)
 
-    countA = int(a_units**2 * 3)
-    countB = int(b_units**2 * 3)
+    # Pure geometric compliance: Number of marbles matches Area exactly (N = Units^2)
+    countA = int(a_units ** 2)
+    countB = int(b_units ** 2)
     countC = countA + countB
 
     html_code = f"""
@@ -144,16 +145,20 @@ def render_pythagorean_demo(a_units, b_units):
                     Composite.add(engine.world, [triangleBody, boxA, boxB, boxC]);
 
                     function spawnMarbles(box, count, color, size, catMarble, maskMarble) {{
+                        // DYNAMIC RADIAL SCALE: Scales marble size so small unit counts (e.g., 9) 
+                        // perfectly fill out their respective container bounds without stacking awkwardly.
+                        let dynamicRadius = Math.max(4.5, (size / Math.sqrt(count)) * 0.38);
+
                         for (let i = 0; i < count; i++) {{
-                            let lx = (Math.random() - 0.5) * (size - thick * 3);
-                            let ly = (Math.random() - 0.5) * (size - thick * 3);
+                            let lx = (Math.random() - 0.5) * (size - thick * 3.5);
+                            let ly = (Math.random() - 0.5) * (size - thick * 3.5);
                             let cos = Math.cos(box.angle);
                             let sin = Math.sin(box.angle);
                             
                             let marble = Bodies.circle(
                                 box.position.x + (lx * cos - ly * sin), 
                                 box.position.y + (lx * sin + ly * cos), 
-                                4.5, 
+                                dynamicRadius, 
                                 {{
                                     restitution: 0.1, friction: 0.05,
                                     render: {{ fillStyle: color }},
