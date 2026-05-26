@@ -68,7 +68,7 @@ def render_pythagorean_demo(a_units, b_units):
                           Events = Matter.Events,
                           Body = Matter.Body;
 
-                    const engine = Engine.create({ positionIterations: 16, velocityIterations: 16 });
+                    const engine = Engine.create({{ positionIterations: 16, velocityIterations: 16 }});
                     engine.gravity.y = 1.0;
 
                     const width = 800;
