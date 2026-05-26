@@ -174,21 +174,21 @@ def render_pythagorean_demo(a_units, b_units):
                     // --- RECALCULATED VERTICAL LAYOUT TARGETS (Text Buffer Adjusted) ---
                     // Pushing Box B down to y=250 provides a 100px buffer zone at the top of the canvas
                     // for the "Side B²" and "Vol" titles to render cleanly without truncation.
+                    // --- EXPLICIT ALGEBRAIC LAYOUT TARGETS ---
                     const targetBX = 200;
                     const targetBY = 250; 
                     
-                    // Increasing the vertical padding gap between Box B and Box A to 120px 
-                    // prevents the "Side A²" header from colliding with the "+" operator.
+                    const targetAY = targetBY + sideB/2 + 80 + 45 + sideA/2; 
                     const targetAX = 200;
-                    const targetAY = targetBY + sideB/2 + sideA/2 + 120; 
                     
-                    // Box C automatically balances to line up perfectly across from the left stack
                     const targetCX = 580;
                     const targetCY = (targetBY + targetAY) / 2; 
                     
-                    // Phase 4B Triangle Target (Bottom Right Quadrant)
-                    const targetTriX = width - 200;
-                    const targetTriY = height - 200;
+                    // THE TRIANGLE PLACEMENT FIX: Dynamically center the triangle perfectly 
+                    // in the empty space between the bottom of Box C and the canvas edge.
+                    const bottomOfBoxC = targetCY + sideC/2 + thick;
+                    const targetTriX = width - 150; // Tucked slightly to the right
+                    const targetTriY = (bottomOfBoxC + height) / 2;
 
                     // State Machine Expansion Vectors
                     let expTri, expA, expB, expC;
@@ -272,7 +272,9 @@ def render_pythagorean_demo(a_units, b_units):
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
 
                             let targets = [
-                                {{ b: triangleBody, tx: globalCX, ty: globalCY + 150 * easeP }},
+                                // THE CHOREOGRAPHY FIX: Triangle remains anchored perfectly at the center
+                                // of the viewport while the squares radially separate away from it.
+                                {{ b: triangleBody, tx: globalCX, ty: globalCY }}, 
                                 {{ b: boxA, tx: globalCX + locBoxA.x, ty: globalCY + locBoxA.y + 150 * easeP }},
                                 {{ b: boxB, tx: globalCX + locBoxB.x - 150 * easeP, ty: globalCY + locBoxB.y - 100 * easeP }},
                                 {{ b: boxC, tx: globalCX + locBoxC.x + 150 * easeP, ty: globalCY + locBoxC.y - 100 * easeP }}
@@ -390,7 +392,7 @@ def render_pythagorean_demo(a_units, b_units):
                             
                             context.font = "italic 16px sans-serif";
                             context.fillStyle = "rgba(148, 163, 184, " + labelsOpacity + ")";
-                            context.fillText("Empirical Density Match: " + countB + " + " + countA + " = " + countC, width / 2, 780);
+                            context.fillText("Empirical Density Match: " + countB + " + " + countA + " = " + countC, 250, 780);
                         }}
                         context.restore();
                     }});

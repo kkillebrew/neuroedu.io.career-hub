@@ -81,8 +81,8 @@ if "Geometry" in active_lesson:
         st.info("💡 **Adjust Dimensions**\n\nWatch how the space transforms in real-time.")
         
         # Sliders represent dimensions bounded safely between 2 and 10
-        b_units = st.slider("Base (b) Units", min_value=2, max_value=6, value=3, step=1)
-        h_units = st.slider("Height (h) Units", min_value=2, max_value=6, value=4, step=1)
+        b_units = st.slider("Base (b) Units", min_value=2, max_value=10, value=6, step=1)
+        h_units = st.slider("Height (h) Units", min_value=2, max_value=10, value=5, step=1)
         
         st.caption(f"**Total Area (Rect):** {b_units * h_units} units²\n\n**Total Area (Tri):** {(b_units * h_units)/2} units²")
         
@@ -105,9 +105,6 @@ elif "Probability" in active_lesson:
     render_probability_demo(sample_count=num_samples)
 
 # 3. Handle the dynamic input control matrix and render the Canvas view
-# =============================================================================
-# SPOKE LAYER ROUTING CONTROL MATRIX: LESSON 3 - PYTHAGOREAN THEOREM MATRIX
-# =============================================================================
 elif "Pythagorean" in active_lesson:
     st.subheader("Geometric Visualization of $A^2 + B^2 = C^2$")
     
@@ -120,8 +117,8 @@ elif "Pythagorean" in active_lesson:
         
         if input_mode == "Side Lengths":
             # Bounded between 3 and 8 to prevent physics viewport out-of-bounds clipping
-            side_a = st.slider("Base Dimension (Side A)", min_value=3, max_value=8, value=4, step=1)
-            side_b = st.slider("Height Dimension (Side B)", min_value=3, max_value=8, value=3, step=1)
+            side_a = st.slider("Base Dimension (Side A)", min_value=2, max_value=6, value=4, step=1)
+            side_b = st.slider("Height Dimension (Side B)", min_value=2, max_value=6, value=3, step=1)
         else:
             # Mathematical fallback conversion logic for dynamic angle mapping
             angle_theta = st.slider("Internal Angle (Θ°)", min_value=15, max_value=75, value=36, step=1)
