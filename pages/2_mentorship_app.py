@@ -153,51 +153,51 @@ elif "Pythagorean" in active_lesson:
 
 # --- LESSON 4: FITT'S LAW ---
 elif "Neuro-Motor" in active_lesson:
-st.subheader("Fitts's Law: Quantitative Neuro-Motor Profiling")
-st.write("""
-Explore sensory-motor bandwidth limits by clicking home triggers and targets as quickly as possible.
-Your results are aggregated against our global cohort database in real time.
-""")
+    st.subheader("Fitts's Law: Quantitative Neuro-Motor Profiling")
+    st.write("""
+    Explore sensory-motor bandwidth limits by clicking home triggers and targets as quickly as possible.
+    Your results are aggregated against our global cohort database in real time.
+    """)
 
-experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
+    experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
 
-# App ID mapping for strict Firestore pathing (Rule 1 Compliance)
-app_id = "neuroedu-career-hub"
-firebase_config = "{}" # Hydrate with your actual Streamlit Secrets dict
-user_uid = "anonymous_guest" # Or fetch dynamically if you implement standard auth
+    # App ID mapping for strict Firestore pathing (Rule 1 Compliance)
+    app_id = "neuroedu-career-hub"
+    firebase_config = "{}" # Hydrate with your actual Streamlit Secrets dict
+    user_uid = "anonymous_guest" # Or fetch dynamically if you implement standard auth
 
-with experiment_col:
-    st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
-    render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config, user_uid=user_uid)
+    with experiment_col:
+        st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
+        render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config, user_uid=user_uid)
 
-with analytics_col:
-    st.info("📈 **Cohort Performance Analysis**")
-    
-    try:
-        # Note: Replace this placeholder with your actual Firestore fetch logic
-        raw_fitts_data = [] 
+    with analytics_col:
+        st.info("📈 **Cohort Performance Analysis**")
         
-        fig_regression, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
-        
-        if fig_regression:
-            st.plotly_chart(fig_regression, use_container_width=True, config=PLOTLY_CONFIG)
+        try:
+            # Note: Replace this placeholder with your actual Firestore fetch logic
+            raw_fitts_data = [] 
             
-            # Educational LaTeX OLS Readout
-            st.markdown(f"""
-            <div style="background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 8px; border-left: 4px solid #10B981;">
-                <p style="margin: 0; font-size: 0.9rem; color: #94A3B8;"><b>OLS Statistical Formula Model:</b></p>
-                <p style="margin: 5px 0; font-size: 1.1rem; font-family: monospace; color:#10B981;">
-                    MT = {stats['intercept_a']} + {stats['slope_b']} &middot; ID
-                </p>
-                <p style="margin: 0; font-size: 0.8rem; color: #64748B;">
-                    Variance R²: <b>{stats['r_squared']}</b> | Model Significance p: <b>{stats['p_val']}</b>
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.warning(stats)
-    except Exception as err:
-        st.error(f"Failed to compile regression chart: {err}")
+            fig_regression, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
+            
+            if fig_regression:
+                st.plotly_chart(fig_regression, use_container_width=True, config=PLOTLY_CONFIG)
+                
+                # Educational LaTeX OLS Readout
+                st.markdown(f"""
+                <div style="background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 8px; border-left: 4px solid #10B981;">
+                    <p style="margin: 0; font-size: 0.9rem; color: #94A3B8;"><b>OLS Statistical Formula Model:</b></p>
+                    <p style="margin: 5px 0; font-size: 1.1rem; font-family: monospace; color:#10B981;">
+                        MT = {stats['intercept_a']} + {stats['slope_b']} &middot; ID
+                    </p>
+                    <p style="margin: 0; font-size: 0.8rem; color: #64748B;">
+                        Variance R²: <b>{stats['r_squared']}</b> | Model Significance p: <b>{stats['p_val']}</b>
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.warning(stats)
+        except Exception as err:
+            st.error(f"Failed to compile regression chart: {err}")
 
 
 st.divider()
