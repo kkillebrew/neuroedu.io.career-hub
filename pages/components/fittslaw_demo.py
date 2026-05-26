@@ -157,7 +157,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                         
                         drawFrame();
                     }}
-                } 
+                }} 
                 else if (currentPhase === "TARGET") {{
                     let dist = Math.hypot(mouseX - activeTarget.x, mouseY - activeTarget.y);
                     if (dist < (activeTarget.w / 2)) {{
