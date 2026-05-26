@@ -94,15 +94,15 @@ def render_pythagorean_demo(a_units, b_units):
                     const CAT_MARBLE_C = 0x0040;
 
                     // --- FLAWLESS GEOMETRIC ALIGNMENT MATRIX ---
-                    // Explicit right triangle coordinates relative to 0,0
-                    const v1 = {{ x: -sideA/2, y: sideB/2 }};  // Bottom Left (Right Angle)
-                    const v2 = {{ x: sideA/2, y: sideB/2 }};   // Bottom Right
-                    const v3 = {{ x: -sideA/2, y: -sideB/2 }}; // Top Left
+                    // Explicit right triangle coordinates relative to the geometric Centroid (1/3)
+                    const v1 = {{ x: -sideA/3, y: sideB/3 }};       // Bottom Left (Right Angle)
+                    const v2 = {{ x: 2*sideA/3, y: sideB/3 }};      // Bottom Right
+                    const v3 = {{ x: -sideA/3, y: -2*sideB/3 }};    // Top Left
 
                     const triangleBody = Bodies.fromVertices(globalCX, globalCY, [v1, v2, v3], {{
                         isStatic: true, 
-                        collisionFilter: {{ category: CAT_TRIANGLE }},
-                        render: {{ visible: false }} // THE GHOST FIX: Hide default grey fill
+                        isSensor: true, // THE GHOST FIX: Makes it pass through all boxes and marbles!
+                        render: {{ visible: false }} 
                     }}, true);
 
                     const thick = 16; 
@@ -118,26 +118,27 @@ def render_pythagorean_demo(a_units, b_units):
                             Bodies.rectangle(h, 0, thick, w, {{ render: {{ fillStyle: wallColor, opacity: 0 }}, collisionFilter: {{ category: catBox, mask: maskBox }} }})
                         ];
                         
-                        // THE BROADPHASE FIX: We explicitly pass the collision filters 
-                        // to the parent constructor so the engine maps the auto-generated hull!
-                        const box = Body.create({{ 
+                        const box = Body.create({{
                             parts: parts, 
                             isStatic: true,
-                            collisionFilter: {{ category: catBox, mask: maskBox }} 
+                            collisionFilter: {{ category: catBox, mask: maskBox }}
                         }});
                         Body.setPosition(box, {{ x: globalCX + localX, y: globalCY + localY }});
                         Body.setAngle(box, angle);
                         return box;
                     }}
 
-                    // Calculate perfect flush surface anchors
-                    const locBoxA = {{ x: 0, y: sideB/2 + sideA/2 + thick/2, angle: 0 }}; // Base
-                    const locBoxB = {{ x: -sideA/2 - sideB/2 - thick/2, y: 0, angle: 0 }}; // Height
+                    // Calculate perfect flush surface anchors relative to the Centroid
+                    const locBoxA = {{ x: sideA/6, y: sideB/3 + sideA/2 + thick/2, angle: 0 }};
+                    const locBoxB = {{ x: -sideA/3 - sideB/2 - thick/2, y: -sideB/6, angle: 0 }};
                     
-                    const angleHyp = Math.atan2(-sideB, -sideA);
-                    const normX = Math.sin(-angleHyp); 
-                    const normY = Math.cos(-angleHyp);
-                    const locBoxC = {{ x: normX * (sideC/2 + thick/2), y: normY * (sideC/2 + thick/2), angle: angleHyp }}; // Hypotenuse
+                    const normCX = sideB / sideC;
+                    const normCY = -sideA / sideC;
+                    const locBoxC = {{
+                        x: sideA/6 + normCX * (sideC/2 + thick/2), 
+                        y: -sideB/6 + normCY * (sideC/2 + thick/2), 
+                        angle: Math.atan2(-sideB, -sideA) 
+                    }};
 
                     const boxA = createSquareContainer(locBoxA.x, locBoxA.y, sideA, locBoxA.angle, CAT_BOX_A, CAT_MARBLE_A);
                     const boxB = createSquareContainer(locBoxB.x, locBoxB.y, sideB, locBoxB.angle, CAT_BOX_B, CAT_MARBLE_B);
@@ -231,13 +232,13 @@ def render_pythagorean_demo(a_units, b_units):
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
                             let angle = easeP * Math.PI * 2; 
 
+                            // RESTORED ORBITAL MATRIX: Using radial loc targets, not linear tx targets!
                             [
-                                // Redirect Triangle to the bottom right quadrant
-                                {{ b: triangleBody, tx: expTri.x + (targetTriX - expTri.x) * easeP, ty: expTri.y + (targetTriY - expTri.y) * easeP, tAng: 0 }},
-                                {{ b: boxA, tx: expA.x + (targetAX - expA.x) * easeP, ty: expA.y + (targetAY - expA.y) * easeP, tAng: locBoxA.angle * (1 - easeP) }}, 
-                                {{b: boxB, loc: locBoxB}}, 
-                                {{b: boxC, loc: locBoxC}} ].forEach(item => {{
-                                
+                                {{ b: triangleBody, loc: {{x:0, y:0, angle:0}} }},
+                                {{ b: boxA, loc: locBoxA }}, 
+                                {{ b: boxB, loc: locBoxB }}, 
+                                {{ b: boxC, loc: locBoxC }} 
+                            ].forEach(item => {{
                                 let oldX = item.b.position.x;
                                 let oldY = item.b.position.y;
                                 let oldAngle = item.b.angle;
@@ -304,7 +305,8 @@ def render_pythagorean_demo(a_units, b_units):
                             let easeP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
 
                             [
-                                {{ b: triangleBody, tx: expTri.x, ty: expTri.y + (targetTriY - expTri.y) * easeP, tAng: 0 }},
+                                // Restored Triangle Translation Matrix (Moving to Bottom Right)
+                                {{ b: triangleBody, tx: expTri.x + (targetTriX - expTri.x) * easeP, ty: expTri.y + (targetTriY - expTri.y) * easeP, tAng: 0 }},
                                 {{ b: boxA, tx: expA.x + (targetAX - expA.x) * easeP, ty: expA.y + (targetAY - expA.y) * easeP, tAng: locBoxA.angle * (1 - easeP) }},
                                 {{ b: boxB, tx: expB.x + (targetBX - expB.x) * easeP, ty: expB.y + (targetBY - expB.y) * easeP, tAng: locBoxB.angle * (1 - easeP) }},
                                 {{ b: boxC, tx: expC.x + (targetCX - expC.x) * easeP, ty: expC.y + (targetCY - expC.y) * easeP, tAng: locBoxC.angle * (1 - easeP) }}
