@@ -46,9 +46,32 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
 
         <script>
             // --- FIREBASE CLOUD SETUP (Rule 1 & Rule 3 Compliance) ---
-            const firebaseConfig = {firebase_config};
+            // 1. Receive raw JSON string from Python and parse it back into a JavaScript object
+            const firebaseConfig = JSON.parse('{firebase_config}'); 
             const appId = "{app_id}";
             const userUid = "{user_uid}";
+
+            let db = null;
+            let auth = null;
+            let currentUser = null;
+
+            try {{
+                // 2. Initialize only if the API key exists and isn't the placeholder
+                if (firebaseConfig && firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {{
+                    firebase.initializeApp(firebaseConfig);
+                    db = firebase.firestore();
+                    auth = firebase.auth();
+
+                    auth.signInAnonymously().then(cred => {{
+                        currentUser = cred.user;
+                        console.log("Authenticated successfully with Firebase.");
+                    }}).catch(err => console.error("Authentication setup failed: ", err));
+                }} else {{
+                    console.warn("Keys missing or default. Running canvas in Sandbox Mode.");
+                }}
+            }} catch (e) {{
+                console.error("Database connection failed. Entering local Sandbox:", e);
+            }}
 
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
@@ -190,17 +213,20 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             }});
 
             function commitSessionData() {{
-                drawHUDMessage("Writing Empirical Metrics...", "Synchronizing local spatial trial logs securely with global Firestore repository.");
-
-                if (!currentUser) {{
-                    drawHUDMessage("Network Access Failure", "Authentication channel is disconnected. Please refresh the page.");
+                // Guardrail: Fallback exit sequence if running without an active Firebase config
+                if (!db || !currentUser) {{
+                    drawHUDMessage("Session Complete (Sandbox Mode)", "Connect your Firebase credentials to unlock live database writing.");
+                    document.getElementById("btn-start").style.display = "inline";
+                    document.getElementById("btn-start").innerText = "Restart Session";
                     return;
                 }}
 
-                // Assemble batch storage updates (Strict Rule 1 Compliance)
+                drawHUDMessage("Writing Empirical Metrics...", "Synchronizing spatial trial logs securely with database.");
+
                 const batch = db.batch();
                 sessionData.forEach(trial => {{
-                    const docRef = db.collection('artifacts').doc(appId).collection('public').document('data').collection('fitts_trials').doc();
+                    // Strict Rule 1 Pathing mapping
+                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('fitts_trials').doc();
                     batch.set(docRef, {{
                         user_id: userUid,
                         amplitude: trial.amplitude,
@@ -212,12 +238,12 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                 }});
 
                 batch.commit().then(() => {{
-                    drawHUDMessage("Session Synced Successfully!", "Results uploaded to cohort model. Please click outside to compile regression plots.");
+                    drawHUDMessage("Session Synced!", "Data posted. Click anywhere outside the module to compile OLS plots.");
                     document.getElementById("btn-start").style.display = "inline";
-                    document.getElementById("btn-start").innerText = "Restart Experiment";
+                    document.getElementById("btn-start").innerText = "Restart Session";
                 }}).catch(err => {{
-                    console.error("Database Write Crash: ", err);
-                    drawHUDMessage("Database Sync Interrupted", err.message);
+                    console.error("Database Write Error: ", err);
+                    drawHUDMessage("Sync Failure", err.message);
                 }});
             }}
         </script>

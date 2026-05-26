@@ -161,20 +161,36 @@ elif "Neuro-Motor" in active_lesson:
 
     experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
 
-    # App ID mapping for strict Firestore pathing (Rule 1 Compliance)
+    # --- FIREBASE CREDENTIALS ---
+    # Replace these placeholder strings with your actual Firebase config keys
+    # MATLAB Bridge: This is your database connection struct
+    firebase_config_dict = {
+        apiKey: "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
+          authDomain: "neuroedu-career-hub.firebaseapp.com",
+          projectId: "neuroedu-career-hub",
+          storageBucket: "neuroedu-career-hub.firebasestorage.app",
+          messagingSenderId: "1068398164186",
+          appId: "1:1068398164186:web:093262de26300585618de3"
+    }
+
+    # Convert the Python dictionary to a JSON string so it safely passes into JavaScript
+    import json
+    firebase_config_str = json.dumps(firebase_config_dict)
+
     app_id = "neuroedu-career-hub"
-    firebase_config = "{}" # Hydrate with your actual Streamlit Secrets dict
-    user_uid = "anonymous_guest" # Or fetch dynamically if you implement standard auth
+    user_uid = "anonymous_guest"
 
     with experiment_col:
         st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
-        render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config, user_uid=user_uid)
+        # Pipe the config string directly down to the canvas component
+        render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config_str, user_uid=user_uid)
 
     with analytics_col:
         st.info("📈 **Cohort Performance Analysis**")
         
         try:
-            # Note: Replace this placeholder with your actual Firestore fetch logic
+            # We will wire up the actual Firestore fetch logic in the next phase
+            # For now, pass an empty list to avoid crashing the UI
             raw_fitts_data = [] 
             
             fig_regression, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
@@ -182,7 +198,6 @@ elif "Neuro-Motor" in active_lesson:
             if fig_regression:
                 st.plotly_chart(fig_regression, use_container_width=True, config=PLOTLY_CONFIG)
                 
-                # Educational LaTeX OLS Readout
                 st.markdown(f"""
                 <div style="background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 8px; border-left: 4px solid #10B981;">
                     <p style="margin: 0; font-size: 0.9rem; color: #94A3B8;"><b>OLS Statistical Formula Model:</b></p>
