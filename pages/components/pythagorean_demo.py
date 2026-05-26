@@ -169,14 +169,21 @@ def render_pythagorean_demo(a_units, b_units):
                         }}
                     }}
 
-                    // --- VERTICAL LAYOUT TARGETS (No overlaps allowed) ---
+                    // --- RECALCULATED VERTICAL LAYOUT TARGETS (Text Buffer Adjusted) ---
+                    // Pushing Box B down to y=250 provides a 100px buffer zone at the top of the canvas
+                    // for the "Side B²" and "Vol" titles to render cleanly without truncation.
                     const targetBX = 200;
-                    const targetBY = 190;
+                    const targetBY = 250; 
+                    
+                    // Increasing the vertical padding gap between Box B and Box A to 120px 
+                    // prevents the "Side A²" header from colliding with the "+" operator.
                     const targetAX = 200;
-                    const targetAY = targetBY + sideB/2 + sideA/2 + 100; // Stacked directly below B
+                    const targetAY = targetBY + sideB/2 + sideA/2 + 120; 
+                    
+                    // Box C automatically balances to line up perfectly across from the left stack
                     const targetCX = 580;
-                    const targetCY = (targetBY + targetAY) / 2; // Vertically centered to the stack
-                    const targetTriY = height - 100;
+                    const targetCY = (targetBY + targetAY) / 2; 
+                    const targetTriY = height - 80;
 
                     // State Machine Expansion Vectors
                     let expTri, expA, expB, expC;
@@ -320,27 +327,8 @@ def render_pythagorean_demo(a_units, b_units):
                         let elapsed = performance.now() - startTime;
                         context.save();
                         
-                        context.font = "bold 15px sans-serif";
-                        context.fillStyle = "#64748B";
-                        context.fillText("Active State Engine Metrics", 25, 40);
-                        
-                        context.font = "14px sans-serif";
-                        context.fillStyle = elapsed <= 3000 ? "#38BDF8" : "#475569";
-                        context.fillText("Phase 1: Settlement & Growth", 25, 65);
-                        
-                        context.fillStyle = (elapsed > 3000 && elapsed <= 4000) ? "#38BDF8" : "#475569";
-                        context.fillText("Phase 2: Populate Mass Arrays", 25, 88);
+                        // Active runtime diagnostics completely scrubbed for production view.
 
-                        context.fillStyle = (elapsed > 4000 && elapsed <= 8000) ? "#38BDF8" : "#475569";
-                        context.fillText("Phase 3: Orbit Kinematics", 25, 111);
-                        
-                        context.fillStyle = (elapsed > 9000 && elapsed <= 13000) ? "#38BDF8" : "#475569";
-                        context.fillText("Phase 4: Matrix Linearization", 25, 134);
-
-                        context.fillStyle = elapsed > 13000 ? "#10B981" : "#475569";
-                        context.fillText("Phase 5: Equation Equilibrium", 25, 157);
-
-                        // High contrast equation HUD mapping sequence
                         if (elapsed > 12500) {{
                             context.fillStyle = "rgba(248, 250, 252, " + labelsOpacity + ")";
                             context.font = "bold 48px sans-serif";
@@ -351,26 +339,26 @@ def render_pythagorean_demo(a_units, b_units):
                             context.fillText("+", 200, plusY + 16);
                             context.fillText("=", 400, targetCY + 16);
 
-                            // Top Left: Box B 
+                            // Top Left Stack: Box B Titles (Anchored safely above Box B)
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(244, 63, 94, " + labelsOpacity + ")";
-                            context.fillText("Side B²", 200, targetBY - sideB/2 - 40);
+                            context.fillText("Side B²", 200, targetBY - sideB/2 - 45);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + (b_units * b_units) + " units²", 200, targetBY - sideB/2 - 15);
+                            context.fillText("Vol = " + (b_units * b_units) + " units²", 200, targetBY - sideB/2 - 20);
 
-                            // Bottom Left: Box A
+                            // Bottom Left Stack: Box A Titles (Anchored safely above Box A)
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(56, 189, 248, " + labelsOpacity + ")";
-                            context.fillText("Side A²", 200, targetAY - sideA/2 - 40);
+                            context.fillText("Side A²", 200, targetAY - sideA/2 - 45);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + (a_units * a_units) + " units²", 200, targetAY - sideA/2 - 15);
+                            context.fillText("Vol = " + (a_units * a_units) + " units²", 200, targetAY - sideA/2 - 20);
 
-                            // Right Column: Box C
+                            // Right Column: Box C Titles (Anchored safely above Box C)
                             context.font = "bold 20px sans-serif";
                             context.fillStyle = "rgba(16, 185, 129, " + labelsOpacity + ")";
-                            context.fillText("Hypotenuse C²", 580, targetCY - sideC/2 - 40);
+                            context.fillText("Hypotenuse C²", 580, targetCY - sideC/2 - 45);
                             context.font = "14px sans-serif";
-                            context.fillText("Vol = " + Math.round(a_units*a_units + b_units*b_units) + " units²", 580, targetCY - sideC/2 - 15);
+                            context.fillText("Vol = " + Math.round(a_units*a_units + b_units*b_units) + " units²", 580, targetCY - sideC/2 - 20);
                             
                             context.font = "italic 16px sans-serif";
                             context.fillStyle = "rgba(148, 163, 184, " + labelsOpacity + ")";
