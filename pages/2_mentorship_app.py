@@ -159,9 +159,18 @@ elif "Pythagorean" in active_lesson:
 # --- LESSON 4: FITT'S LAW ---
 elif "Neuro-Motor" in active_lesson:
     st.subheader("Fitts's Law: Quantitative Neuro-Motor Profiling")
-    st.write("""
-    Explore sensory-motor bandwidth limits by clicking home triggers and targets as quickly as possible.
-    Your results are aggregated against our global cohort database in real time.
+    
+    # 1. EXPANDED EXPERIMENT DESCRIPTION
+    st.markdown("""
+    **The Science of Sensory-Motor Bandwidth** In 1954, Paul Fitts proposed that the human motor system operates much like a telecommunications channel. There is a fundamental, inescapable trade-off between the **speed** of a movement and the **accuracy** required to complete it. 
+    
+    In this experiment, you are generating real-time psychophysics data. By rapidly acquiring targets of varying distances (Amplitude) and sizes (Width), we are mapping the maximum rate at which your brain can process visual spatial information and translate it into muscle kinematics.
+    """)
+
+    # 2. THE HYPOTHESIS
+    st.info("""
+    🧪 **The Scientific Hypothesis** We hypothesize that the time it takes to move to a target ($MT$) will increase linearly as the mathematical difficulty of the task—known as the Index of Difficulty ($ID$)—increases.  
+    **$MT = a + b \cdot \log_2(2A/W)$** *(Where $A$ is Amplitude, $W$ is Target Width, and $ID$ is measured in \"bits\" of information).*
     """)
 
     experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
@@ -179,7 +188,6 @@ elif "Neuro-Motor" in active_lesson:
     import json
     firebase_config_str = json.dumps(firebase_config_dict)
 
-    # 1. Generate Anonymous Tracking ID (No IPs, 100% Privacy Compliant)
     if 'fitts_user_id' not in st.session_state:
         st.session_state.fitts_user_id = f"anon_{uuid.uuid4().hex[:8]}"
     
@@ -195,7 +203,7 @@ elif "Neuro-Motor" in active_lesson:
         st.info("📈 **Cohort Performance Analysis**")
         
         try:
-            # 2. Fetch Data directly via Firestore REST API (Using API Key Authorization)
+            # Fetch Data directly via Firestore REST API
             api_key = firebase_config_dict["apiKey"]
             rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials?key={api_key}"
             
@@ -206,7 +214,6 @@ elif "Neuro-Motor" in active_lesson:
                 docs = response.json().get('documents', [])
                 for doc in docs:
                     fields = doc.get('fields', {})
-                    # Transform nested Google JSON into a flat dictionary
                     try:
                         raw_fitts_data.append({
                             'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
@@ -216,32 +223,70 @@ elif "Neuro-Motor" in active_lesson:
                     except Exception:
                         continue
             
-            # 3. Process Data (Pass to the loader)
+            # Process Data
             fig_reg, fig_swarm, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
             
             if fig_reg:
-                # Build interactive tabs for the two views
-                tab1, tab2 = st.tabs(["Linear Regression", "Trial Distributions"])
+                tab1, tab2 = st.tabs(["Linear Regression (Bandwidth)", "Trial Distributions (Variance)"])
+                
+                # 3. PLOT DESCRIPTIONS IN TABS
                 with tab1:
+                    st.caption("""
+                    **How to read this plot:** The slope of the dashed line ($b$) represents your \"information processing rate.\" 
+                    A **flatter (lower) slope** means you are highly efficient—difficulty barely slows you down. 
+                    Compare your Bright Red averages to the Bright Green cohort averages to see your relative processing speed.
+                    """)
                     st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)
+                
                 with tab2:
+                    st.caption("""
+                    **How to read this plot:** Fitts's Law requires averaging, but looking at raw variance is crucial. 
+                    The vertical spread of the faded red dots shows your intra-subject noise (consistency). 
+                    The white star pinpoints exactly where your average execution speed sits relative to the rest of the global population at that specific difficulty tier.
+                    """)
                     st.plotly_chart(fig_swarm, use_container_width=True, config=PLOTLY_CONFIG)
                 
+                # 4. STATS SECTION & DUAL OLS READOUT
                 st.markdown(f"""
-                <div style="background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 8px; border-left: 4px solid #10B981;">
-                    <p style="margin: 0; font-size: 0.9rem; color: #94A3B8;"><b>OLS Statistical Formula Model:</b></p>
-                    <p style="margin: 5px 0; font-size: 1.1rem; font-family: monospace; color:#10B981;">
-                        MT = {stats['intercept_a']} + {stats['slope_b']} &middot; ID
+                <div style="background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #38BDF8; margin-bottom: 15px;">
+                    <p style="margin: 0 0 10px 0; font-size: 1rem; color: #E2E8F0;"><b>Statistical Significance & OLS Modeling</b></p>
+                    <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #94A3B8;">
+                    To prove the hypothesis, we run an Ordinary Least Squares (OLS) regression to check if the Index of Difficulty has a statistically significant effect on Movement Time (testing the null hypothesis $H_0: b = 0$). A p-value < 0.05 confirms the Fitts's Law effect is present in the data.
                     </p>
-                    <p style="margin: 0; font-size: 0.8rem; color: #64748B;">
-                        Variance R²: <b>{stats['r_squared']}</b> | Model Significance p: <b>{stats['p_val']}</b>
-                    </p>
+                    
+                    <div style="display: flex; justify-content: space-between; border-top: 1px solid #334155; padding-top: 10px;">
+                        <div style="width: 48%;">
+                            <span style="font-size: 0.8rem; color: #EF4444; font-weight: bold;">YOUR MOTOR PROFILE</span><br>
+                            <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['user']['intercept_a']} + {stats['user']['slope_b']} &middot; ID</span><br>
+                            <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['user']['r_squared']}</span><br>
+                            <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['user']['p_val']}</b></span>
+                        </div>
+                        <div style="border-left: 1px solid #334155; margin: 0 10px;"></div>
+                        <div style="width: 48%;">
+                            <span style="font-size: 0.8rem; color: #22C55E; font-weight: bold;">GLOBAL COHORT PROFILE</span><br>
+                            <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['global']['intercept_a']} + {stats['global']['slope_b']} &middot; ID</span><br>
+                            <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['global']['r_squared']}</span><br>
+                            <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['global']['p_val']}</b></span>
+                        </div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
             else:
                 st.warning(stats)
         except Exception as err:
             st.error(f"Failed to compile regression chart: {err}")
+
+    # 5. DISCUSSION & CITATIONS
+    st.markdown("""
+    ---
+    #### **Discussion & Conclusions**
+    As observed in the significant p-values above, human movement is not simply determined by how far away an object is; it is strictly governed by the ratio of distance to target size. The implications of this formula heavily dictate modern UI/UX software design (e.g., placing critical buttons like the 'Start Menu' at the corners of screens, which grants them an essentially infinite 'Width' and dramatically lowers their Index of Difficulty). 
+    
+    *References:*
+    * Fitts, P. M. (1954). The information capacity of the human motor system in controlling the amplitude of movement. *Journal of Experimental Psychology*, 47(6), 381–391.
+    * MacKenzie, I. S. (1992). Fitts' Law as a research and design tool in human-computer interaction. *Human-Computer Interaction*, 7(1), 91-139.
+    """)
 
 
 st.divider()

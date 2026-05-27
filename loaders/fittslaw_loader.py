@@ -157,12 +157,21 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         yaxis=dict(title="Movement Time (ms)", gridcolor="rgba(148, 163, 184, 0.12)")
     )
 
-    # Return the Active User's specific statistical profile to the dashboard text block
+    # Pack BOTH statistical parameters for display inside the dashboard
     stats_summary = {
-        'intercept_a': round(int_u, 1),
-        'slope_b': round(slope_u, 1),
-        'r_squared': round(r_u ** 2, 3),
-        'p_val': round(p_u, 4)
+        'user': {
+            'intercept_a': round(int_u, 1),
+            'slope_b': round(slope_u, 1),
+            'r_squared': round(r_u ** 2, 3),
+            'p_val': round(p_u, 4) if p_u >= 0.0001 else "<0.0001"
+        },
+        'global': {
+            'intercept_a': round(int_g, 1),
+            'slope_b': round(slope_g, 1),
+            'r_squared': round(r_g ** 2, 3),
+            'p_val': round(p_g, 4) if p_g >= 0.0001 else "<0.0001"
+        }
     }
 
+    # Return BOTH figures along with the dual stats dictionary
     return fig_reg, fig_swarm, stats_summary
