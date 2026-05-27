@@ -180,6 +180,12 @@ elif "Neuro-Motor" in active_lesson:
     you are mapping the logarithmic trade-off between movement speed and target accuracy.
     """)
     
+    # --- RESTORED: SESSION INITIALIZATION CHECK ---
+    # MATLAB Equivalent: if ~isfield(session_state, 'fitts_user_id') ... end
+    if 'fitts_user_id' not in st.session_state:
+        st.session_state.fitts_user_id = f"anon_{uuid.uuid4().hex[:8]}"
+    
+    # Now we can safely query the state struct
     user_uid = st.session_state.fitts_user_id
     app_id = "neuroedu-career-hub"
     project_id = firebase_config_dict["projectId"]
