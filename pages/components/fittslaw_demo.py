@@ -5,18 +5,13 @@ AUTHOR: Kyle W. Killebrew, PhD & Data Science Mentorship Engine
 STATUS: Active Production Blueprint (Lesson 4)
 DESCRIPTION:
     A high-speed HTML5 Canvas reaction-time engine tracking Fitts's Law.
-    Captures target amplitude (A), width (W), and movement time (MT).
-    Writes empirical data records directly to Firestore.
+    Includes High-DPI (Retina) display scaling and dynamic responsive resizing.
 =============================================================================
 """
 
 import streamlit.components.v1 as components
 
 def render_fittslaw_demo(app_id, firebase_config, user_uid):
-    """
-    Renders an interactive reaction grid inside a Streamlit HTML5 iFrame.
-    Pipes Firebase connection metadata directly into client-side JS.
-    """
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -26,7 +21,6 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
         <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
         <style>
             body {{ margin: 0; padding: 0; background-color: #0F172A; font-family: sans-serif; color: #F8FAFC; overflow: hidden; }}
-            /* Responsive Matrix: Fills container up to 1000px */
             canvas {{ display: block; margin: 10px auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.55); cursor: crosshair; width: 100%; max-width: 1000px; height: auto; aspect-ratio: 2 / 1; }}
             #control-panel {{ text-align: center; margin-top: 5px; }}
             .btn {{ background-color: #6366F1; color: white; border: none; padding: 10px 20px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }}
@@ -40,7 +34,9 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             <div>Current ID: <span id="lbl-id" style="color: #10B981; font-weight:bold;">-- bits</span></div>
             <div>Mean MT: <span id="lbl-mt" style="color: #F59E0B; font-weight:bold;">-- ms</span></div>
         </div>
-        <canvas id="canvas-fitts" width="800" height="400"></canvas>
+        
+        <canvas id="canvas-fitts"></canvas>
+        
         <div id="control-panel">
             <button id="btn-start" class="btn" onclick="initiateSession()">Start Experiment Session</button>
         </div>
@@ -58,7 +54,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                         firebase.initializeApp(firebaseConfig);
                     }}
                     db = firebase.firestore();
-                    console.log("Firebase connected successfully via Python REST Bridge.");
+                    console.log("Firebase connected successfully.");
                 }}
             }} catch (e) {{
                 console.error("Database bypass: ", e);
@@ -67,6 +63,17 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             const canvas = document.getElementById("canvas-fitts");
             const ctx = canvas.getContext("2d");
             
+            // --- HIGH-DPI (RETINA) SCALING MATRICES ---
+            const logicalWidth = 800;
+            const logicalHeight = 400;
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Multiply internal memory grid by screen pixel density
+            canvas.width = logicalWidth * dpr;
+            canvas.height = logicalHeight * dpr;
+            // Scale rendering engine to map 1 logical unit to DPR physical pixels
+            ctx.scale(dpr, dpr);
+
             let trialCount = 0;
             const maxTrials = 10;
             let activeTarget = null; 
@@ -76,15 +83,15 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             let sessionData = [];
 
             function drawHUDMessage(msg, submsg) {{
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.clearRect(0, 0, logicalWidth, logicalHeight);
                 ctx.fillStyle = "#F8FAFC";
                 ctx.font = "bold 24px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText(msg, canvas.width/2, canvas.height/2 - 20);
+                ctx.fillText(msg, logicalWidth/2, logicalHeight/2 - 20);
                 
                 ctx.fillStyle = "#94A3B8";
                 ctx.font = "16px sans-serif";
-                ctx.fillText(submsg, canvas.width/2, canvas.height/2 + 15);
+                ctx.fillText(submsg, logicalWidth/2, logicalHeight/2 + 15);
             }}
 
             drawHUDMessage("Fitts's Law Neuro-Motor Control Rig", "Click 'Start Experiment Session' below to begin testing your visual-motor bandwidth.");
@@ -98,7 +105,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             }}
 
             function drawFrame() {{
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 if (currentPhase === "HOME") {{
                     ctx.beginPath();
@@ -132,11 +139,10 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             canvas.addEventListener("mousedown", function(e) {{
                 const rect = canvas.getBoundingClientRect();
                 
-                // Dynamic translation scale matrix: Calculates CSS contraction ratio
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
+                // Maps the dynamically stretched CSS bounds directly back to the 800x400 grid
+                const scaleX = logicalWidth / rect.width;
+                const scaleY = logicalHeight / rect.height;
                 
-                // Translate raw viewport mouse clicks to native high-res coordinates
                 const mouseX = (e.clientX - rect.left) * scaleX;
                 const mouseY = (e.clientY - rect.top) * scaleY;
 
@@ -229,5 +235,5 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
     </body>
     </html>
     """
-    # Expanded iFrame viewport bounds to fit the full-width layout parameters cleanly
-    components.html(html_code, height=540)
+    # Increased iFrame wrapper height to 650px to ensure the button is never clipped
+    components.html(html_code, height=650)
