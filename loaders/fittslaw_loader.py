@@ -50,16 +50,15 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     # ---------------------------------------------------------
     # STEP 2: STATISTICAL REGRESSION (OLS)
     # ---------------------------------------------------------
-    # Regress for Current User
+    # Regress for Current User (Check for variance first)
+    user_has_model = False
     try:
-        # Check if we have enough distinct ID points to run a regression (Min 2 points)
         if df_you_mean['index_difficulty'].nunique() >= 2:
             slope_u, int_u, r_u, p_u, _ = linregress(df_you_mean['index_difficulty'], df_you_mean['movement_time'])
+            user_has_model = True
         else:
-            # Raise error to trigger the 'except' block if variation is insufficient
             raise ValueError("Insufficient variance")
     except Exception:
-        # Fallback values when the user hasn't played enough or varied difficulty enough
         slope_u, int_u, r_u, p_u = 0, 0, 0, 1
 
     # Regress for Global Cohort
@@ -110,11 +109,13 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         mode='lines', name='Global OLS',
         line=dict(color='rgba(34, 197, 94, 0.7)', dash='dash', width=2)
     ))
-    fig_reg.add_trace(go.Scatter(
-        x=id_range, y=(slope_u * id_range + int_u),
-        mode='lines', name='Your Motor OLS',
-        line=dict(color='rgba(239, 68, 68, 1)', dash='dash', width=2.5)
-    ))
+    
+    if user_has_model:
+        fig_reg.add_trace(go.Scatter(
+            x=id_range, y=(slope_u * id_range + int_u),
+            mode='lines', name='Your Motor OLS',
+            line=dict(color='rgba(239, 68, 68, 1)', dash='dash', width=2.5)
+        ))
 
     fig_reg.update_layout(
         title="Fitts's Law: Individual Bandwidth vs. Global Cohort",
@@ -164,12 +165,13 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     )
 
     # Pack BOTH statistical parameters for display inside the dashboard
+    # Return the Active User's specific statistical profile
     stats_summary = {
         'user': {
-            'intercept_a': round(int_u, 1),
-            'slope_b': round(slope_u, 1),
-            'r_squared': round(r_u ** 2, 3),
-            'p_val': round(p_u, 4) if p_u >= 0.0001 else "<0.0001"
+            'intercept_a': round(int_u, 1) if user_has_model else "N/A",
+            'slope_b': round(slope_u, 1) if user_has_model else "N/A",
+            'r_squared': round(r_u ** 2, 3) if user_has_model else "N/A",
+            'p_val': (round(p_u, 4) if p_u >= 0.0001 else "<0.0001") if user_has_model else "N/A"
         },
         'global': {
             'intercept_a': round(int_g, 1),
@@ -179,5 +181,4 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         }
     }
 
-    # Return BOTH figures along with the dual stats dictionary
     return fig_reg, fig_swarm, stats_summary

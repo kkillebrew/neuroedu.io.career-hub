@@ -26,7 +26,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
         <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
         <style>
             body {{ margin: 0; padding: 0; background-color: #0F172A; font-family: sans-serif; color: #F8FAFC; overflow: hidden; }}
-            canvas {{ display: block; margin: 10px auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.55); cursor: crosshair; }}
+            canvas {{ display: block; margin: 10px auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.55); cursor: crosshair; max-width: 100%; height: auto; }}
             #control-panel {{ text-align: center; margin-top: 5px; }}
             .btn {{ background-color: #6366F1; color: white; border: none; padding: 10px 20px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }}
             .btn:hover {{ background-color: #4F46E5; }}
@@ -78,10 +78,10 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             
             let trialCount = 0;
             const maxTrials = 10;
-            let activeTarget = null; // Contains {{x, y, w, d}}
-            let homePosition = {{ x: 400, y: 350, r: 25 }}; // Baseline finger position
+            let activeTarget = null; 
+            let homePosition = { x: 300, y: 250, r: 20 }; // Scaled for 600x300 canvas
             let trialStartTime = 0;
-            let currentPhase = "HOME"; // Phases: HOME, TARGET, DONE
+            let currentPhase = "HOME"; 
             let sessionData = [];
 
             function drawHUDMessage(msg, submsg) {{
@@ -142,21 +142,27 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
 
             canvas.addEventListener("mousedown", function(e) {{
                 const rect = canvas.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
+                
+                // CRITICAL FIX: Calculate the ratio between actual CSS size and native canvas resolution
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                // Apply scaling matrix to mouse coordinates
+                const mouseX = (e.clientX - rect.left) * scaleX;
+                const mouseY = (e.clientY - rect.top) * scaleY;
 
                 if (currentPhase === "HOME") {{
                     let dist = Math.hypot(mouseX - homePosition.x, mouseY - homePosition.y);
                     if (dist < homePosition.r) {{
-                        // Calculate next random index parameters
-                        const amplitudes = [150, 200, 250, 300];
-                        const widths = [16, 24, 32, 48];
+                        
+                        // Perfectly halved to keep ID ratios identical while fitting small screens
+                        const amplitudes = [75, 100, 125, 150];
+                        const widths = [8, 12, 16, 24];
                         
                         const a = amplitudes[Math.floor(Math.random() * amplitudes.length)];
                         const w = widths[Math.floor(Math.random() * widths.length)];
                         
-                        // Spawn target radially around home base to maintain natural reach vectors
-                        const angle = Math.PI + (Math.random() * Math.PI); // Upper hemisphere arc
+                        const angle = Math.PI + (Math.random() * Math.PI); 
                         const tx = homePosition.x + Math.cos(angle) * a;
                         const ty = homePosition.y + Math.sin(angle) * a;
 
@@ -169,7 +175,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                         
                         drawFrame();
                     }}
-                }} 
+                }}
                 else if (currentPhase === "TARGET") {{
                     let dist = Math.hypot(mouseX - activeTarget.x, mouseY - activeTarget.y);
                     if (dist < (activeTarget.w / 2)) {{
