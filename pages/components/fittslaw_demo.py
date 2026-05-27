@@ -26,11 +26,12 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
         <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
         <style>
             body {{ margin: 0; padding: 0; background-color: #0F172A; font-family: sans-serif; color: #F8FAFC; overflow: hidden; }}
-            canvas {{ display: block; margin: 10px auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.55); cursor: crosshair; max-width: 100%; height: auto; }}
+            /* Responsive Matrix: Fills container up to 1000px */
+            canvas {{ display: block; margin: 10px auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.55); cursor: crosshair; width: 100%; max-width: 1000px; height: auto; aspect-ratio: 2 / 1; }}
             #control-panel {{ text-align: center; margin-top: 5px; }}
             .btn {{ background-color: #6366F1; color: white; border: none; padding: 10px 20px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }}
             .btn:hover {{ background-color: #4F46E5; }}
-            #hud {{ display: flex; justify-content: space-around; max-width: 800px; margin: 0 auto; font-size: 14px; color: #94A3B8; }}
+            #hud {{ display: flex; justify-content: space-around; max-width: 1000px; margin: 0 auto; font-size: 14px; color: #94A3B8; }}
         </style>
     </head>
     <body>
@@ -45,41 +46,31 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
         </div>
 
         <script>
-            // --- FIREBASE CLOUD SETUP (Rule 1 & Rule 3 Compliance) ---
-            
-            // FIX 1: Direct native object injection (Bypassing JSON.parse entirely)
-            const firebaseConfig = {firebase_config}; 
+            const firebaseConfig = JSON.parse('{firebase_config}'); 
             const appId = "{app_id}";
             const userUid = "{user_uid}";
 
-            let db = null; // Removed auth and currentUser
+            let db = null;
 
             try {{
                 if (firebaseConfig && firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {{
-                    
-                    // FIX 2: Prevent Firebase from crashing during Streamlit hot-reloads
                     if (!firebase.apps.length) {{
                         firebase.initializeApp(firebaseConfig);
                     }}
-                    
                     db = firebase.firestore();
-                    console.log("Firebase connected. Using Python backend UUID for tracking.");
-                }} else {{
-                    console.warn("Keys missing or default. Running canvas in Sandbox Mode.");
+                    console.log("Firebase connected successfully via Python REST Bridge.");
                 }}
             }} catch (e) {{
-                console.error("Database connection failed. Entering local Sandbox:", e);
+                console.error("Database bypass: ", e);
             }}
 
-            // --- EXPERIMENTAL CONTROL STATE VARIABLES ---
-            // (This should follow immediately after the catch block!)
             const canvas = document.getElementById("canvas-fitts");
             const ctx = canvas.getContext("2d");
             
             let trialCount = 0;
             const maxTrials = 10;
             let activeTarget = null; 
-            let homePosition = {{ x: 300, y: 250, r: 20 }}; // Scaled for 600x300 canvas
+            let homePosition = {{ x: 400, y: 350, r: 25 }}; 
             let trialStartTime = 0;
             let currentPhase = "HOME"; 
             let sessionData = [];
@@ -96,7 +87,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                 ctx.fillText(submsg, canvas.width/2, canvas.height/2 + 15);
             }}
 
-            drawHUDMessage("Fitts's Law Neuro-Motor Control Rig", "Click 'Start Experiment Session' below to begin testing your visual-motor bandwith.");
+            drawHUDMessage("Fitts's Law Neuro-Motor Control Rig", "Click 'Start Experiment Session' below to begin testing your visual-motor bandwidth.");
 
             function initiateSession() {{
                 trialCount = 0;
@@ -110,14 +101,13 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                 if (currentPhase === "HOME") {{
-                    // Draw start baseline circle
                     ctx.beginPath();
                     ctx.arc(homePosition.x, homePosition.y, homePosition.r, 0, Math.PI * 2);
                     ctx.fillStyle = "#6366F1";
                     ctx.shadowBlur = 15;
                     ctx.shadowColor = "#6366F1";
                     ctx.fill();
-                    ctx.shadowBlur = 0; // Reset shadow
+                    ctx.shadowBlur = 0;
 
                     ctx.fillStyle = "#F8FAFC";
                     ctx.font = "bold 14px sans-serif";
@@ -125,16 +115,15 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                     ctx.fillText("TAP HERE", homePosition.x, homePosition.y + 5);
                 }} 
                 else if (currentPhase === "TARGET") {{
-                    // Draw visual goal target circle
                     ctx.beginPath();
                     ctx.arc(activeTarget.x, activeTarget.y, activeTarget.w / 2, 0, Math.PI * 2);
                     ctx.fillStyle = "#EF4444";
                     ctx.shadowBlur = 15;
                     ctx.shadowColor = "#EF4444";
                     ctx.fill();
-                    ctx.shadowBlur = 0; // Reset shadow
+                    ctx.shadowBlur = 0;
 
-                    ctx.fillStyle = "#10B981";
+                    ctx.fillStyle = "#F8FAFC";
                     ctx.font = "bold 12px sans-serif";
                     ctx.fillText("CLICK!", activeTarget.x, activeTarget.y + 4);
                 }}
@@ -143,21 +132,19 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             canvas.addEventListener("mousedown", function(e) {{
                 const rect = canvas.getBoundingClientRect();
                 
-                // CRITICAL FIX: Calculate the ratio between actual CSS size and native canvas resolution
+                // Dynamic translation scale matrix: Calculates CSS contraction ratio
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
                 
-                // Apply scaling matrix to mouse coordinates
+                // Translate raw viewport mouse clicks to native high-res coordinates
                 const mouseX = (e.clientX - rect.left) * scaleX;
                 const mouseY = (e.clientY - rect.top) * scaleY;
 
                 if (currentPhase === "HOME") {{
                     let dist = Math.hypot(mouseX - homePosition.x, mouseY - homePosition.y);
                     if (dist < homePosition.r) {{
-                        
-                        // Perfectly halved to keep ID ratios identical while fitting small screens
-                        const amplitudes = [75, 100, 125, 150];
-                        const widths = [8, 12, 16, 24];
+                        const amplitudes = [150, 200, 250, 300];
+                        const widths = [16, 24, 32, 48];
                         
                         const a = amplitudes[Math.floor(Math.random() * amplitudes.length)];
                         const w = widths[Math.floor(Math.random() * widths.length)];
@@ -175,14 +162,13 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                         
                         drawFrame();
                     }}
-                }}
+                }} 
                 else if (currentPhase === "TARGET") {{
                     let dist = Math.hypot(mouseX - activeTarget.x, mouseY - activeTarget.y);
                     if (dist < (activeTarget.w / 2)) {{
                         let movementTime = performance.now() - trialStartTime;
                         trialCount++;
                         
-                        // Cache empirical metrics
                         sessionData.push({{
                             amplitude: activeTarget.a,
                             width: activeTarget.w,
@@ -208,7 +194,6 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             }});
 
             function commitSessionData() {{
-                // Guardrail: Now ONLY checks if the database is connected
                 if (!db) {{
                     drawHUDMessage("Session Complete (Sandbox Mode)", "Connect your Firebase credentials to unlock live database writing.");
                     document.getElementById("btn-start").style.display = "inline";
@@ -244,5 +229,5 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
     </body>
     </html>
     """
-    # Large 820px wrapper to cleanly accommodate canvas and stats widgets
-    components.html(html_code, height=520)
+    # Expanded iFrame viewport bounds to fit the full-width layout parameters cleanly
+    components.html(html_code, height=540)

@@ -12,8 +12,11 @@ import streamlit as st
 import os
 import sys
 import numpy as np
-import uuid       # <-- ADD THIS
-import requests   # <-- ADD THIS
+import pandas as pd          # Restored for Section 2 Data Pipelines
+import plotly.express as px  # Restored for Section 2 Data Pipelines
+import uuid
+import requests
+import json
 
 # --- PATH CONFIGURATION ---
 # This tells the script to look one folder up to find the 'loaders' directory
@@ -31,8 +34,6 @@ from pages.components.pythagorean_demo import render_pythagorean_demo
 from pages.components.fittslaw_demo import render_fittslaw_demo
 from loaders.fittslaw_loader import process_cohort_fitts_regression
 
-from career_hub_sidebar import apply_global_settings, render_sidebar
-
 ########################################
 #        APPLY GLOBAL SETTINGS         #
 ########################################
@@ -47,10 +48,9 @@ render_sidebar()
 # Initialize the data from the loader
 bio = get_biographic_metadata()
 _, _, academic = get_portfolio_metadata()
-
 mentorship = get_mentorship_data()
 
-# Define Plotly standard configuration to lock the UI per the Style Guide
+# Define Plotly standard configuration to lock the UI globally
 PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
 
 # =============================================================================
@@ -70,7 +70,7 @@ active_lesson = st.radio(
         "📐 Lesson 1: Geometry & Area Generation",
         "🎲 Lesson 2: Probability & Chance Space",
         "📐 Lesson 3: Pythagorean Theorem Matrix",
-        "🧠 Lesson 4: Neuro-Motor Reaction Experiment" # <- ADD THIS LINE
+        "🧠 Lesson 4: Neuro-Motor Reaction Experiment" 
     ],
     horizontal=True,
     label_visibility="collapsed"
@@ -107,8 +107,6 @@ elif "Probability" in active_lesson:
     num_samples = st.selectbox("Select Number of Empirical Trials to Run:", [50, 100, 250, 500, 750, 1000])
     
     # 2. Render the Matter.js Physics Component
-    # We no longer process Pandas/NumPy arrays here. We pass the parameter directly 
-    # to the browser to handle the Plinko state machine.
     st.info("💡 **Watch the Distribution Form**\n\nNotice how the random binary choices at each peg naturally assemble into a Gaussian distribution.")
     render_probability_demo(sample_count=num_samples)
 
@@ -132,7 +130,6 @@ elif "Pythagorean" in active_lesson:
             angle_theta = st.slider("Internal Angle (Θ°)", min_value=15, max_value=75, value=36, step=1)
             
             # Extrapolate relative sides using trigonometry scale transformations
-            # Locking the hypotenuse to a stable scale value keeps the simulation frames bounded
             hypotenuse_reference = 6.5
             side_a = hypotenuse_reference * np.cos(np.radians(angle_theta))
             side_b = hypotenuse_reference * np.sin(np.radians(angle_theta))
@@ -153,27 +150,17 @@ elif "Pythagorean" in active_lesson:
             
     with anim_col:
         # Launch browser GPU-accelerated Matter.js simulation frame
-        # Routing the slider arguments directly into the synchronized view component parameters
         render_pythagorean_demo(a_units=side_a, b_units=side_b)
 
 # --- LESSON 4: FITT'S LAW ---
 elif "Neuro-Motor" in active_lesson:
     st.subheader("Fitts's Law: Quantitative Neuro-Motor Profiling")
     
-    # 1. EXPANDED EXPERIMENT DESCRIPTION
     st.markdown("""
-    **The Science of Sensory-Motor Bandwidth** In 1954, Paul Fitts proposed that the human motor system operates much like a telecommunications channel. There is a fundamental, inescapable trade-off between the **speed** of a movement and the **accuracy** required to complete it. 
-    
-    In this experiment, you are generating real-time psychophysics data. By rapidly acquiring targets of varying distances (Amplitude) and sizes (Width), we are mapping the maximum rate at which your brain can process visual spatial information and translate it into muscle kinematics.
+    **The Science of Sensory-Motor Bandwidth:** Replicating Paul Fitts's classic 1954 psychophysics paradigm. 
+    This experiment measures your motor control channel capacity. By rapidly tapping targets of varying sizes and distances, 
+    you are mapping the logarithmic trade-off between movement speed and target accuracy.
     """)
-
-    # 2. THE HYPOTHESIS
-    st.info("""
-    🧪 **The Scientific Hypothesis** We hypothesize that the time it takes to move to a target ($MT$) will increase linearly as the mathematical difficulty of the task—known as the Index of Difficulty ($ID$)—increases.  
-    **$MT = a + b \cdot \log_2(2A/W)$** *(Where $A$ is Amplitude, $W$ is Target Width, and $ID$ is measured in \"bits\" of information).*
-    """)
-
-    experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
 
     # --- FIREBASE CREDENTIALS ---
     firebase_config_dict = {
@@ -185,7 +172,6 @@ elif "Neuro-Motor" in active_lesson:
         "appId": "1:1068398164186:web:093262de26300585618de3"
     }
 
-    import json
     firebase_config_str = json.dumps(firebase_config_dict)
 
     if 'fitts_user_id' not in st.session_state:
@@ -195,89 +181,84 @@ elif "Neuro-Motor" in active_lesson:
     app_id = "neuroedu-career-hub"
     project_id = firebase_config_dict["projectId"]
 
-    with experiment_col:
-        st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
-        render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config_str, user_uid=user_uid)
+    # =========================================================================
+    # STAGE 1: FULL-WIDTH CONTAINER FOR EXPERIMENT (Top Row)
+    # =========================================================================
+    st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
+    render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config_str, user_uid=user_uid)
 
-    with analytics_col:
-        st.info("📈 **Cohort Performance Analysis**")
+    st.divider()
+
+    # =========================================================================
+    # STAGE 2: ANALYTICS COLUMN SPLIT (Bottom Row)
+    # =========================================================================
+    st.subheader("📊 Analytics & Telemetry Engine")
+    graph_col, stats_col = st.columns([1.4, 1.0], gap="large")
+
+    try:
+        api_key = firebase_config_dict["apiKey"]
+        rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials?key={api_key}"
         
-        try:
-            # Fetch Data directly via Firestore REST API
-            api_key = firebase_config_dict["apiKey"]
-            rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials?key={api_key}"
-            
-            response = requests.get(rest_url)
+        response = requests.get(rest_url)
 
-            raw_fitts_data = []
-            if response.status_code == 200:
-                docs = response.json().get('documents', [])
-                for doc in docs:
-                    fields = doc.get('fields', {})
-                    try:
-                        raw_fitts_data.append({
-                            'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
-                            'index_difficulty': float(fields.get('index_difficulty', {}).get('doubleValue', 0)),
-                            'movement_time': float(fields.get('movement_time', {}).get('doubleValue', 0))
-                        })
-                    except Exception:
-                        continue
-            
-            # Process Data
-            fig_reg, fig_swarm, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
-            
+        raw_fitts_data = []
+        if response.status_code == 200:
+            docs = response.json().get('documents', [])
+            for doc in docs:
+                fields = doc.get('fields', {})
+                try:
+                    raw_fitts_data.append({
+                        'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
+                        'index_difficulty': float(fields.get('index_difficulty', {}).get('doubleValue', 0)),
+                        'movement_time': float(fields.get('movement_time', {}).get('doubleValue', 0))
+                    })
+                except Exception:
+                    continue
+        
+        fig_reg, fig_swarm, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
+        
+        with graph_col:
             if fig_reg:
                 tab1, tab2 = st.tabs(["Linear Regression (Bandwidth)", "Trial Distributions (Variance)"])
-                
-                # 3. PLOT DESCRIPTIONS IN TABS
                 with tab1:
-                    st.caption("""
-                    **How to read this plot:** The slope of the dashed line ($b$) represents your \"information processing rate.\" 
-                    A **flatter (lower) slope** means you are highly efficient—difficulty barely slows you down. 
-                    Compare your Bright Red averages to the Bright Green cohort averages to see your relative processing speed.
-                    """)
+                    st.caption("**How to read this plot:** The slope of the line ($b$) models your sensory-motor bit-rate transmission. A flatter slope means you are highly efficient.")
                     st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)
-                
                 with tab2:
-                    st.caption("""
-                    **How to read this plot:** Fitts's Law requires averaging, but looking at raw variance is crucial. 
-                    The vertical spread of the faded red dots shows your intra-subject noise (consistency). 
-                    The white star pinpoints exactly where your average execution speed sits relative to the rest of the global population at that specific difficulty tier.
-                    """)
+                    st.caption("**How to read this plot:** The red box tracks your click consistency. The star pinpoints your average speed ranking among the global population.")
                     st.plotly_chart(fig_swarm, use_container_width=True, config=PLOTLY_CONFIG)
-                
-                # 4. STATS SECTION & DUAL OLS READOUT
-                st.markdown(f"""
-                <div style="background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #38BDF8; margin-bottom: 15px;">
-                    <p style="margin: 0 0 10px 0; font-size: 1rem; color: #E2E8F0;"><b>Statistical Significance & OLS Modeling</b></p>
-                    <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #94A3B8;">
-                    To prove the hypothesis, we run an Ordinary Least Squares (OLS) regression to check if the Index of Difficulty has a statistically significant effect on Movement Time (testing the null hypothesis $H_0: b = 0$). A p-value < 0.05 confirms the Fitts's Law effect is present in the data.
-                    </p>
-                    
-                    <div style="display: flex; justify-content: space-between; border-top: 1px solid #334155; padding-top: 10px;">
-                        <div style="width: 48%;">
-                            <span style="font-size: 0.8rem; color: #EF4444; font-weight: bold;">YOUR MOTOR PROFILE</span><br>
-                            <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['user']['intercept_a']} + {stats['user']['slope_b']} &middot; ID</span><br>
-                            <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['user']['r_squared']}</span><br>
-                            <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['user']['p_val']}</b></span>
-                        </div>
-                        <div style="border-left: 1px solid #334155; margin: 0 10px;"></div>
-                        <div style="width: 48%;">
-                            <span style="font-size: 0.8rem; color: #22C55E; font-weight: bold;">GLOBAL COHORT PROFILE</span><br>
-                            <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['global']['intercept_a']} + {stats['global']['slope_b']} &middot; ID</span><br>
-                            <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['global']['r_squared']}</span><br>
-                            <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['global']['p_val']}</b></span>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
             else:
                 st.warning(stats)
-        except Exception as err:
-            st.error(f"Failed to compile regression chart: {err}")
 
-    # 5. DISCUSSION & CITATIONS
+        with stats_col:
+            if fig_reg:
+                html_block = f"""
+                    <div style="background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #38BDF8; margin-bottom: 15px;">
+                    <p style="margin: 0 0 10px 0; font-size: 1rem; color: #E2E8F0; font-weight: bold;">Statistical Significance & OLS Modeling</p>
+                    <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #94A3B8;">
+                    We run an Ordinary Least Squares (OLS) regression to test the null hypothesis H₀: b = 0. A model significance p-value &lt; 0.05 successfully validates the presence of the Fitts's Law trade-off.
+                    </p>
+                    <div style="border-top: 1px solid #334155; padding-top: 10px; margin-bottom: 15px;">
+                    <span style="font-size: 0.8rem; color: #EF4444; font-weight: bold;">YOUR MOTOR PROFILE</span><br>
+                    <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['user']['intercept_a']} + {stats['user']['slope_b']} &middot; ID</span><br>
+                    <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['user']['r_squared']}</span><br>
+                    <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['user']['p_val']}</b></span>
+                    </div>
+                    <div style="border-top: 1px solid #334155; padding-top: 10px;">
+                    <span style="font-size: 0.8rem; color: #22C55E; font-weight: bold;">GLOBAL COHORT PROFILE</span><br>
+                    <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['global']['intercept_a']} + {stats['global']['slope_b']} &middot; ID</span><br>
+                    <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['global']['r_squared']}</span><br>
+                    <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['global']['p_val']}</b></span>
+                    </div>
+                    </div>
+                    """
+                st.markdown(html_block, unsafe_allow_html=True)
+                
+    except Exception as err:
+        st.error(f"Failed to compile regression chart: {err}")
+
+    # =========================================================================
+    # STAGE 3: RESTORED DISCUSSION & CITATIONS
+    # =========================================================================
     st.markdown("""
     ---
     #### **Discussion & Conclusions**
@@ -287,7 +268,6 @@ elif "Neuro-Motor" in active_lesson:
     * Fitts, P. M. (1954). The information capacity of the human motor system in controlling the amplitude of movement. *Journal of Experimental Psychology*, 47(6), 381–391.
     * MacKenzie, I. S. (1992). Fitts' Law as a research and design tool in human-computer interaction. *Human-Computer Interaction*, 7(1), 91-139.
     """)
-
 
 st.divider()
 
