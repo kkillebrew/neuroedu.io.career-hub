@@ -33,6 +33,8 @@ from pages.components.probability_demo import render_probability_demo  # <-- NEW
 from pages.components.pythagorean_demo import render_pythagorean_demo
 from pages.components.fittslaw_demo import render_fittslaw_demo
 from loaders.fittslaw_loader import process_cohort_fitts_regression
+from pages.components.visual_search_demo import render_visual_search_demo
+from loaders.visual_search_loader import process_visual_search_analytics
 
 ########################################
 #        APPLY GLOBAL SETTINGS         #
@@ -70,7 +72,8 @@ active_lesson = st.radio(
         "📐 Lesson 1: Geometry & Area Generation",
         "🎲 Lesson 2: Probability & Chance Space",
         "📐 Lesson 3: Pythagorean Theorem Matrix",
-        "🧠 Lesson 4: Neuro-Motor Reaction Experiment" 
+        "🧠 Lesson 4: Neuro-Motor Reaction Experiment",
+        "👁️ Lesson 5: Visual Search & Attention" # <-- ADD THIS LINE
     ],
     horizontal=True,
     label_visibility="collapsed"
@@ -278,6 +281,106 @@ elif "Neuro-Motor" in active_lesson:
     * Fitts, P. M. (1954). The information capacity of the human motor system in controlling the amplitude of movement. *Journal of Experimental Psychology*, 47(6), 381–391.
     * MacKenzie, I. S. (1992). Fitts' Law as a research and design tool in human-computer interaction. *Human-Computer Interaction*, 7(1), 91-139.
     """)
+
+# --- LESSON 5: VISUAL SEARCH ---
+elif "Visual Search" in active_lesson:
+    st.subheader("Visual Search: Parallel vs. Serial Processing")
+    
+    st.markdown("""
+    **The Science of Feature Integration:** Replicating Treisman & Gelade's (1980) classic visual search paradigm. 
+    This experiment tests whether your brain can process entire visual fields simultaneously (Parallel Pop-Out) 
+    or if it must scan items one-by-one (Serial Conjunction Binding).
+    """)
+
+    # Firebase ID setup (Reusing the session ID logic from Fitts's Law)
+    if 'search_user_id' not in st.session_state:
+        st.session_state.search_user_id = f"anon_{uuid.uuid4().hex[:8]}"
+    
+    user_uid = st.session_state.search_user_id
+    app_id = "neuroedu-career-hub"
+
+    # 1. Render Interactive Canvas
+    st.info("🎯 **Find the Target**\nClick 'Start Visual Search Experiment' below to begin.")
+    render_visual_search_demo(app_id=app_id, firebase_config=firebase_config_str, user_uid=user_uid)
+
+    st.divider()
+
+    # 2. Analytics Pipeline
+    st.subheader("📊 Cognitive Telemetry Engine")
+    graph_col, stats_col = st.columns([1.4, 1.0], gap="large")
+
+    try:
+        # Asymmetric REST Call for Visual Search Collection
+        api_key = firebase_config_dict["apiKey"]
+        rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/visual_search_trials?key={api_key}"
+        
+        response = requests.get(rest_url)
+        raw_search_data = []
+        
+        if response.status_code == 200:
+            docs = response.json().get('documents', [])
+            for doc in docs:
+                fields = doc.get('fields', {})
+                try:
+                    raw_search_data.append({
+                        'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
+                        'condition': fields.get('condition', {}).get('stringValue', 'unknown'),
+                        'set_size': int(fields.get('set_size', {}).get('integerValue', 0)),
+                        'reaction_time': float(fields.get('reaction_time', {}).get('doubleValue', 0))
+                    })
+                except Exception:
+                    continue
+        
+        fig_reg, fig_box, stats = process_visual_search_analytics(raw_search_data, current_user_uid=user_uid)
+        
+        with graph_col:
+            if fig_reg:
+                tab1, tab2 = st.tabs(["Linear Regression (Search Slopes)", "Trial Distributions (Variance)"])
+                with tab1:
+                    st.caption("**How to read this plot:** Flat lines mean your brain processed the entire screen instantly (Parallel). Steep upward slopes mean you had to scan items one-by-one (Serial).")
+                    st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)
+                with tab2:
+                    st.plotly_chart(fig_box, use_container_width=True, config=PLOTLY_CONFIG)
+            else:
+                st.warning(stats)
+
+        with stats_col:
+            if fig_reg and stats:
+                conj_slope = stats.get('Conjunction', {}).get('slope', 0)
+                color_slope = stats.get('Color', {}).get('slope', 0)
+                
+                html_block = f"""
+<div style="background-color: #EFF6FF; padding: 16px; border-radius: 8px; border-left: 4px solid #3B82F6; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <p style="margin: 0 0 6px 0; font-size: 0.95rem; color: #1E40AF; font-weight: bold;">Theory: The Pop-Out Effect</p>
+    <p style="margin: 0; font-size: 0.85rem; color: #1E3A8A; line-height: 1.4;">
+        Single features (like pure color) are processed automatically by the visual cortex before attention is even deployed. Conjunctions (Red AND Half-Circle) require active, serial attention to bind the features together.
+    </p>
+</div>
+
+<div style="background-color: #FEF2F2; padding: 14px; border-radius: 8px; border-left: 4px solid #EF4444; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <p style="margin: 0 0 6px 0; font-size: 0.85rem; color: #991B1B; font-weight: bold;">🧠 YOUR CONJUNCTION PENALTY</p>
+    <p style="margin: 0 0 4px 0; font-family: monospace; font-size: 1.1rem; color: #7F1D1D; font-weight: bold;">
+        + {conj_slope:.1f} ms / item
+    </p>
+    <p style="margin: 0; font-size: 0.8rem; color: #991B1B; line-height: 1.3;">
+        This is your serial scanning speed. Every additional distractor adds this many milliseconds to your search time.
+    </p>
+</div>
+
+<div style="background-color: #F0FDF4; padding: 14px; border-radius: 8px; border-left: 4px solid #22C55E; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <p style="margin: 0 0 6px 0; font-size: 0.85rem; color: #166534; font-weight: bold;">⚡ YOUR POP-OUT SPEED</p>
+    <p style="margin: 0 0 4px 0; font-family: monospace; font-size: 1.1rem; color: #14532D; font-weight: bold;">
+        + {color_slope:.1f} ms / item
+    </p>
+    <p style="margin: 0; font-size: 0.8rem; color: #166534; line-height: 1.3;">
+        Because this slope is near zero, we mathematically prove that your brain processed 100 items just as fast as 25 items!
+    </p>
+</div>
+"""
+                st.markdown(html_block, unsafe_allow_html=True)
+                
+    except Exception as err:
+        st.error(f"Failed to compile search telemetry: {err}")
 
 st.divider()
 
