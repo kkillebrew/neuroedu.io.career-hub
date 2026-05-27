@@ -165,12 +165,12 @@ elif "Neuro-Motor" in active_lesson:
     # Replace these placeholder strings with your actual Firebase config keys
     # MATLAB Bridge: This is your database connection struct
     firebase_config_dict = {
-        apiKey: "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
-          authDomain: "neuroedu-career-hub.firebaseapp.com",
-          projectId: "neuroedu-career-hub",
-          storageBucket: "neuroedu-career-hub.firebasestorage.app",
-          messagingSenderId: "1068398164186",
-          appId: "1:1068398164186:web:093262de26300585618de3"
+        "apiKey": "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
+        "authDomain": "neuroedu-career-hub.firebaseapp.com",
+        "projectId": "neuroedu-career-hub",
+        "storageBucket": "neuroedu-career-hub.appspot.com",
+        "messagingSenderId": "1068398164186",
+        "appId": "1:1068398164186:web:093262de26300585618de3"
     }
 
     # Convert the Python dictionary to a JSON string so it safely passes into JavaScript
