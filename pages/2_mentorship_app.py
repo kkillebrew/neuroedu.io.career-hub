@@ -203,11 +203,15 @@ elif "Neuro-Motor" in active_lesson:
                     fields = doc.get('fields', {})
                     # Transform nested Google JSON into a flat dictionary
                     try:
-                        raw_fitts_data.append({
-                            'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
-                            'index_difficulty': float(fields.get('index_difficulty', {}).get('doubleValue', 0)),
-                            'movement_time': float(fields.get('movement_time', {}).get('doubleValue', 0))
-                        })
+                        # Fetch Data directly via Firestore REST API (Using API Key Authorization)
+                        api_key = firebase_config_dict["apiKey"]
+                        rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials?key={api_key}"
+                        
+                        response = requests.get(rest_url)
+
+                        raw_fitts_data = []
+                        if response.status_code == 200:
+                            docs = response.json().get('documents', [])
                     except Exception:
                         continue
             

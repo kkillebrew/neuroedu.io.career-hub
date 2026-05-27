@@ -47,25 +47,17 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
         <script>
             // --- FIREBASE CLOUD SETUP (Rule 1 & Rule 3 Compliance) ---
             // 1. Receive raw JSON string from Python and parse it back into a JavaScript object
-            const firebaseConfig = JSON.parse('{firebase_config}'); 
-            const appId = "{app_id}";
-            const userUid = "{user_uid}";
+            const firebaseConfig = JSON.parse('{{firebase_config}}'); 
+            const appId = "{{app_id}}";
+            const userUid = "{{user_uid}}";
 
-            let db = null;
-            let auth = null;
-            let currentUser = null;
+            let db = null; // Removed auth and currentUser
 
             try {{
-                // 2. Initialize only if the API key exists and isn't the placeholder
                 if (firebaseConfig && firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {{
                     firebase.initializeApp(firebaseConfig);
                     db = firebase.firestore();
-                    auth = firebase.auth();
-
-                    auth.signInAnonymously().then(cred => {{
-                        currentUser = cred.user;
-                        console.log("Authenticated successfully with Firebase.");
-                    }}).catch(err => console.error("Authentication setup failed: ", err));
+                    console.log("Firebase connected. Using Python backend UUID for tracking.");
                 }} else {{
                     console.warn("Keys missing or default. Running canvas in Sandbox Mode.");
                 }}
@@ -204,8 +196,8 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             }});
 
             function commitSessionData() {{
-                // Guardrail: Fallback exit sequence if running without an active Firebase config
-                if (!db || !currentUser) {{
+                // Guardrail: Now ONLY checks if the database is connected
+                if (!db) {{
                     drawHUDMessage("Session Complete (Sandbox Mode)", "Connect your Firebase credentials to unlock live database writing.");
                     document.getElementById("btn-start").style.display = "inline";
                     document.getElementById("btn-start").innerText = "Restart Session";
@@ -216,7 +208,6 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
 
                 const batch = db.batch();
                 sessionData.forEach(trial => {{
-                    // Strict Rule 1 Pathing mapping
                     const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('fitts_trials').doc();
                     batch.set(docRef, {{
                         user_id: userUid,
