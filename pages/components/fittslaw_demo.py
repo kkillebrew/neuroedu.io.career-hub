@@ -73,17 +73,8 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
                 console.error("Database connection failed. Entering local Sandbox:", e);
             }}
 
-            firebase.initializeApp(firebaseConfig);
-            const db = firebase.firestore();
-            const auth = firebase.auth();
-
-            let currentUser = null;
-            auth.signInAnonymously().then(cred => {{
-                currentUser = cred.user;
-                console.log("Authenticated as: ", currentUser.uid);
-            }}).catch(err => console.error("Rule 3 Auth Violation: ", err));
-
             // --- EXPERIMENTAL CONTROL STATE VARIABLES ---
+            // (This should follow immediately after the catch block!)
             const canvas = document.getElementById("canvas-fitts");
             const ctx = canvas.getContext("2d");
             
