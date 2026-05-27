@@ -192,8 +192,10 @@ elif "Neuro-Motor" in active_lesson:
         st.info("📈 **Cohort Performance Analysis**")
         
         try:
-            # 2. Fetch Data directly via Firestore REST API
-            rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials"
+            # 2. Fetch Data directly via Firestore REST API (Using API Key Authorization)
+            api_key = firebase_config_dict["apiKey"]
+            rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials?key={api_key}"
+            
             response = requests.get(rest_url)
 
             raw_fitts_data = []
@@ -203,19 +205,15 @@ elif "Neuro-Motor" in active_lesson:
                     fields = doc.get('fields', {})
                     # Transform nested Google JSON into a flat dictionary
                     try:
-                        # Fetch Data directly via Firestore REST API (Using API Key Authorization)
-                        api_key = firebase_config_dict["apiKey"]
-                        rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials?key={api_key}"
-                        
-                        response = requests.get(rest_url)
-
-                        raw_fitts_data = []
-                        if response.status_code == 200:
-                            docs = response.json().get('documents', [])
+                        raw_fitts_data.append({
+                            'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
+                            'index_difficulty': float(fields.get('index_difficulty', {}).get('doubleValue', 0)),
+                            'movement_time': float(fields.get('movement_time', {}).get('doubleValue', 0))
+                        })
                     except Exception:
                         continue
             
-            # 3. Process Data (Notice we now expect TWO figures returned)
+            # 3. Process Data (Pass to the loader)
             fig_reg, fig_swarm, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
             
             if fig_reg:

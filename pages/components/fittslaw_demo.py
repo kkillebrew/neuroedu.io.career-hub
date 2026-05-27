@@ -21,9 +21,9 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
     <!DOCTYPE html>
     <html>
     <head>
-        <script src="[https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js)"></script>
-        <script src="[https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js)"></script>
-        <script src="[https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js)"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
         <style>
             body {{ margin: 0; padding: 0; background-color: #0F172A; font-family: sans-serif; color: #F8FAFC; overflow: hidden; }}
             canvas {{ display: block; margin: 10px auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.55); cursor: crosshair; }}
