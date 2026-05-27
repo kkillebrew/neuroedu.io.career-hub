@@ -79,7 +79,7 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
             let trialCount = 0;
             const maxTrials = 10;
             let activeTarget = null; 
-            let homePosition = { x: 300, y: 250, r: 20 }; // Scaled for 600x300 canvas
+            let homePosition = {{ x: 300, y: 250, r: 20 }}; // Scaled for 600x300 canvas
             let trialStartTime = 0;
             let currentPhase = "HOME"; 
             let sessionData = [];
