@@ -24,86 +24,76 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     if 'index_difficulty' not in df.columns or 'movement_time' not in df.columns:
         return None, None, "Database structure mismatch."
 
+    # --- SCIENTIFIC GUARDRAIL: FILTER UNREALISTIC dropout/0ms DATA ---
+    # Drops empty fields or extreme outliers under 5ms caused by async packet drops
     df = df.dropna(subset=['index_difficulty', 'movement_time'])
+    df = df[df['movement_time'] > 5.0]
+    
     if len(df) < 5:
-        return None, None, "Too few data points collected to run statistical regression."
+        return None, None, "Too few valid data points collected to compute analytics."
 
-    # Round ID bounds to strict intervals to align the vertical groupings
+    # Round ID bounds to strict intervals to align the vertical groupings neatly
     df['index_difficulty'] = df['index_difficulty'].round(2)
 
     # ---------------------------------------------------------
-    # STEP 1: MATRICES SEPARATION & "CELL ARRAY" COLLAPSE
+    # STEP 1: MATRICES SEPARATION & COLLAPSE
     # ---------------------------------------------------------
-    # 1. Your Raw Trials (10xN arrays)
     df_you_raw = df[df['user_id'] == current_user_uid]
-
-    # 2. Collapse all raw trials into strict User Averages for each Difficulty Index
     df_user_means = df.groupby(['user_id', 'index_difficulty'])['movement_time'].mean().reset_index()
 
-    # 3. Separate the Averages
     df_you_mean = df_user_means[df_user_means['user_id'] == current_user_uid]
     df_other_means = df_user_means[df_user_means['user_id'] != current_user_uid]
-
-    # 4. Calculate the True Global Cohort Mean (The average of all individual user averages)
     df_global_mean = df_user_means.groupby('index_difficulty')['movement_time'].mean().reset_index()
 
     # ---------------------------------------------------------
     # STEP 2: STATISTICAL REGRESSION (OLS)
     # ---------------------------------------------------------
-    # Regress for Current User (Check for variance first)
     user_has_model = False
     try:
         if df_you_mean['index_difficulty'].nunique() >= 2:
             slope_u, int_u, r_u, p_u, _ = linregress(df_you_mean['index_difficulty'], df_you_mean['movement_time'])
             user_has_model = True
         else:
-            raise ValueError("Insufficient variance")
+            raise ValueError()
     except Exception:
         slope_u, int_u, r_u, p_u = 0, 0, 0, 1
 
-    # Regress for Global Cohort
     try:
         slope_g, int_g, r_g, p_g, _ = linregress(df_global_mean['index_difficulty'], df_global_mean['movement_time'])
     except Exception:
         slope_g, int_g, r_g, p_g = 0, 0, 0, 1
 
-    # Define the X-axis sweep for the trendlines
     id_range = np.linspace(df['index_difficulty'].min(), df['index_difficulty'].max(), 50)
 
     # ---------------------------------------------------------
-    # PLOT 1: LINEAR REGRESSION (Bandwidth Modeling)
+    # PLOT 1: LINEAR REGRESSION
     # ---------------------------------------------------------
     fig_reg = go.Figure()
 
-    # Layer 1: Faded Red (Your Raw Motor Variance)
     fig_reg.add_trace(go.Scatter(
         x=df_you_raw['index_difficulty'], y=df_you_raw['movement_time'],
         mode='markers', name='Your Raw Trials',
         marker=dict(color='rgba(239, 68, 68, 0.15)', size=5)
     ))
 
-    # Layer 2: Faded Green (Other Individual User Averages)
     fig_reg.add_trace(go.Scatter(
         x=df_other_means['index_difficulty'], y=df_other_means['movement_time'],
         mode='markers', name='Other Users (Averages)',
         marker=dict(color='rgba(34, 197, 94, 0.3)', size=6)
     ))
 
-    # Layer 3: Bright Green (True Global Average)
     fig_reg.add_trace(go.Scatter(
         x=df_global_mean['index_difficulty'], y=df_global_mean['movement_time'],
         mode='markers', name='Global Cohort Average',
         marker=dict(color='rgba(34, 197, 94, 1)', size=10, symbol='diamond', line=dict(color='#FFF', width=1))
     ))
 
-    # Layer 4: Bright Red (Your Calculated Average)
     fig_reg.add_trace(go.Scatter(
         x=df_you_mean['index_difficulty'], y=df_you_mean['movement_time'],
         mode='markers', name='Your Processing Average',
         marker=dict(color='rgba(239, 68, 68, 1)', size=10, line=dict(color='#FFF', width=1))
     ))
 
-    # Layer 5: OLS Trendlines
     fig_reg.add_trace(go.Scatter(
         x=id_range, y=(slope_g * id_range + int_g),
         mode='lines', name='Global OLS',
@@ -121,7 +111,8 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         title="Fitts's Law: Individual Bandwidth vs. Global Cohort",
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
         margin=dict(l=10, r=10, t=40, b=10), height=350,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(15,23,42,0.7)"),
+        # TRANSLUCENT LEGEND MODIFICATION
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(0,0,0,0)", font=dict(color="#F8FAFC")),
         xaxis=dict(title="Index of Difficulty (bits)", gridcolor="rgba(148, 163, 184, 0.12)"),
         yaxis=dict(title="Movement Time (ms)", gridcolor="rgba(148, 163, 184, 0.12)")
     )
@@ -131,7 +122,6 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     # ---------------------------------------------------------
     fig_swarm = go.Figure()
 
-    # Group 1 (Red Box): Your Raw Trials
     fig_swarm.add_trace(go.Box(
         x=df_you_raw['index_difficulty'], y=df_you_raw['movement_time'],
         name="Your Trial Variance", boxpoints='all', jitter=0.3, pointpos=-1.5,
@@ -139,7 +129,6 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         line=dict(color='rgba(239, 68, 68, 0.8)', width=1.5)
     ))
 
-    # Group 2 (Green Box): Global Cohort Averages Distribution
     fig_swarm.add_trace(go.Box(
         x=df_user_means['index_difficulty'], y=df_user_means['movement_time'],
         name="Cohort Averages Distribution", boxpoints='all', jitter=0.3, pointpos=1.5,
@@ -147,7 +136,6 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         line=dict(color='rgba(34, 197, 94, 0.8)', width=1.5)
     ))
 
-    # Highlighting Overlay: Pinpoint exactly where the user's average sits among the cohort
     fig_swarm.add_trace(go.Scatter(
         x=df_you_mean['index_difficulty'], y=df_you_mean['movement_time'],
         mode='markers', name="Your Average Position",
@@ -155,17 +143,16 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     ))
 
     fig_swarm.update_layout(
-        boxmode='group', # Forces the red and green boxes to sit side-by-side at each ID tick
+        boxmode='group', 
         title="Execution Variance & Cohort Placement",
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
         margin=dict(l=10, r=10, t=40, b=10), height=350,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(15,23,42,0.7)"),
+        # TRANSLUCENT LEGEND MODIFICATION
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(0,0,0,0)", font=dict(color="#F8FAFC")),
         xaxis=dict(title="Index of Difficulty (bits)", gridcolor="rgba(148, 163, 184, 0.12)"),
         yaxis=dict(title="Movement Time (ms)", gridcolor="rgba(148, 163, 184, 0.12)")
     )
 
-    # Pack BOTH statistical parameters for display inside the dashboard
-    # Return the Active User's specific statistical profile
     stats_summary = {
         'user': {
             'intercept_a': round(int_u, 1) if user_has_model else "N/A",
