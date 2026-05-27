@@ -47,9 +47,9 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
         <script>
             // --- FIREBASE CLOUD SETUP (Rule 1 & Rule 3 Compliance) ---
             // 1. Receive raw JSON string from Python and parse it back into a JavaScript object
-            const firebaseConfig = JSON.parse('{{firebase_config}}'); 
-            const appId = "{{app_id}}";
-            const userUid = "{{user_uid}}";
+            const firebaseConfig = JSON.parse('{firebase_config}'); 
+            const appId = "{app_id}";
+            const userUid = "{user_uid}";
 
             let db = null; // Removed auth and currentUser
 
