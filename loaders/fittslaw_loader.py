@@ -52,8 +52,14 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     # ---------------------------------------------------------
     # Regress for Current User
     try:
-        slope_u, int_u, r_u, p_u, _ = linregress(df_you_mean['index_difficulty'], df_you_mean['movement_time'])
+        # Check if we have enough distinct ID points to run a regression (Min 2 points)
+        if df_you_mean['index_difficulty'].nunique() >= 2:
+            slope_u, int_u, r_u, p_u, _ = linregress(df_you_mean['index_difficulty'], df_you_mean['movement_time'])
+        else:
+            # Raise error to trigger the 'except' block if variation is insufficient
+            raise ValueError("Insufficient variance")
     except Exception:
+        # Fallback values when the user hasn't played enough or varied difficulty enough
         slope_u, int_u, r_u, p_u = 0, 0, 0, 1
 
     # Regress for Global Cohort
