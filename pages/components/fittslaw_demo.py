@@ -46,8 +46,9 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
 
         <script>
             // --- FIREBASE CLOUD SETUP (Rule 1 & Rule 3 Compliance) ---
-            // 1. Receive raw JSON string from Python and parse it back into a JavaScript object
-            const firebaseConfig = JSON.parse('{firebase_config}'); 
+            
+            // FIX 1: Direct native object injection (Bypassing JSON.parse entirely)
+            const firebaseConfig = {firebase_config}; 
             const appId = "{app_id}";
             const userUid = "{user_uid}";
 
@@ -55,7 +56,12 @@ def render_fittslaw_demo(app_id, firebase_config, user_uid):
 
             try {{
                 if (firebaseConfig && firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {{
-                    firebase.initializeApp(firebaseConfig);
+                    
+                    // FIX 2: Prevent Firebase from crashing during Streamlit hot-reloads
+                    if (!firebase.apps.length) {{
+                        firebase.initializeApp(firebaseConfig);
+                    }}
+                    
                     db = firebase.firestore();
                     console.log("Firebase connected. Using Python backend UUID for tracking.");
                 }} else {{
