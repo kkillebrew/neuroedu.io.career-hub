@@ -64,6 +64,21 @@ My methodology relies on **cognitive grounding**—showing students how mathemat
 conceptually, rather than demanding blind memorization. This maximizes attention capture and structural encoding.
 """)
 
+# --- CENTRALIZED FIREBASE CREDENTIAL MATRIX ---
+# MATLAB Bridge: Think of this as defining a global configuration struct at the top 
+# of your master experiment execution script to avoid initialization failures.
+firebase_config_dict = {
+    "apiKey": "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
+    "authDomain": "neuroedu-career-hub.firebaseapp.com",
+    "projectId": "neuroedu-career-hub",
+    "storageBucket": "neuroedu-career-hub.appspot.com",
+    "messagingSenderId": "1068398164186",
+    "appId": "1:1068398164186:web:093262de26300585618de3"
+}
+
+firebase_config_str = json.dumps(firebase_config_dict)
+project_id = firebase_config_dict["projectId"]
+
 # --- CRITICAL FIX: LAZY LOADING ROUTER ---
 # Replaces st.tabs() with a conditional radio to prevent background canvas execution
 active_lesson = st.radio(
@@ -164,21 +179,6 @@ elif "Neuro-Motor" in active_lesson:
     This experiment measures your motor control channel capacity. By rapidly tapping targets of varying sizes and distances, 
     you are mapping the logarithmic trade-off between movement speed and target accuracy.
     """)
-
-    # --- FIREBASE CREDENTIALS ---
-    firebase_config_dict = {
-        "apiKey": "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
-        "authDomain": "neuroedu-career-hub.firebaseapp.com",
-        "projectId": "neuroedu-career-hub",
-        "storageBucket": "neuroedu-career-hub.appspot.com",
-        "messagingSenderId": "1068398164186",
-        "appId": "1:1068398164186:web:093262de26300585618de3"
-    }
-
-    firebase_config_str = json.dumps(firebase_config_dict)
-
-    if 'fitts_user_id' not in st.session_state:
-        st.session_state.fitts_user_id = f"anon_{uuid.uuid4().hex[:8]}"
     
     user_uid = st.session_state.fitts_user_id
     app_id = "neuroedu-career-hub"
