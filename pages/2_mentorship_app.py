@@ -184,7 +184,7 @@ elif "Neuro-Motor" in active_lesson:
     # =========================================================================
     # STAGE 1: FULL-WIDTH CONTAINER FOR EXPERIMENT (Top Row)
     # =========================================================================
-    st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
+    st.info("🎯 **Target Challenge Grid**\nClick the 'START NOW' button to unlock targets.")
     render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config_str, user_uid=user_uid)
 
     st.divider()
@@ -232,25 +232,35 @@ elif "Neuro-Motor" in active_lesson:
         with stats_col:
             if fig_reg:
                 html_block = f"""
-                    <div style="background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #38BDF8; margin-bottom: 15px;">
-                    <p style="margin: 0 0 10px 0; font-size: 1rem; color: #E2E8F0; font-weight: bold;">Statistical Significance & OLS Modeling</p>
-                    <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #94A3B8;">
-                    We run an Ordinary Least Squares (OLS) regression to test the null hypothesis H₀: b = 0. A model significance p-value &lt; 0.05 successfully validates the presence of the Fitts's Law trade-off.
-                    </p>
-                    <div style="border-top: 1px solid #334155; padding-top: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 0.8rem; color: #EF4444; font-weight: bold;">YOUR MOTOR PROFILE</span><br>
-                    <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['user']['intercept_a']} + {stats['user']['slope_b']} &middot; ID</span><br>
-                    <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['user']['r_squared']}</span><br>
-                    <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['user']['p_val']}</b></span>
-                    </div>
-                    <div style="border-top: 1px solid #334155; padding-top: 10px;">
-                    <span style="font-size: 0.8rem; color: #22C55E; font-weight: bold;">GLOBAL COHORT PROFILE</span><br>
-                    <span style="font-family: monospace; font-size: 1.0rem; color: #F8FAFC;">MT = {stats['global']['intercept_a']} + {stats['global']['slope_b']} &middot; ID</span><br>
-                    <span style="font-size: 0.75rem; color: #64748B;">Variance Expl. (R²): {stats['global']['r_squared']}</span><br>
-                    <span style="font-size: 0.75rem; color: #64748B;">Significance (p): <b>{stats['global']['p_val']}</b></span>
-                    </div>
-                    </div>
-                    """
+<div style="background-color: #EFF6FF; padding: 16px; border-radius: 8px; border-left: 4px solid #3B82F6; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <p style="margin: 0 0 6px 0; font-size: 0.95rem; color: #1E40AF; font-weight: bold;">Statistical Significance & OLS Modeling</p>
+    <p style="margin: 0; font-size: 0.85rem; color: #1E3A8A; line-height: 1.4;">
+        We execute an Ordinary Least Squares (OLS) regression to systematically reject the null hypothesis (H₀: b = 0). A model significance rating of <b>p &lt; 0.05</b> mathematically confirms that task difficulty is actively governing motor processing speed.
+    </p>
+</div>
+
+<div style="background-color: #FEF2F2; padding: 14px; border-radius: 8px; border-left: 4px solid #EF4444; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <p style="margin: 0 0 6px 0; font-size: 0.85rem; color: #991B1B; font-weight: bold;">🎯 YOUR SENSORY-MOTOR PROFILE</p>
+    <p style="margin: 0 0 4px 0; font-family: monospace; font-size: 1.1rem; color: #7F1D1D; font-weight: bold;">
+        MT = {stats['user']['intercept_a']} + {stats['user']['slope_b']} &middot; ID
+    </p>
+    <p style="margin: 0; font-size: 0.8rem; color: #991B1B; line-height: 1.3;">
+        Variance Explained (R²): <b>{stats['user']['r_squared']}</b><br>
+        Model Significance (p): <b>{stats['user']['p_val']}</b>
+    </p>
+</div>
+
+<div style="background-color: #F0FDF4; padding: 14px; border-radius: 8px; border-left: 4px solid #22C55E; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <p style="margin: 0 0 6px 0; font-size: 0.85rem; color: #166534; font-weight: bold;">👥 GLOBAL COHORT PROFILE</p>
+    <p style="margin: 0 0 4px 0; font-family: monospace; font-size: 1.1rem; color: #14532D; font-weight: bold;">
+        MT = {stats['global']['intercept_a']} + {stats['global']['slope_b']} &middot; ID
+    </p>
+    <p style="margin: 0; font-size: 0.8rem; color: #166534; line-height: 1.3;">
+        Variance Explained (R²): <b>{stats['global']['r_squared']}</b><br>
+        Model Significance (p): <b>{stats['global']['p_val']}</b>
+    </p>
+</div>
+"""
                 st.markdown(html_block, unsafe_allow_html=True)
                 
     except Exception as err:
