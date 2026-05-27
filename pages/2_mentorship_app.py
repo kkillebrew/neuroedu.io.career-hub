@@ -12,6 +12,8 @@ import streamlit as st
 import os
 import sys
 import numpy as np
+import uuid       # <-- ADD THIS
+import requests   # <-- ADD THIS
 
 # --- PATH CONFIGURATION ---
 # This tells the script to look one folder up to find the 'loaders' directory
@@ -162,8 +164,6 @@ elif "Neuro-Motor" in active_lesson:
     experiment_col, analytics_col = st.columns([1.1, 1.0], gap="medium")
 
     # --- FIREBASE CREDENTIALS ---
-    # Replace these placeholder strings with your actual Firebase config keys
-    # MATLAB Bridge: This is your database connection struct
     firebase_config_dict = {
         "apiKey": "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
         "authDomain": "neuroedu-career-hub.firebaseapp.com",
@@ -173,30 +173,54 @@ elif "Neuro-Motor" in active_lesson:
         "appId": "1:1068398164186:web:093262de26300585618de3"
     }
 
-    # Convert the Python dictionary to a JSON string so it safely passes into JavaScript
     import json
     firebase_config_str = json.dumps(firebase_config_dict)
 
+    # 1. Generate Anonymous Tracking ID (No IPs, 100% Privacy Compliant)
+    if 'fitts_user_id' not in st.session_state:
+        st.session_state.fitts_user_id = f"anon_{uuid.uuid4().hex[:8]}"
+    
+    user_uid = st.session_state.fitts_user_id
     app_id = "neuroedu-career-hub"
-    user_uid = "anonymous_guest"
+    project_id = firebase_config_dict["projectId"]
 
     with experiment_col:
         st.info("🎯 **Target Challenge Grid**\nClick the baseline 'TAP HERE' node to unlock targets.")
-        # Pipe the config string directly down to the canvas component
         render_fittslaw_demo(app_id=app_id, firebase_config=firebase_config_str, user_uid=user_uid)
 
     with analytics_col:
         st.info("📈 **Cohort Performance Analysis**")
         
         try:
-            # We will wire up the actual Firestore fetch logic in the next phase
-            # For now, pass an empty list to avoid crashing the UI
-            raw_fitts_data = [] 
+            # 2. Fetch Data directly via Firestore REST API
+            rest_url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/artifacts/{app_id}/public/data/fitts_trials"
+            response = requests.get(rest_url)
+
+            raw_fitts_data = []
+            if response.status_code == 200:
+                docs = response.json().get('documents', [])
+                for doc in docs:
+                    fields = doc.get('fields', {})
+                    # Transform nested Google JSON into a flat dictionary
+                    try:
+                        raw_fitts_data.append({
+                            'user_id': fields.get('user_id', {}).get('stringValue', 'unknown'),
+                            'index_difficulty': float(fields.get('index_difficulty', {}).get('doubleValue', 0)),
+                            'movement_time': float(fields.get('movement_time', {}).get('doubleValue', 0))
+                        })
+                    except Exception:
+                        continue
             
-            fig_regression, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
+            # 3. Process Data (Notice we now expect TWO figures returned)
+            fig_reg, fig_swarm, stats = process_cohort_fitts_regression(raw_fitts_data, current_user_uid=user_uid)
             
-            if fig_regression:
-                st.plotly_chart(fig_regression, use_container_width=True, config=PLOTLY_CONFIG)
+            if fig_reg:
+                # Build interactive tabs for the two views
+                tab1, tab2 = st.tabs(["Linear Regression", "Trial Distributions"])
+                with tab1:
+                    st.plotly_chart(fig_reg, use_container_width=True, config=PLOTLY_CONFIG)
+                with tab2:
+                    st.plotly_chart(fig_swarm, use_container_width=True, config=PLOTLY_CONFIG)
                 
                 st.markdown(f"""
                 <div style="background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 8px; border-left: 4px solid #10B981;">
