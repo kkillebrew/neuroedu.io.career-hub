@@ -50,6 +50,9 @@ _, _, academic = get_portfolio_metadata()
 
 mentorship = get_mentorship_data()
 
+# Define Plotly standard configuration to lock the UI per the Style Guide
+PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
+
 # =============================================================================
 # SECTION 1: EDUCATIONAL DESIGN & PHILOSOPHY (Interactive Visual Lessons)
 # =============================================================================
@@ -248,9 +251,6 @@ st.divider()
 # =============================================================================
 st.header("2. Education & Professional History")
 st.write("Tracking quantitative student development, milestone testing metrics, and higher-education instruction.")
-
-# Define Plotly standard configuration to lock the UI per the Style Guide
-PLOTLY_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
 
 # --- THE ABSOLUTE REPOSITORY PATH ANCHOR ---
 # __file__ evaluates to the absolute path of this file (.../pages/2_mentorship_app.py).
