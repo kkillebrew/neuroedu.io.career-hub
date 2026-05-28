@@ -44,42 +44,86 @@ bio = get_biographic_metadata()
 pubs, skills, academic = get_portfolio_metadata()
 references = get_references_metadata()
 
-# --- MAIN HUB LAYOUT ---
-# 1. TOP ROW: Profile Image and Title
-col_img, col_text = st.columns([1, 4], gap="large")
+# --- MASTHEAD & BIOGRAPHIC LAYOUT ---
+# 1. Base64 Image Encoding (Bypassing Streamlit's rigid image constraints for CSS control)
+# MATLAB Analogy: Similar to using `imread` combined with `imfinfo` to handle raw image matrices safely.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+logo_path = os.path.join(current_dir, "documents", "Neuro-Edu_Logo_Transparent.png")
+img_path = os.path.join(current_dir, "documents", "kyle.jpg")
 
-with col_img:
-    # This forces Streamlit to look relative to exactly where career_hub_app.py lives
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    img_path = os.path.join(base_dir, "documents", "kyle.jpg")
-    
-    if os.path.exists(img_path):
-        st.image(img_path, width='stretch')
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
     else:
-        # Now it will tell you exactly what path it is failing to find!
-        st.warning(f"Image not found. Looked in: {img_path}")
+        # Graceful Failure: If the image breaks, this error tells you exactly where it looked.
+        st.error(f"⚠️ Debug: Image not found at absolute path: {image_path}")
+        return ""
 
-with col_text:
-    st.title(bio['name'])
-    st.subheader(bio['title'])
+b64_logo = get_base64_image(logo_path)
+b64_profile = get_base64_image(img_path)
+
+# 2. High-Contrast Slate CSS & Structural Injection
+# Note: HTML inside st.markdown MUST be left-aligned to prevent Markdown from rendering it as a code block.
+st.markdown(f"""
+<style>
+/* Profile Image Architecture */
+.profile-img-container {{
+    width: 180px; 
+    height: 180px;
+    margin: 0 auto 20px auto;
+    overflow: hidden; 
+    border-radius: 50%;
+    border: 2px solid #334155;
+    background-color: #0F172A;
+}}
+.profile-img-container img {{
+    width: 150%; 
+    margin: -25% 0 0 -25%; 
+}}
+.logo-container {{ text-align: center; margin-bottom: 15px; }}
+.logo-container img {{ max-width: 280px; width: 100%; height: auto; }}
+
+/* Typography & Header Hierarchy */
+.masthead-title {{ font-size: 2.5rem; font-weight: bold; color: #F8FAFC; text-align: center; margin-bottom: 5px; line-height: 1.2; }}
+.masthead-subtitle {{ font-size: 1.15rem; color: #94A3B8; text-align: center; margin-bottom: 25px; font-weight: 500; }}
+.vision-header {{ font-size: 1.05rem; color: #F8FAFC; text-align: center; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }}
+.vision-blurb {{ font-size: 0.9rem; color: #CBD5E1; text-align: center; max-width: 750px; margin: 0 auto 40px auto; line-height: 1.6; padding: 15px; background-color: #0F172A; border-radius: 8px; border: 1px solid #1E293B; }}
+</style>
+
+<div class="logo-container">
+    <img src="data:image/png;base64,{b64_logo}" alt="Neuro-Edu Logo">
+</div>
+<div class="profile-img-container">
+    <img src="data:image/jpeg;base64,{b64_profile}" alt="Kyle W. Killebrew">
+</div>
+<div class="masthead-title">{bio['name']}</div>
+<div class="masthead-subtitle">Behavioral, Cognitive, Neuro, and Data Scientist and Educational Mentor</div>
+
+<!-- Added missing Strategic Vision structure -->
+<div class="vision-header">Strategic Vision</div>
+<div class="vision-blurb">
+    {bio['bio']}
+</div>
+""", unsafe_allow_html=True)
 
 st.divider()
 
 # --- EXPLORE MY WORK: THE PORTFOLIO MATRIX ---
 st.markdown("""
-    <style>
-    /* Dark Slate Themed Portfolio Boxes */
-    .portfolio-box { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 20px; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .portfolio-header { color: #F8FAFC; text-align: center; margin-bottom: 20px; font-size: 1.25rem; font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-    
-    /* Flexbox Alternating Layout Matrix */
-    .proj-row { display: flex; align-items: stretch; margin-bottom: 15px; gap: 15px; }
-    .proj-row.reverse { flex-direction: row-reverse; }
-    .proj-text { flex: 1.5; display: flex; flex-direction: column; justify-content: center; }
-    .proj-title { font-weight: 600; color: #E2E8F0; font-size: 0.95rem; margin-bottom: 4px; }
-    .proj-desc { color: #94A3B8; font-size: 0.8rem; line-height: 1.4; }
-    .proj-canvas { flex: 1; background-color: #1E293B; border-radius: 4px; border: 1px solid #334155; min-height: 80px; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 0.75rem; font-style: italic;}
-    </style>
+<style>
+/* Dark Slate Themed Portfolio Boxes */
+.portfolio-box { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 20px; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+.portfolio-header { color: #F8FAFC; text-align: center; margin-bottom: 20px; font-size: 1.25rem; font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+
+/* Flexbox Alternating Layout Matrix */
+.proj-row { display: flex; align-items: stretch; margin-bottom: 15px; gap: 15px; }
+.proj-row.reverse { flex-direction: row-reverse; }
+.proj-text { flex: 1.5; display: flex; flex-direction: column; justify-content: center; }
+.proj-title { font-weight: 600; color: #E2E8F0; font-size: 0.95rem; margin-bottom: 4px; }
+.proj-desc { color: #94A3B8; font-size: 0.8rem; line-height: 1.4; }
+.proj-canvas { flex: 1; background-color: #1E293B; border-radius: 4px; border: 1px solid #334155; min-height: 80px; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 0.75rem; font-style: italic;}
+</style>
 """, unsafe_allow_html=True)
 
 # Three uniform, horizontally aligned display blocks
@@ -87,96 +131,87 @@ b1, b2, b3 = st.columns(3, gap="large")
 
 with b1:
     st.markdown("""
-    <div class="portfolio-box">
-        <div class="portfolio-header">Data Science Portfolio</div>
-        
-        <div class="proj-row">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text">
-                <div class="proj-title">Longitudinal MAPS Percentile Engine</div>
-                <div class="proj-desc">A memory-optimized data pipeline utilizing Pandas explicit column filtering to track national percentile growth metrics across sequential testing terms.</div>
-            </div>
-        </div>
-        
-        <div class="proj-row reverse">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text" style="text-align: right;">
-                <div class="proj-title">Keyboard Typing Behavior Analysis</div>
-                <div class="proj-desc">An interactive machine learning pipeline executing feature extraction and cluster analysis on behavioral keystroke dynamics to isolate user profiles.</div>
-            </div>
-        </div>
-        
-        <div class="proj-row">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text">
-                <div class="proj-title">Time-Series Signal Processing Dashboard</div>
-                <div class="proj-desc">A high-performance visualization dashboard designed for large-scale EEG data tracking, applying automated artifact rejection.</div>
-            </div>
+<div class="portfolio-box">
+    <div class="portfolio-header">Data Science Portfolio</div>
+    <div class="proj-row">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text">
+            <div class="proj-title">Longitudinal MAPS Percentile Engine</div>
+            <div class="proj-desc">A memory-optimized data pipeline utilizing Pandas explicit column filtering to track national percentile growth metrics across sequential testing terms.</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="proj-row reverse">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text" style="text-align: right;">
+            <div class="proj-title">Keyboard Typing Behavior Analysis</div>
+            <div class="proj-desc">An interactive machine learning pipeline executing feature extraction and cluster analysis on behavioral keystroke dynamics to isolate user profiles.</div>
+        </div>
+    </div>
+    <div class="proj-row">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text">
+            <div class="proj-title">Time-Series Signal Processing Dashboard</div>
+            <div class="proj-desc">A high-performance visualization dashboard designed for large-scale EEG data tracking, applying automated artifact rejection.</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 with b2:
     st.markdown("""
-    <div class="portfolio-box">
-        <div class="portfolio-header">Academic Research Portfolio</div>
-        
-        <div class="proj-row reverse">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text" style="text-align: right;">
-                <div class="proj-title">Cortical Dynamics in Psychosis Populations</div>
-                <div class="proj-desc">High-density EEG research mapping phase-locking values and neural oscillations during cognitive tasks to isolate biomarkers.</div>
-            </div>
-        </div>
-        
-        <div class="proj-row">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text">
-                <div class="proj-title">Working Memory Grouping Metrics</div>
-                <div class="proj-desc">Behavioral modeling analysis exploring the limits of human visual short-term storage capacity when processing chunked arrays.</div>
-            </div>
-        </div>
-        
-        <div class="proj-row reverse">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text" style="text-align: right;">
-                <div class="proj-title">Psychophysics Replication Frameworks</div>
-                <div class="proj-desc">An automated statistical analysis suite built to process multi-participant trial data, verifying experimental design paradigms.</div>
-            </div>
+<div class="portfolio-box">
+    <div class="portfolio-header">Academic Research Portfolio</div>
+    <div class="proj-row reverse">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text" style="text-align: right;">
+            <div class="proj-title">Cortical Dynamics in Psychosis Populations</div>
+            <div class="proj-desc">High-density EEG research mapping phase-locking values and neural oscillations during cognitive tasks to isolate biomarkers.</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="proj-row">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text">
+            <div class="proj-title">Working Memory Grouping Metrics</div>
+            <div class="proj-desc">Behavioral modeling analysis exploring the limits of human visual short-term storage capacity when processing chunked arrays.</div>
+        </div>
+    </div>
+    <div class="proj-row reverse">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text" style="text-align: right;">
+            <div class="proj-title">Psychophysics Replication Frameworks</div>
+            <div class="proj-desc">An automated statistical analysis suite built to process multi-participant trial data, verifying experimental design paradigms.</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 with b3:
     st.markdown("""
-    <div class="portfolio-box">
-        <div class="portfolio-header">Education & Mentorship Portfolio</div>
-        
-        <div class="proj-row">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text">
-                <div class="proj-title">Fitts's Law Neuro-Motor Control Rig</div>
-                <div class="proj-desc">An interactive HTML5 Canvas reaction-time engine that maps human visual-motor channel capacity and bandwidth.</div>
-            </div>
-        </div>
-        
-        <div class="proj-row reverse">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text" style="text-align: right;">
-                <div class="proj-title">Visual Search & Attention Task</div>
-                <div class="proj-desc">A pre-attentive feature binding experiment replicating Treisman and Wolfe paradigms to demonstrate parallel pop-out mechanics.</div>
-            </div>
-        </div>
-        
-        <div class="proj-row">
-            <div class="proj-canvas">Canvas Render</div>
-            <div class="proj-text">
-                <div class="proj-title">Geometric Space & Dissection Displayer</div>
-                <div class="proj-desc">A real-time coordinate transformation simulator utilizing HTML5 loops to visually demonstrate area derivation to students.</div>
-            </div>
+<div class="portfolio-box">
+    <div class="portfolio-header">Education & Mentorship Portfolio</div>
+    <div class="proj-row">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text">
+            <div class="proj-title">Fitts's Law Neuro-Motor Control Rig</div>
+            <div class="proj-desc">An interactive HTML5 Canvas reaction-time engine that maps human visual-motor channel capacity and bandwidth.</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="proj-row reverse">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text" style="text-align: right;">
+            <div class="proj-title">Visual Search & Attention Task</div>
+            <div class="proj-desc">A pre-attentive feature binding experiment replicating Treisman and Wolfe paradigms to demonstrate parallel pop-out mechanics.</div>
+        </div>
+    </div>
+    <div class="proj-row">
+        <div class="proj-canvas">Canvas Render</div>
+        <div class="proj-text">
+            <div class="proj-title">Geometric Space & Dissection Displayer</div>
+            <div class="proj-desc">A real-time coordinate transformation simulator utilizing HTML5 loops to visually demonstrate area derivation to students.</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.divider()
 
