@@ -415,18 +415,35 @@ for job in mentorship['career_history']:
                 # DATA PIPELINE TYPE 1: LONGITUDINAL MAPS PERCENTILES
                 # ---------------------------------------------------------
                 if job['dataset_type'] == 'maps':
-                    # cols_to_load = ["Last Name", "First Name", "Fall '25%", "Winter '25%", "Spring '25%"]
+                    # --- FIXED: Exact column names from CSV schema ---
+                    cols_to_load = ["Last", "First", "Fall '25 %", "Winter '25 %", "Spring '25 %"]
                     try:
-                        # 1. Load the entire CSV without the strict usecols filter
-                        df_maps = pd.read_csv(target_csv)
+                        # Memory-optimized load
+                        df_maps = pd.read_csv(target_csv, usecols=cols_to_load)
                         
-                        # 2. Print the exact headers to the Streamlit UI
-                        st.error("⚠️ Column Name Mismatch. Please check the exact names below:")
-                        st.code(df_maps.columns.tolist())
+                        df_melted = df_maps.melt(
+                            id_vars=["Last", "First"], 
+                            value_vars=["Fall '25 %", "Winter '25 %", "Spring '25 %"],
+                            var_name="Testing Term", 
+                            value_name="Percentile"
+                        )
                         
-                        # 3. Stop the script from running the rest of the plotting logic
-                        st.stop() 
+                        # Clean up the axis labels by removing the " %" string
+                        df_melted['Testing Term'] = df_melted['Testing Term'].str.replace(" %", "")
                         
+                        fig = px.box(
+                            df_melted, x="Testing Term", y="Percentile", points="all",
+                            title="Longitudinal MAP Percentile Distributions",
+                            color="Testing Term",
+                            color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
+                            margin=dict(l=10, r=10, t=40, b=10), height=280, showlegend=False,
+                            yaxis=dict(title="National Percentile Scale", gridcolor="rgba(148, 163, 184, 0.12)")
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                    
                     except FileNotFoundError:
                         st.error(f"System rejected path: `{target_csv}`. Check Linux case-sensitivity.")
                     except Exception as e:
