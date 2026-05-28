@@ -116,11 +116,12 @@ st.divider()
 # --- EXPLORE MY WORK: THE PORTFOLIO MATRIX ---
 st.markdown("""
 <style>
-.proj-title a { color: #E2E8F0; text-decoration: none; transition: color 0.3s ease; }
-.proj-title a:hover { color: #38BDF8; }
+/* Header Link Styling */
+.portfolio-header a { color: #F8FAFC; text-decoration: none; transition: color 0.3s ease; }
+.portfolio-header a:hover { color: #38BDF8; }
 
 .portfolio-box { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 25px; height: 100%; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-.portfolio-header { color: #F8FAFC; text-align: center; margin-bottom: 25px; font-size: 1.4rem; font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 15px; }
+.portfolio-header { text-align: center; margin-bottom: 25px; font-size: 1.4rem; font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 15px; }
 
 .proj-row { display: flex; align-items: stretch; margin-bottom: 20px; gap: 20px; flex: 1; }
 .proj-row.reverse { flex-direction: row-reverse; }
@@ -136,25 +137,25 @@ b1, b2, b3 = st.columns(3, gap="large")
 with b1:
     st.markdown("""
 <div class="portfolio-box">
-    <div class="portfolio-header">Data Science Portfolio</div>
+    <div class="portfolio-header"><a href="https://data-projects.neuro-edu.io/" target="_blank">Data Science Portfolio</a></div>
     <div class="proj-row">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text">
-            <div class="proj-title"><a href="#">Longitudinal MAPS Percentile Engine</a></div>
+            <div class="proj-title">Longitudinal MAPS Percentile Engine</div>
             <div class="proj-desc">A memory-optimized data pipeline utilizing Pandas explicit column filtering to track national percentile growth metrics across sequential testing terms.</div>
         </div>
     </div>
     <div class="proj-row reverse">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text" style="text-align: right;">
-            <div class="proj-title"><a href="#">Keyboard Typing Behavior Analysis</a></div>
+            <div class="proj-title">Keyboard Typing Behavior Analysis</div>
             <div class="proj-desc">An interactive machine learning pipeline executing feature extraction and cluster analysis on behavioral keystroke dynamics to isolate user profiles.</div>
         </div>
     </div>
     <div class="proj-row">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text">
-            <div class="proj-title"><a href="#">Time-Series Signal Processing Dashboard</a></div>
+            <div class="proj-title">Time-Series Signal Processing Dashboard</div>
             <div class="proj-desc">A high-performance visualization dashboard designed for large-scale EEG data tracking, applying automated artifact rejection.</div>
         </div>
     </div>
@@ -164,25 +165,25 @@ with b1:
 with b2:
     st.markdown("""
 <div class="portfolio-box">
-    <div class="portfolio-header">Academic Research Portfolio</div>
+    <div class="portfolio-header"><a href="https://kylewkillebrew.neuro-edu.io/1_academic_research_app" target="_blank">Academic Research Portfolio</a></div>
     <div class="proj-row reverse">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text" style="text-align: right;">
-            <div class="proj-title"><a href="#">Cortical Dynamics in Psychosis Populations</a></div>
+            <div class="proj-title">Cortical Dynamics in Psychosis Populations</div>
             <div class="proj-desc">High-density EEG research mapping phase-locking values and neural oscillations during cognitive tasks to isolate biomarkers.</div>
         </div>
     </div>
     <div class="proj-row">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text">
-            <div class="proj-title"><a href="#">Working Memory Grouping Metrics</a></div>
+            <div class="proj-title">Working Memory Grouping Metrics</div>
             <div class="proj-desc">Behavioral modeling analysis exploring the limits of human visual short-term storage capacity when processing chunked arrays.</div>
         </div>
     </div>
     <div class="proj-row reverse">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text" style="text-align: right;">
-            <div class="proj-title"><a href="#">Psychophysics Replication Frameworks</a></div>
+            <div class="proj-title">Psychophysics Replication Frameworks</div>
             <div class="proj-desc">An automated statistical analysis suite built to process multi-participant trial data, verifying experimental design paradigms.</div>
         </div>
     </div>
@@ -192,25 +193,25 @@ with b2:
 with b3:
     st.markdown("""
 <div class="portfolio-box">
-    <div class="portfolio-header">Education & Mentorship Portfolio</div>
+    <div class="portfolio-header"><a href="https://kylewkillebrew.neuro-edu.io/2_mentorship_app" target="_blank">Education & Mentorship Portfolio</a></div>
     <div class="proj-row">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text">
-            <div class="proj-title"><a href="#">Fitts's Law Neuro-Motor Control Rig</a></div>
+            <div class="proj-title">Fitts's Law Neuro-Motor Control Rig</div>
             <div class="proj-desc">An interactive HTML5 Canvas reaction-time engine that maps human visual-motor channel capacity and bandwidth.</div>
         </div>
     </div>
     <div class="proj-row reverse">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text" style="text-align: right;">
-            <div class="proj-title"><a href="#">Visual Search & Attention Task</a></div>
+            <div class="proj-title">Visual Search & Attention Task</div>
             <div class="proj-desc">A pre-attentive feature binding experiment replicating Treisman and Wolfe paradigms to demonstrate parallel pop-out mechanics.</div>
         </div>
     </div>
     <div class="proj-row">
         <div class="proj-canvas">Canvas Render</div>
         <div class="proj-text">
-            <div class="proj-title"><a href="#">Geometric Space & Dissection Displayer</a></div>
+            <div class="proj-title">Geometric Space & Dissection Displayer</div>
             <div class="proj-desc">A real-time coordinate transformation simulator utilizing HTML5 loops to visually demonstrate area derivation to students.</div>
         </div>
     </div>
@@ -219,7 +220,7 @@ with b3:
 
 st.divider()
 
-# --- RESTORED: PROFESSIONAL DOCUMENTATION ---
+# --- PROFESSIONAL DOCUMENTATION ---
 st.markdown("<h3 style='text-align: center; color: #F8FAFC; margin-bottom: 20px;'>Professional Documentation</h3>", unsafe_allow_html=True)
 
 doc_1, doc_2, doc_3, doc_4 = st.columns(4)
