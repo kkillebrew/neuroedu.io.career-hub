@@ -398,101 +398,104 @@ for job in mentorship['career_history']:
     with st.container():
         # Decouple text logs from the data visualizations using a clean 1:2 column layout
         c_left, c_right = st.columns([1, 2], gap="medium")
+        
+        # --- RESTORED: LEFT COLUMN TEXT ---
+        with c_left:
+            st.markdown(f"#### **{job['school']}**")
+            st.markdown(f"*{job['role']}*")
+            st.caption(f"🗓️ {job['years']}")
+            st.write(job['metrics'])
+            
         with c_right:
             if job.get('file_path'):
-                # --- THE ABSOLUTE PATH ASSEMBLY ---
+                # Assemble the strict absolute path
                 target_csv = os.path.join(repo_root, job['file_path'])
                 
-                # --- PATCH: DYNAMIC UPLOAD FALLBACK ---
-                # MATLAB Bridge: Equivalent to uigetfile() if the hardcoded path fails
-                file_source = target_csv if os.path.exists(target_csv) else None
-                
-                if not file_source:
-                    st.warning(f"File missing on server: `{job['file_path']}`")
-                    # Provide a web UI upload widget to inject the data dynamically
-                    file_source = st.file_uploader(
-                        f"Upload {job['dataset_type'].upper()} Data for {job['years']}", 
-                        type=['csv'], 
-                        key=job['school'] + job['role']
-                    )
-                
-                if file_source is not None:
-                    # ---------------------------------------------------------
-                    # DATA PIPELINE TYPE 1: LONGITUDINAL MAPS PERCENTILES
-                    # ---------------------------------------------------------
-                    if job['dataset_type'] == 'maps':
-                        cols_to_load = ["Last Name", "First Name", "Fall '25%", "Winter '25%", "Spring '25%"]
-                        try:
-                            df_maps = pd.read_csv(file_source, usecols=cols_to_load)
-                            
-                            df_melted = df_maps.melt(
-                                id_vars=["Last Name", "First Name"], 
-                                value_vars=["Fall '25%", "Winter '25%", "Spring '25%"],
-                                var_name="Testing Term", 
-                                value_name="Percentile"
-                            )
-                            df_melted['Testing Term'] = df_melted['Testing Term'].str.replace("%", "")
-                            
-                            fig = px.box(
-                                df_melted, x="Testing Term", y="Percentile", points="all",
-                                title="Longitudinal MAP Percentile Distributions",
-                                color="Testing Term",
-                                color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80']
-                            )
-                            fig.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
-                                margin=dict(l=10, r=10, t=40, b=10), height=280, showlegend=False,
-                                yaxis=dict(title="National Percentile Scale", gridcolor="rgba(148, 163, 184, 0.12)")
-                            )
-                            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
-                        except Exception as e:
-                            st.error(f"Error executing MAPs data parse: {e}")
-
-                    # ---------------------------------------------------------
-                    # DATA PIPELINE TYPE 2: STANDARDS-BASED ELA METRICS
-                    # ---------------------------------------------------------
-                    elif job['dataset_type'] == 'ela':
-                        myth_components = ['Sequence', 'Techniques', 'Transitions', 'Details', 'Conclusion']
-                        core_standards = [
-                            'Article Analysis - Citing Evidence (RI.7.1.)', 
-                            'Article Analysis - Central Idea (RI.7.1)', 
-                            'RI.7.5: Quiz (Text Structure)', 'SLG #3', 
-                            'RI.7.6 Transportation', 'Unit Test: Percy Jackson'
-                        ]
-                        cols_to_load = ["Last Name", "First Name"] + core_standards + myth_components
+                # ---------------------------------------------------------
+                # DATA PIPELINE TYPE 1: LONGITUDINAL MAPS PERCENTILES
+                # ---------------------------------------------------------
+                if job['dataset_type'] == 'maps':
+                    cols_to_load = ["Last Name", "First Name", "Fall '25%", "Winter '25%", "Spring '25%"]
+                    try:
+                        # Aggressively load without checking os.path.exists first
+                        df_maps = pd.read_csv(target_csv, usecols=cols_to_load)
                         
-                        try:
-                            df_ela = pd.read_csv(file_source, usecols=cols_to_load)
-                            df_ela = df_ela.replace({'M': np.nan})
-                            assess_cols = core_standards + myth_components
-                            df_ela[assess_cols] = df_ela[assess_cols].apply(pd.to_numeric, errors='coerce')
-                            
-                            df_ela['Create Your Own Myth'] = df_ela[myth_components].mean(axis=1, skipna=True)
-                            
-                            plot_cols = core_standards + ['Create Your Own Myth']
-                            df_plot = df_ela[["Last Name", "First Name"] + plot_cols].copy()
-                            
-                            df_melted_ela = df_plot.melt(
-                                id_vars=["Last Name", "First Name"], value_vars=plot_cols,
-                                var_name="Standard / Assessment", value_name="Score (0-4)"
-                            )
-                            df_melted_ela['Standard / Assessment'] = df_melted_ela['Standard / Assessment'].apply(
-                                lambda x: x[:15] + "..." if len(x) > 15 else x
-                            )
-                            
-                            fig = px.box(
-                                df_melted_ela, x="Standard / Assessment", y="Score (0-4)",
-                                title="Standards Mastery Distributions (0-4 Scale)", color_discrete_sequence=['#6366F1']
-                            )
-                            fig.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
-                                margin=dict(l=10, r=10, t=40, b=10), height=280,
-                                yaxis=dict(title="Proficiency Score", range=[-0.2, 4.2], gridcolor="rgba(148, 163, 184, 0.12)"),
-                                xaxis=dict(title="")
-                            )
-                            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
-                        except Exception as e:
-                            st.error(f"Error executing ELA standards parse: {e}")
+                        df_melted = df_maps.melt(
+                            id_vars=["Last Name", "First Name"], 
+                            value_vars=["Fall '25%", "Winter '25%", "Spring '25%"],
+                            var_name="Testing Term", 
+                            value_name="Percentile"
+                        )
+                        df_melted['Testing Term'] = df_melted['Testing Term'].str.replace("%", "")
+                        
+                        fig = px.box(
+                            df_melted, x="Testing Term", y="Percentile", points="all",
+                            title="Longitudinal MAP Percentile Distributions",
+                            color="Testing Term",
+                            color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
+                            margin=dict(l=10, r=10, t=40, b=10), height=280, showlegend=False,
+                            yaxis=dict(title="National Percentile Scale", gridcolor="rgba(148, 163, 184, 0.12)")
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                    
+                    except FileNotFoundError:
+                        st.error(f"System rejected path: `{target_csv}`. Check Linux case-sensitivity.")
+                    except Exception as e:
+                        st.error(f"Error executing MAPs data parse: {e}")
+
+                # ---------------------------------------------------------
+                # DATA PIPELINE TYPE 2: STANDARDS-BASED ELA METRICS
+                # ---------------------------------------------------------
+                elif job['dataset_type'] == 'ela':
+                    myth_components = ['Sequence', 'Techniques', 'Transitions', 'Details', 'Conclusion']
+                    core_standards = [
+                        'Article Analysis - Citing Evidence (RI.7.1.)', 
+                        'Article Analysis - Central Idea (RI.7.1)', 
+                        'RI.7.5: Quiz (Text Structure)', 'SLG #3', 
+                        'RI.7.6 Transportation', 'Unit Test: Percy Jackson'
+                    ]
+                    cols_to_load = ["Last Name", "First Name"] + core_standards + myth_components
+                    
+                    try:
+                        # Aggressively load without checking os.path.exists first
+                        df_ela = pd.read_csv(target_csv, usecols=cols_to_load)
+                        
+                        df_ela = df_ela.replace({'M': np.nan})
+                        assess_cols = core_standards + myth_components
+                        df_ela[assess_cols] = df_ela[assess_cols].apply(pd.to_numeric, errors='coerce')
+                        
+                        df_ela['Create Your Own Myth'] = df_ela[myth_components].mean(axis=1, skipna=True)
+                        
+                        plot_cols = core_standards + ['Create Your Own Myth']
+                        df_plot = df_ela[["Last Name", "First Name"] + plot_cols].copy()
+                        
+                        df_melted_ela = df_plot.melt(
+                            id_vars=["Last Name", "First Name"], value_vars=plot_cols,
+                            var_name="Standard / Assessment", value_name="Score (0-4)"
+                        )
+                        df_melted_ela['Standard / Assessment'] = df_melted_ela['Standard / Assessment'].apply(
+                            lambda x: x[:15] + "..." if len(x) > 15 else x
+                        )
+                        
+                        fig = px.box(
+                            df_melted_ela, x="Standard / Assessment", y="Score (0-4)",
+                            title="Standards Mastery Distributions (0-4 Scale)", color_discrete_sequence=['#6366F1']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
+                            margin=dict(l=10, r=10, t=40, b=10), height=280,
+                            yaxis=dict(title="Proficiency Score", range=[-0.2, 4.2], gridcolor="rgba(148, 163, 184, 0.12)"),
+                            xaxis=dict(title="")
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+                        
+                    except FileNotFoundError:
+                        st.error(f"System rejected path: `{target_csv}`. Check Linux case-sensitivity.")
+                    except Exception as e:
+                        st.error(f"Error executing ELA standards parse: {e}")
 
             # ---------------------------------------------------------
             # DATA PIPELINE TYPE 3: UNIVERSITY COURSE MATRIX DISPLAY
