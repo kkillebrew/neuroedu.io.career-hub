@@ -1,54 +1,4 @@
-"""
-=============================================================================
-MODULE: career_hub_sidebar.py (UI Controller)
-AUTHOR: Kyle W. Killebrew, PhD
-DESCRIPTION: 
-    Centralized sidebar component for the Career Hub ecosystem.
-    Imports into app.py and all pages/ scripts to ensure a uniform
-    UI without duplicating code.
-=============================================================================
-"""
-
-import streamlit as st
-import os
-from PIL import Image
-
-def apply_global_settings(hub_title):
-    """
-    Sets the favicon and page title across the hub.
-    MATLAB Analogy: This is your 'set(fig, 'Name', hub_title)' equivalent.
-    """
-
-    # --- ICON LOADING LOGIC ---
-    # We define the path to our newly created transparent favicon
-    favicon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "documents", "Neuro-Edu_favicon_Transparent.ico")
-
-    # We attempt to load the icon; if it's missing, we use a neuro-themed emoji as a fallback
-    try:
-        favicon = Image.open(favicon_path)
-    except Exception:
-        favicon = "🧠" 
-
-    # --- THE PAGE CONFIGURATION ---
-    # MATLAB Analogy: This is like setting the 'Name' and 'Icon' properties 
-    # of your uifigure during initialization.
-    st.set_page_config(
-        page_title=hub_title, # Or "Data Projects Hub"
-        page_icon=favicon, # This is what puts the Monet Brain in the browser tab!
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-
-def render_sidebar():
-    """
-    Renders the custom sidebar with the masthead, directory, presence links,
-    and unified CSS styling.
-    
-    MATLAB ANALOGY: This is like a custom UI function that accepts a figure 
-    handle and builds out the standardized uipanels and uicontrols.
-    """
-    
-    # --- 1. GLOBAL SIDEBAR CSS (Styling & Bug Fixes) ---
+# --- 1. GLOBAL SIDEBAR CSS (Styling & Bug Fixes) ---
     st.markdown("""
         <style>
         /* Hide the default Streamlit sidebar navigation menu to remove emojis/clutter */
@@ -59,11 +9,14 @@ def render_sidebar():
             font-family: sans-serif !important; 
         }
 
-        /* Standardize Sidebar Background & Text using Palette A (Neuromorphic Blue) */
+        /* Standardize Sidebar Background & STRICTLY Enforce Text Color */
         [data-testid="stSidebar"] {
-            background-color: #0F172A; /* Deep Slate */
-            color: #F8FAFC; /* Crisp White */
-            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: #0F172A !important; /* Deep Slate */
+        }
+        
+        /* This prevents Streamlit's Light/Dark mode auto-detect from turning text gray */
+        [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+            color: #F8FAFC !important;
         }
 
         /* Custom link styling to replace the default navigation */
@@ -78,7 +31,7 @@ def render_sidebar():
             transition: background-color 0.3s, color 0.3s;
         }
         .sidebar-link:hover {
-            background-color: #1E293B; /* Slightly lighter slate */
+            background-color: #1E293B !important; 
             color: #38BDF8 !important; /* Bright Sky Blue Accent */
         }
         
@@ -87,20 +40,22 @@ def render_sidebar():
             display: flex;
             align-items: center;
             gap: 15px;
-            margin-top: -40px; /* Pulls content up to remove dead whitespace */
+            margin-top: -40px; 
             margin-bottom: 30px;
         }
         .masthead-text {
-            line-height: 1.2;
+            line-height: 1.25;
         }
         .masthead-name {
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: bold;
-            color: #F8FAFC;
+            color: #F8FAFC !important;
+            margin-bottom: 4px;
         }
         .masthead-title {
-            font-size: 0.85rem;
-            color: #94A3B8; /* Muted Slate */
+            font-size: 0.75rem; /* Shrunk down to subtext size */
+            color: #94A3B8 !important; /* Muted Slate */
+            line-height: 1.3;
         }
         
         /* Presence / Social Bar Styling */
@@ -110,21 +65,21 @@ def render_sidebar():
             justify-content: center;
             margin-top: 30px;
             margin-bottom: 20px;
-            flex-wrap: wrap; /* Allows icons to wrap if screen is very narrow */
+            flex-wrap: wrap; 
         }
         .presence-icon {
-            color: #94A3B8;
+            color: #94A3B8 !important;
             transition: color 0.3s;
         }
         .presence-icon:hover {
-            color: #38BDF8; /* Sky Blue Accent on hover */
+            color: #38BDF8 !important; 
         }
         
         /* Copyright footer */
         .sidebar-footer {
             text-align: center;
             font-size: 0.75rem;
-            color: #64748B;
+            color: #64748B !important;
             margin-top: 40px;
         }
         </style>
@@ -132,24 +87,23 @@ def render_sidebar():
 
     with st.sidebar:
         # --- 2. MASTHEAD (Monet Brain PNG + Welcome) ---        
-        # Create a two-column layout for the logo and the text
         col1, col2 = st.columns([1, 2.5], gap="small")
         
         with col1:
-        # Dynamically locate the image to prevent pathing errors
             base_dir = os.path.dirname(os.path.abspath(__file__))
             logo_path = os.path.join(base_dir, "documents", "Neuro-Edu_Logo_Transparent.png")
             
             if os.path.exists(logo_path):
                 st.image(logo_path, use_container_width=True)
             else:
-                st.write("🧠") # Failsafe if the image isn't found
+                st.write("🧠") 
         
         with col2:
+             # Applied the correct explicit subtext
              st.markdown("""
                 <div class="masthead-text">
                     <div class="masthead-name">Kyle W. Killebrew, PhD</div>
-                    <div class="masthead-title">Data Scientist & AI Educator</div>
+                    <div class="masthead-title">Behavioral, Cognitive, Neuro, and Data Scientist and Educational Mentor</div>
                 </div>
             """, unsafe_allow_html=True)
 
