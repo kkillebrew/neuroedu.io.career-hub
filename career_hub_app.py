@@ -25,8 +25,10 @@ from career_hub_loader import (
     get_portfolio_metadata, 
     get_references_metadata,
 )
+from pages.components.mini_demos import render_fittslaw_mini, render_pythagorean_mini, render_geometry_mini
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
+
 
 ########################################
 #        APPLY GLOBAL SETTINGS         #
@@ -193,32 +195,62 @@ with b2:
 """, unsafe_allow_html=True)
 
 with b3:
+    # Retain the main Box styling by rendering the header first
     st.markdown("""
-<div class="portfolio-box">
-    <div class="portfolio-header"><a href="https://kylewkillebrew.neuro-edu.io/2_mentorship_app" target="_blank">Education & Mentorship Portfolio</a></div>
-    <div class="proj-row">
-        <div class="proj-canvas">Canvas Render</div>
+    <style>
+    .portfolio-box-native { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 25px; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .portfolio-header a { color: #F8FAFC; text-decoration: none; transition: color 0.3s ease; }
+    .portfolio-header a:hover { color: #38BDF8; }
+    .proj-text { display: flex; flex-direction: column; justify-content: center; height: 100%; }
+    .proj-title { font-weight: 600; color: #E2E8F0; font-size: 1.1rem; margin-bottom: 6px; }
+    .proj-desc { color: #94A3B8; font-size: 0.95rem; line-height: 1.5; }
+    </style>
+    <div class="portfolio-box-native">
+        <div class="portfolio-header" style="text-align: center; margin-bottom: 25px; font-size: 1.4rem; font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 15px;">
+            <a href="https://kylewkillebrew.neuro-edu.io/2_mentorship_app" target="_blank">Education & Mentorship Portfolio</a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Project 1: Fitts's Law ---
+    c1, c2 = st.columns([1, 1.5], gap="medium")
+    with c1:
+        render_fittslaw_mini()
+    with c2:
+        st.markdown("""
         <div class="proj-text">
             <div class="proj-title">Fitts's Law Neuro-Motor Control Rig</div>
             <div class="proj-desc">An interactive HTML5 Canvas reaction-time engine that maps human visual-motor channel capacity and bandwidth.</div>
         </div>
-    </div>
-    <div class="proj-row reverse">
-        <div class="proj-canvas">Canvas Render</div>
+        """, unsafe_allow_html=True)
+    
+    st.write("") # Vertical padding
+
+    # --- Project 2: Pythagorean / Visual Search ---
+    c3, c4 = st.columns([1.5, 1], gap="medium")
+    with c3:
+        st.markdown("""
         <div class="proj-text" style="text-align: right;">
-            <div class="proj-title">Visual Search & Attention Task</div>
-            <div class="proj-desc">A pre-attentive feature binding experiment replicating Treisman and Wolfe paradigms to demonstrate parallel pop-out mechanics.</div>
+            <div class="proj-title">Pythagorean Math Simulator</div>
+            <div class="proj-desc">A state-machine procedural engine rendering trigonometric transformations to visually unpack proofs.</div>
         </div>
-    </div>
-    <div class="proj-row">
-        <div class="proj-canvas">Canvas Render</div>
+        """, unsafe_allow_html=True)
+    with c4:
+        render_pythagorean_mini()
+        
+    st.write("") 
+
+    # --- Project 3: Geometric Space ---
+    c5, c6 = st.columns([1, 1.5], gap="medium")
+    with c5:
+        render_geometry_mini()
+    with c6:
+        st.markdown("""
         <div class="proj-text">
-            <div class="proj-title">Geometric Space & Dissection Displayer</div>
+            <div class="proj-title">Geometric Space Displayer</div>
             <div class="proj-desc">A real-time coordinate transformation simulator utilizing HTML5 loops to visually demonstrate area derivation to students.</div>
         </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 st.divider()
 
