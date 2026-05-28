@@ -26,7 +26,7 @@ from career_hub_loader import (
     get_references_metadata,
 )
 from pages.components.mini_mentor_demos import render_fittslaw_mini, render_pythagorean_mini, render_geometry_mini
-from pages.components.mini_demos_research import render_sfm_mini, render_eeg_mini, render_rotating_line_mini
+from pages.components.mini_research_demos import render_sfm_mini, render_eeg_mini, render_rotating_line_mini
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
