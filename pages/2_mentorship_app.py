@@ -421,9 +421,10 @@ for job in mentorship['career_history']:
                         # Memory-optimized load
                         df_maps = pd.read_csv(target_csv, usecols=cols_to_load)
                         
+                        # --- FIXED: Reordered columns to Spring, Fall, Winter ---
                         df_melted = df_maps.melt(
                             id_vars=["Last", "First"], 
-                            value_vars=["Fall '25 %", "Winter '25 %", "Spring '25 %"],
+                            value_vars=["Spring '25 %", "Fall '25 %", "Winter '25 %"],
                             var_name="Testing Term", 
                             value_name="Percentile"
                         )
@@ -431,11 +432,12 @@ for job in mentorship['career_history']:
                         # Clean up the axis labels by removing the " %" string
                         df_melted['Testing Term'] = df_melted['Testing Term'].str.replace(" %", "")
                         
+                        # --- FIXED: Shifted color palette to match the new term order ---
                         fig = px.box(
                             df_melted, x="Testing Term", y="Percentile", points="all",
                             title="Longitudinal MAP Percentile Distributions",
                             color="Testing Term",
-                            color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80']
+                            color_discrete_sequence=['#4ADE80', '#94A3B8', '#38BDF8'] # Green (Spring), Gray (Fall), Blue (Winter)
                         )
                         fig.update_layout(
                             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
@@ -519,20 +521,30 @@ for job in mentorship['career_history']:
 # Resume Access Block
 st.markdown("### Credentials & Accreditations")
 res_col1, res_col2 = st.columns(2)
+
 with res_col1:
-    # Anchor the PDF retrieval securely to the root level documents folder
-    t_cv = os.path.join(repo_root, "documents/kyle_teaching_cv.pdf")
+    # --- FIXED: Updated Resume target path and Button text ---
+    t_cv = os.path.join(repo_root, "documents/KWK_Teacher_Resume_20260325.pdf")
     if os.path.exists(t_cv):
          with open(t_cv, "rb") as f:
-            st.download_button("📂 Download Teaching Portfolio Resume (PDF)", f.read(), "kyle_teaching_cv.pdf")
+            # Adding mime="application/pdf" encourages the browser to open a new tab rather than force-download
+            st.download_button("📄 Teaching and Mentorship Resume", f.read(), "KWK_Teacher_Resume_20260325.pdf", mime="application/pdf")
     else:
-        # High contrast fallback displays the exact path being queried on the container
         st.button("📂 Teaching Resume Staged on Server", disabled=True)
         st.caption(f"Debug Target: `{t_cv}`")
 
 with res_col2:
     st.markdown("###### Standardized Learner Profiles")
     st.caption("Click to explore tracking indices for programming logic, mathematical intuition, and research replication frameworks.")
+    
+    # --- NEW: Learner Profile PDF Injection ---
+    l_prof = os.path.join(repo_root, "documents/Learning Profile - 6_8_Math.pdf")
+    if os.path.exists(l_prof):
+         with open(l_prof, "rb") as f:
+            st.download_button("📊 Math 6-8: Learner Profile", f.read(), "Learning Profile - 6_8_Math.pdf", mime="application/pdf")
+    else:
+        st.button("📊 Learner Profile Staged on Server", disabled=True)
+        st.caption(f"Debug Target: `{l_prof}`")
 
 st.divider()
 

@@ -64,15 +64,16 @@ def get_mentorship_data():
                 'metrics': 'Instructed advanced university-level course tracks across behavioral data analysis, neuroscience, and experimental methods.',
                 'dataset_type': 'university',
                 'file_path': None,
+                # DO NOT CHANGE THESE UNR COURSE LINKS - REQUIRED FOR ACTIVE ROUTING
                 'courses_taught': [
-                    "PSY 101: Introduction to Psychology"
-                    "PSY 210: Introduction to Statistical Methods",
-                    "PSY 240: Introduction to Research Methods",
-                    "PSY 301: Experimental Psychology",
-                    "PSY 403: Physiological Psychology",
-                    "PSY 405: Perception"
-                    "PSY 432: Human Memory",
-                    "PSY 427: Computer Applications in Social and Behavioral Science"
+                    "[PSY 101](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1096902): Introduction to Psychology",
+                    "[PSY 210](https://catalog.unr.edu/preview_course.php?catoid=58&coid=1096904): Statistical Methods",
+                    "[PSY 240](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1096906&print): Introduction to Research Methods",
+                    "[PSY 310](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1096910): Educational/Experimental Psychology",
+                    "[PSY 403](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1096912&print): Physiological Psychology",
+                    "[PSY 405](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1096914): Perception",
+                    "[PSY 427](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1098024): Computer Applications in Social and Behavioral Science",
+                    "[PSY 432](https://catalog.unr.edu/preview_course_nopop.php?catoid=58&coid=1096923): Human Memory"
                 ]
             }
         ],
