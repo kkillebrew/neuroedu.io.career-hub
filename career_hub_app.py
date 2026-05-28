@@ -75,21 +75,23 @@ with col_img:
     st.markdown(f"""
 <style>
 .profile-img-container {{
-    width: 120px; 
-    height: 120px;
-    margin: 0 auto 20px auto;
+    width: 240px; /* Doubled in size (100% increase) */
+    height: 240px;
+    margin: 25px auto 0 auto; /* Pushes the image down to align perfectly with the text center */
     overflow: hidden; 
     border-radius: 50%;
-    border: 2px solid #334155;
+    border: 3px solid #334155; /* Slightly thicker border to match the new scale */
     background-color: #0F172A;
     display: flex;
     justify-content: center;
     align-items: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4); /* Added a soft shadow for depth */
 }}
 .profile-img-container img {{
     width: 100%;
     height: 100%;
     object-fit: cover; 
+    object-position: 25% 50%; /* Maintains your specific off-center face crop */
 }}
 </style>
 <div class="profile-img-container">
