@@ -110,9 +110,8 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
     fig_reg.update_layout(
         title="Fitts's Law: Individual Bandwidth vs. Global Cohort",
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
-        margin=dict(l=10, r=10, t=40, b=10), height=350,
-        # TRANSLUCENT LEGEND MODIFICATION
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(0,0,0,0)", font=dict(color="#F8FAFC")),
+        margin=dict(l=10, r=150, t=40, b=10), # Increase right margin (r) to 150 to make room
+        legend=dict(yanchor="middle", y=0.5, xanchor="left", x=1.02, bgcolor="rgba(0,0,0,0)", font=dict(color="#F8FAFC")),
         xaxis=dict(title="Index of Difficulty (bits)", gridcolor="rgba(148, 163, 184, 0.12)"),
         yaxis=dict(title="Movement Time (ms)", gridcolor="rgba(148, 163, 184, 0.12)")
     )
@@ -146,9 +145,8 @@ def process_cohort_fitts_regression(raw_trials, current_user_uid):
         boxmode='group', 
         title="Execution Variance & Cohort Placement",
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
-        margin=dict(l=10, r=10, t=40, b=10), height=350,
-        # TRANSLUCENT LEGEND MODIFICATION
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(0,0,0,0)", font=dict(color="#F8FAFC")),
+        margin=dict(l=10, r=150, t=40, b=10), # Increase right margin (r) to 150 to make room
+        legend=dict(yanchor="middle", y=0.5, xanchor="left", x=1.02, bgcolor="rgba(0,0,0,0)", font=dict(color="#F8FAFC")),
         xaxis=dict(title="Index of Difficulty (bits)", gridcolor="rgba(148, 163, 184, 0.12)"),
         yaxis=dict(title="Movement Time (ms)", gridcolor="rgba(148, 163, 184, 0.12)")
     )

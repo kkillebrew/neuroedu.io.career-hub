@@ -179,40 +179,33 @@ def render_visual_search_demo(app_id, firebase_config, user_uid):
                 ctx.translate(item.x, item.y);
                 
                 if (condType === 'Color') {{
-                    // Pop-Out: 1 Blue Target vs Red Distractors
-                    ctx.beginPath();
-                    ctx.arc(0, 0, item.r, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI * 2);
                     ctx.fillStyle = isTarget ? "#3B82F6" : "#EF4444";
                     ctx.fill();
                 }} 
                 else if (condType === 'Shape') {{
-                    // Pop-Out: 1 'O' vs 'X's (High Curvature vs Sharp Angles)
                     ctx.fillStyle = "#F8FAFC";
-                    ctx.font = "bold 24px monospace";
+                    ctx.font = "bold 36px monospace"; // Increased by 50%
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(isTarget ? "O" : "X", 0, 0);
-                }}
+                }} 
                 else if (condType === 'Spatial') {{
-                    // Serial Tracking: 1 'T' vs 'L's
                     ctx.fillStyle = "#F8FAFC";
-                    ctx.font = "bold 24px monospace";
+                    ctx.font = "bold 36px monospace"; // Increased by 50%
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     if (!isTarget) ctx.rotate((Math.floor(Math.random() * 4) * 90) * Math.PI / 180);
                     ctx.fillText(isTarget ? "T" : "L", 0, 0);
-                }} 
+                }}
                 else if (condType === 'Conjunction') {{
-                    // Serial Binding: Split Hemispheres
-                    // Canvas Y-axis goes down. 0 to PI is Bottom. PI to 2PI is Top.
+                    // FIX: Draw a full circle first, then overlay the half circle to prevent anti-aliasing gaps
                     if (isTarget) {{
-                        // Target: Red Top, Blue Bottom
-                        ctx.beginPath(); ctx.arc(0, 0, item.r, Math.PI, Math.PI*2); ctx.fillStyle = "#EF4444"; ctx.fill();
-                        ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI); ctx.fillStyle = "#3B82F6"; ctx.fill();
+                        ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI*2); ctx.fillStyle = "#EF4444"; ctx.fill(); // Full Red
+                        ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI); ctx.fillStyle = "#3B82F6"; ctx.fill();   // Blue Bottom
                     }} else {{
-                        // Distractors: Blue Top, Red Bottom
-                        ctx.beginPath(); ctx.arc(0, 0, item.r, Math.PI, Math.PI*2); ctx.fillStyle = "#3B82F6"; ctx.fill();
-                        ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI); ctx.fillStyle = "#EF4444"; ctx.fill();
+                        ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI*2); ctx.fillStyle = "#3B82F6"; ctx.fill(); // Full Blue
+                        ctx.beginPath(); ctx.arc(0, 0, item.r, 0, Math.PI); ctx.fillStyle = "#EF4444"; ctx.fill();   // Red Bottom
                     }}
                 }}
                 ctx.restore();
