@@ -25,7 +25,8 @@ from career_hub_loader import (
     get_portfolio_metadata, 
     get_references_metadata,
 )
-from pages.components.mini_demos import render_fittslaw_mini, render_pythagorean_mini, render_geometry_mini
+from pages.components.mini_mentor_demos import render_fittslaw_mini, render_pythagorean_mini, render_geometry_mini
+from pages.components.mini_demos_research import render_sfm_mini, render_eeg_mini, render_rotating_line_mini
 
 from career_hub_sidebar import apply_global_settings, render_sidebar
 
@@ -167,32 +168,62 @@ with b1:
 """, unsafe_allow_html=True)
 
 with b2:
+    # 1. Box Header Styling
     st.markdown("""
-<div class="portfolio-box">
-    <div class="portfolio-header"><a href="https://kylewkillebrew.neuro-edu.io/1_academic_research_app" target="_blank">Academic Research Portfolio</a></div>
-    <div class="proj-row reverse">
-        <div class="proj-canvas">Canvas Render</div>
-        <div class="proj-text" style="text-align: right;">
-            <div class="proj-title">Cortical Dynamics in Psychosis Populations</div>
-            <div class="proj-desc">High-density EEG research mapping phase-locking values and neural oscillations during cognitive tasks to isolate biomarkers.</div>
+    <style>
+    .portfolio-box-native { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 25px; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .portfolio-header a { color: #F8FAFC; text-decoration: none; transition: color 0.3s ease; }
+    .portfolio-header a:hover { color: #38BDF8; }
+    .proj-text { display: flex; flex-direction: column; justify-content: center; height: 100%; }
+    .proj-title { font-weight: 600; color: #E2E8F0; font-size: 1.1rem; margin-bottom: 6px; }
+    .proj-desc { color: #94A3B8; font-size: 0.95rem; line-height: 1.5; }
+    </style>
+    <div class="portfolio-box-native">
+        <div class="portfolio-header" style="text-align: center; margin-bottom: 25px; font-size: 1.4rem; font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 15px;">
+            <a href="https://kylewkillebrew.neuro-edu.io/1_academic_research_app" target="_blank">Academic Research Portfolio</a>
         </div>
     </div>
-    <div class="proj-row">
-        <div class="proj-canvas">Canvas Render</div>
+    """, unsafe_allow_html=True)
+
+    # --- Project 1: Perceptual Abnormalities (SFM) ---
+    c1, c2 = st.columns([1, 1.5], gap="medium")
+    with c1:
+        render_sfm_mini()
+    with c2:
+        st.markdown("""
         <div class="proj-text">
-            <div class="proj-title">Working Memory Grouping Metrics</div>
-            <div class="proj-desc">Behavioral modeling analysis exploring the limits of human visual short-term storage capacity when processing chunked arrays.</div>
+            <div class="proj-title">Perceptual Abnormalities in Psychosis</div>
+            <div class="proj-desc">3D Structure-From-Motion modeling and behavioral thresholding mapping early-stage visual deficits in schizophrenia.</div>
         </div>
-    </div>
-    <div class="proj-row reverse">
-        <div class="proj-canvas">Canvas Render</div>
+        """, unsafe_allow_html=True)
+    
+    st.write("") # Vertical padding
+
+    # --- Project 2: Working Memory EEG ---
+    c3, c4 = st.columns([1.5, 1], gap="medium")
+    with c3:
+        st.markdown("""
         <div class="proj-text" style="text-align: right;">
-            <div class="proj-title">Psychophysics Replication Frameworks</div>
-            <div class="proj-desc">An automated statistical analysis suite built to process multi-participant trial data, verifying experimental design paradigms.</div>
+            <div class="proj-title">Working Memory EEG (SSVEP)</div>
+            <div class="proj-desc">High-density electroencephalography analyzing steady-state visually evoked potentials to track working memory load.</div>
         </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    with c4:
+        render_eeg_mini()
+        
+    st.write("") 
+
+    # --- Project 3: Rotating Line Illusion ---
+    c5, c6 = st.columns([1, 1.5], gap="medium")
+    with c5:
+        render_rotating_line_mini()
+    with c6:
+        st.markdown("""
+        <div class="proj-text">
+            <div class="proj-title">Rotating Line Geometric Illusion</div>
+            <div class="proj-desc">A pure mathematical simulation manipulating angular velocity to correct physiological optic distortions in real-time.</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 with b3:
     # Retain the main Box styling by rendering the header first
