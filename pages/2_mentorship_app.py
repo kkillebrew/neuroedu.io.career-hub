@@ -65,8 +65,6 @@ conceptually, rather than demanding blind memorization. This maximizes attention
 """)
 
 # --- CENTRALIZED FIREBASE CREDENTIAL MATRIX ---
-# MATLAB Bridge: Think of this as defining a global configuration struct at the top 
-# of your master experiment execution script to avoid initialization failures.
 firebase_config_dict = {
     "apiKey": "AIzaSyAkchjI1WCkFd7gVZCQB1Jyn23TslP58b0",
     "authDomain": "neuroedu-career-hub.firebaseapp.com",
@@ -78,6 +76,11 @@ firebase_config_dict = {
 
 firebase_config_str = json.dumps(firebase_config_dict)
 project_id = firebase_config_dict["projectId"]
+
+# --- NEW: GLOBAL SESSION IDENTITY ---
+# This ensures they remain the exact same user across all experiments today
+if 'hub_user_id' not in st.session_state:
+    st.session_state.hub_user_id = f"anon_{uuid.uuid4().hex[:8]}"
 
 # --- CRITICAL FIX: LAZY LOADING ROUTER ---
 # Replaces st.tabs() with a conditional radio to prevent background canvas execution
@@ -180,14 +183,7 @@ elif "Neuro-Motor" in active_lesson:
     you are mapping the logarithmic trade-off between movement speed and target accuracy.
     """)
     
-    # --- RESTORED: SESSION INITIALIZATION CHECK ---
-    # MATLAB Equivalent: if ~isfield(session_state, 'fitts_user_id') ... end
-    if 'fitts_user_id' not in st.session_state:
-        st.session_state.fitts_user_id = f"anon_{uuid.uuid4().hex[:8]}"
-    
     # Now we can safely query the state struct
-    user_uid = st.session_state.fitts_user_id
-    app_id = "neuroedu-career-hub"
     project_id = firebase_config_dict["projectId"]
 
     # =========================================================================
@@ -297,13 +293,6 @@ elif "Visual Search" in active_lesson:
     This experiment tests whether your brain can process entire visual fields simultaneously (Parallel Pop-Out) 
     or if it must scan items one-by-one (Serial Conjunction Binding).
     """)
-
-    # Firebase ID setup (Reusing the session ID logic from Fitts's Law)
-    if 'search_user_id' not in st.session_state:
-        st.session_state.search_user_id = f"anon_{uuid.uuid4().hex[:8]}"
-    
-    user_uid = st.session_state.search_user_id
-    app_id = "neuroedu-career-hub"
 
     # 1. Render Interactive Canvas
     st.info("🎯 **Find the Target**\nClick 'Start Visual Search Experiment' below to begin.")
