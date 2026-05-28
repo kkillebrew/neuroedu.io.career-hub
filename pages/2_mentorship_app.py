@@ -398,26 +398,32 @@ for job in mentorship['career_history']:
     with st.container():
         # Decouple text logs from the data visualizations using a clean 1:2 column layout
         c_left, c_right = st.columns([1, 2], gap="medium")
-        with c_left:
-            st.markdown(f"#### **{job['school']}**")
-            st.markdown(f"*{job['role']}*")
-            st.caption(f"🗓️ {job['years']}")
-            st.write(job['metrics'])
-            
         with c_right:
             if job.get('file_path'):
                 # --- THE ABSOLUTE PATH ASSEMBLY ---
-                # We combine the immutable repo_root anchor with the sub-path from the loader.
                 target_csv = os.path.join(repo_root, job['file_path'])
                 
-                if os.path.exists(target_csv):
+                # --- PATCH: DYNAMIC UPLOAD FALLBACK ---
+                # MATLAB Bridge: Equivalent to uigetfile() if the hardcoded path fails
+                file_source = target_csv if os.path.exists(target_csv) else None
+                
+                if not file_source:
+                    st.warning(f"File missing on server: `{job['file_path']}`")
+                    # Provide a web UI upload widget to inject the data dynamically
+                    file_source = st.file_uploader(
+                        f"Upload {job['dataset_type'].upper()} Data for {job['years']}", 
+                        type=['csv'], 
+                        key=job['school'] + job['role']
+                    )
+                
+                if file_source is not None:
                     # ---------------------------------------------------------
                     # DATA PIPELINE TYPE 1: LONGITUDINAL MAPS PERCENTILES
                     # ---------------------------------------------------------
                     if job['dataset_type'] == 'maps':
                         cols_to_load = ["Last Name", "First Name", "Fall '25%", "Winter '25%", "Spring '25%"]
                         try:
-                            df_maps = pd.read_csv(target_csv, usecols=cols_to_load)
+                            df_maps = pd.read_csv(file_source, usecols=cols_to_load)
                             
                             df_melted = df_maps.melt(
                                 id_vars=["Last Name", "First Name"], 
@@ -434,7 +440,7 @@ for job in mentorship['career_history']:
                                 color_discrete_sequence=['#94A3B8', '#38BDF8', '#4ADE80']
                             )
                             fig.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
                                 margin=dict(l=10, r=10, t=40, b=10), height=280, showlegend=False,
                                 yaxis=dict(title="National Percentile Scale", gridcolor="rgba(148, 163, 184, 0.12)")
                             )
@@ -456,7 +462,7 @@ for job in mentorship['career_history']:
                         cols_to_load = ["Last Name", "First Name"] + core_standards + myth_components
                         
                         try:
-                            df_ela = pd.read_csv(target_csv, usecols=cols_to_load)
+                            df_ela = pd.read_csv(file_source, usecols=cols_to_load)
                             df_ela = df_ela.replace({'M': np.nan})
                             assess_cols = core_standards + myth_components
                             df_ela[assess_cols] = df_ela[assess_cols].apply(pd.to_numeric, errors='coerce')
@@ -479,7 +485,7 @@ for job in mentorship['career_history']:
                                 title="Standards Mastery Distributions (0-4 Scale)", color_discrete_sequence=['#6366F1']
                             )
                             fig.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
                                 margin=dict(l=10, r=10, t=40, b=10), height=280,
                                 yaxis=dict(title="Proficiency Score", range=[-0.2, 4.2], gridcolor="rgba(148, 163, 184, 0.12)"),
                                 xaxis=dict(title="")
@@ -487,8 +493,6 @@ for job in mentorship['career_history']:
                             st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
                         except Exception as e:
                             st.error(f"Error executing ELA standards parse: {e}")
-                else:
-                    st.warning(f"File target missing during absolute container lookup. Looked for: `{target_csv}`")
 
             # ---------------------------------------------------------
             # DATA PIPELINE TYPE 3: UNIVERSITY COURSE MATRIX DISPLAY

@@ -45,7 +45,8 @@ def get_mentorship_data():
                 'years': '2024 - 2025',
                 'metrics': 'Analyzed longitudinal MAP test percentile growth across Fall, Winter, and Spring terms.',
                 'dataset_type': 'maps',
-                'file_path': 'documents/6th Grade Maps Growth - Period 1.csv'
+                # --- UPDATED PATH ---
+                'file_path': 'documents/maps_score/6th Grade Maps Growth - Period 1.csv' 
             },
             {
                 'school': 'Lied STEM Academy',
@@ -53,7 +54,8 @@ def get_mentorship_data():
                 'years': '2025 - Present',
                 'metrics': 'Standards-based assessment tracking (0-4 scale) across core literacy competencies.',
                 'dataset_type': 'ela',
-                'file_path': 'documents/7th Grade ELA Assessment Scores - Period 1.csv'
+                # --- UPDATED PATH ---
+                'file_path': 'documents/maps_score/7th Grade ELA Assessment Scores - Period 1.csv'
             },
             {
                 'school': 'University of Nevada, Reno',
