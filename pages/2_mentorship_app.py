@@ -17,6 +17,7 @@ import plotly.express as px  # Restored for Section 2 Data Pipelines
 import uuid
 import requests
 import json
+import base64
 
 # --- PATH CONFIGURATION ---
 # This tells the script to look one folder up to find the 'loaders' directory
@@ -511,39 +512,58 @@ for job in mentorship['career_history']:
             elif job.get('dataset_type') == 'university':
                 st.markdown("###### 🎓 Lectured Undergraduate Curricula:")
                 for course in job.get('courses_taught', []):
-                    st.markdown(f"`{course}`")
+                    # --- FIXED: Removed backticks so Markdown links render properly ---
+                    st.markdown(f"• {course}")
             
             else:
                 st.caption("ℹ️ No statistical data repository attached to this record.")
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-# Resume Access Block
+# =============================================================================
+# CREDENTIALS & ACCREDITATIONS (With PDF Previews)
+# =============================================================================
 st.markdown("### Credentials & Accreditations")
-res_col1, res_col2 = st.columns(2)
+st.write("Explore my professional teaching history and standardized learner tracking frameworks.")
+
+# Gap="large" gives breathing room between the two PDF viewers
+res_col1, res_col2 = st.columns(2, gap="large")
 
 with res_col1:
-    # --- FIXED: Updated Resume target path and Button text ---
+    # Symmetrical Header 1
+    st.markdown("###### 📄 Teaching & Mentorship Resume")
+    
     t_cv = os.path.join(repo_root, "documents/KWK_Teacher_Resume_20260325.pdf")
     if os.path.exists(t_cv):
          with open(t_cv, "rb") as f:
-            # Adding mime="application/pdf" encourages the browser to open a new tab rather than force-download
-            st.download_button("📄 Teaching and Mentorship Resume", f.read(), "KWK_Teacher_Resume_20260325.pdf", mime="application/pdf")
+            pdf_data = f.read()
+            # use_container_width=True forces the button to span the full column width
+            st.download_button("Download Resume (PDF)", pdf_data, "KWK_Teacher_Resume_20260325.pdf", mime="application/pdf", use_container_width=True)
+            
+            # --- NEW: Base64 PDF Mini-Viewer ---
+            base64_pdf = base64.b64encode(pdf_data).decode('utf-8')
+            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400" style="border: 1px solid #334155; border-radius: 6px;"></iframe>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
     else:
-        st.button("📂 Teaching Resume Staged on Server", disabled=True)
+        st.button("📂 Resume Staged on Server", disabled=True, use_container_width=True)
         st.caption(f"Debug Target: `{t_cv}`")
 
 with res_col2:
-    st.markdown("###### Standardized Learner Profiles")
-    st.caption("Click to explore tracking indices for programming logic, mathematical intuition, and research replication frameworks.")
+    # Symmetrical Header 2 (Perfectly level with Column 1)
+    st.markdown("###### 📊 Math 6-8: Learner Profile")
     
-    # --- NEW: Learner Profile PDF Injection ---
     l_prof = os.path.join(repo_root, "documents/Learning Profile - 6_8_Math.pdf")
     if os.path.exists(l_prof):
          with open(l_prof, "rb") as f:
-            st.download_button("📊 Math 6-8: Learner Profile", f.read(), "Learning Profile - 6_8_Math.pdf", mime="application/pdf")
+            pdf_data = f.read()
+            st.download_button("Download Learner Profile (PDF)", pdf_data, "Learning Profile - 6_8_Math.pdf", mime="application/pdf", use_container_width=True)
+            
+            # --- NEW: Base64 PDF Mini-Viewer ---
+            base64_pdf = base64.b64encode(pdf_data).decode('utf-8')
+            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400" style="border: 1px solid #334155; border-radius: 6px;"></iframe>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
     else:
-        st.button("📊 Learner Profile Staged on Server", disabled=True)
+        st.button("📊 Profile Staged on Server", disabled=True, use_container_width=True)
         st.caption(f"Debug Target: `{l_prof}`")
 
 st.divider()
