@@ -80,13 +80,13 @@ project_id = firebase_config_dict["projectId"]
 # This globally defines the database collection target for all spokes
 app_id = "neuroedu-career-hub"
 
-# Extracts the global ID into a variable accessible by all lesson blocks
-user_uid = st.session_state.hub_user_id
-
 # --- NEW: GLOBAL SESSION IDENTITY ---
 # This ensures they remain the exact same user across all experiments today
 if 'hub_user_id' not in st.session_state:
     st.session_state.hub_user_id = f"anon_{uuid.uuid4().hex[:8]}"
+
+# Extracts the global ID into a variable accessible by all lesson blocks
+user_uid = st.session_state.hub_user_id
 
 # --- CRITICAL FIX: LAZY LOADING ROUTER ---
 # Replaces st.tabs() with a conditional radio to prevent background canvas execution
