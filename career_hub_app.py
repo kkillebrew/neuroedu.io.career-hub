@@ -77,7 +77,7 @@ with col_img:
 .profile-img-container {{
     width: 240px; /* Doubled in size (100% increase) */
     height: 240px;
-    margin: 25px auto 0 auto; /* Pushes the image down to align perfectly with the text center */
+    margin: 20px auto 0 auto; /* Pushes the image down to align perfectly with the text center */
     overflow: hidden; 
     border-radius: 50%;
     border: 3px solid #334155; /* Slightly thicker border to match the new scale */
