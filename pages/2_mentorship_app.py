@@ -77,6 +77,9 @@ firebase_config_dict = {
 firebase_config_str = json.dumps(firebase_config_dict)
 project_id = firebase_config_dict["projectId"]
 
+# This globally defines the database collection target for all spokes
+app_id = "neuroedu-career-hub"
+
 # --- NEW: GLOBAL SESSION IDENTITY ---
 # This ensures they remain the exact same user across all experiments today
 if 'hub_user_id' not in st.session_state:
