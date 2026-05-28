@@ -56,24 +56,24 @@ def render_sidebar():
             color: #F8FAFC !important;
         }
         
-        /* Masthead styling */
-        .masthead-container {
+        /* Unique Sidebar Classes to prevent CSS leakage from main app */
+        .sidebar-masthead-container {
             display: flex;
             align-items: center;
             gap: 15px;
             margin-top: -40px; 
             margin-bottom: 30px;
         }
-        .masthead-text {
+        .sidebar-text-container {
             line-height: 1.25;
         }
-        .masthead-name {
+        .sidebar-name {
             font-size: 1.15rem;
             font-weight: bold;
             color: #F8FAFC !important;
             margin-bottom: 4px;
         }
-        .masthead-title {
+        .sidebar-subtitle {
             font-size: 0.75rem; 
             color: #94A3B8 !important; 
             line-height: 1.3;
@@ -95,10 +95,11 @@ def render_sidebar():
                 st.write("🧠") 
         
         with col2:
+             # Applied completely unique CSS classes to lock the size down safely
              st.markdown("""
-                <div class="masthead-text">
-                    <div class="masthead-name">Kyle W. Killebrew, PhD</div>
-                    <div class="masthead-title">Behavioral, Cognitive, Neuro, and Data Scientist and Educational Mentor</div>
+                <div class="sidebar-text-container">
+                    <div class="sidebar-name">Kyle W. Killebrew, PhD</div>
+                    <div class="sidebar-subtitle">Behavioral, Cognitive, Neuro, and Data Scientist and Educational Mentor</div>
                 </div>
             """, unsafe_allow_html=True)
 
