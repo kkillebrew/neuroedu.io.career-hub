@@ -455,23 +455,48 @@ for job in mentorship['career_history']:
                 elif job['dataset_type'] == 'ela':
                     myth_components = ['Sequence', 'Techniques', 'Transitions', 'Details', 'Conclusion']
                     core_standards = [
-                        'Article Analysis - Citing Evidence (RI.7.1.)', 
+                        # --- FIXED: Removed the trailing period inside the parenthesis ---
+                        'Article Analysis - Citing Evidence (RI.7.1)', 
                         'Article Analysis - Central Idea (RI.7.1)', 
                         'RI.7.5: Quiz (Text Structure)', 'SLG #3', 
                         'RI.7.6 Transportation', 'Unit Test: Percy Jackson'
                     ]
-                    # cols_to_load = ["Last Name", "First Name"] + core_standards + myth_components
+                    # --- FIXED: Use exact "Last" and "First" headers ---
+                    cols_to_load = ["Last", "First"] + core_standards + myth_components
                     
                     try:
-                        # 1. Load the entire CSV into memory without the strict usecols filter
-                        df_ela = pd.read_csv(target_csv)
+                        # Memory-optimized load
+                        df_ela = pd.read_csv(target_csv, usecols=cols_to_load)
                         
-                        # 2. Print the exact headers to the Streamlit UI for diagnostic mapping
-                        st.error("⚠️ ELA Column Name Mismatch. Please check the exact names below:")
-                        st.code(df_ela.columns.tolist())
+                        df_ela = df_ela.replace({'M': np.nan})
+                        assess_cols = core_standards + myth_components
+                        df_ela[assess_cols] = df_ela[assess_cols].apply(pd.to_numeric, errors='coerce')
                         
-                        # 3. Halt the rendering thread to prevent plotting errors
-                        st.stop() 
+                        df_ela['Create Your Own Myth'] = df_ela[myth_components].mean(axis=1, skipna=True)
+                        
+                        plot_cols = core_standards + ['Create Your Own Myth']
+                        # --- FIXED: Slice using "Last" and "First" ---
+                        df_plot = df_ela[["Last", "First"] + plot_cols].copy()
+                        
+                        df_melted_ela = df_plot.melt(
+                            id_vars=["Last", "First"], value_vars=plot_cols, # --- FIXED ---
+                            var_name="Standard / Assessment", value_name="Score (0-4)"
+                        )
+                        df_melted_ela['Standard / Assessment'] = df_melted_ela['Standard / Assessment'].apply(
+                            lambda x: x[:15] + "..." if len(x) > 15 else x
+                        )
+                        
+                        fig = px.box(
+                            df_melted_ela, x="Standard / Assessment", y="Score (0-4)",
+                            title="Standards Mastery Distributions (0-4 Scale)", color_discrete_sequence=['#6366F1']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC",
+                            margin=dict(l=10, r=10, t=40, b=10), height=280,
+                            yaxis=dict(title="Proficiency Score", range=[-0.2, 4.2], gridcolor="rgba(148, 163, 184, 0.12)"),
+                            xaxis=dict(title="")
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
                         
                     except FileNotFoundError:
                         st.error(f"System rejected path: `{target_csv}`. Check Linux case-sensitivity.")
