@@ -188,9 +188,6 @@ elif "Neuro-Motor" in active_lesson:
     This experiment measures your motor control channel capacity. By rapidly tapping targets of varying sizes and distances, 
     you are mapping the logarithmic trade-off between movement speed and target accuracy.
     """)
-    
-    # Now we can safely query the state struct
-    project_id = firebase_config_dict["projectId"]
 
     # =========================================================================
     # STAGE 1: FULL-WIDTH CONTAINER FOR EXPERIMENT (Top Row)
